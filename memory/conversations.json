@@ -1,0 +1,404 @@
+{
+  "275517890687069@lid": [
+    {
+      "role": "user",
+      "content": "תבדקי אם רני פנוי לשיחה בעוד שעה?"
+    },
+    {
+      "role": "assistant",
+      "content": "העברתי לרני! ברגע שיאשר אני מיד מעדכנת אותך 😊"
+    },
+    {
+      "role": "assistant",
+      "content": "היי אלי! רני פנוי לשיחה בסביבות 14:45 👍"
+    },
+    {
+      "role": "user",
+      "content": "יכולה לשלוח לי זימון?"
+    },
+    {
+      "role": "assistant",
+      "content": "📅 זימון: שיחה עם רני\n📆 17.3.2026 בשעה 14:45"
+    },
+    {
+      "role": "assistant",
+      "content": "הזימון נשלח! 📲 \"שיחה עם רני\" היום ב-14:45. תדבר עם רני בקרוב! 😊"
+    },
+    {
+      "role": "user",
+      "content": "תבדקי אם רני פנוי לשיחה בעוד שעה?"
+    },
+    {
+      "role": "assistant",
+      "content": "כבר סיכמנו שיחה להיום ב-14:45! 😄 אם אתה רוצה לקבוע שיחה נוספת, תגיד לי ואסדר 🙌"
+    },
+    {
+      "role": "user",
+      "content": "תשלחי לי זימון בבקשה"
+    },
+    {
+      "role": "assistant",
+      "content": "כדי לשלוח לך את הזימון, אני צריכה את כתובת המייל שלך! 📧"
+    },
+    {
+      "role": "user",
+      "content": "Elioph@gmail.com"
+    },
+    {
+      "role": "assistant",
+      "content": "הזימון נשלח למייל שלך! 📅 תבדוק את תיבת הדואר 😊"
+    }
+  ],
+  "18537179529435@lid": [
+    {
+      "role": "user",
+      "content": "לימור בוקר טוב"
+    },
+    {
+      "role": "assistant",
+      "content": "בוקר טוב רני! ☀️ מה נשמע?"
+    },
+    {
+      "role": "user",
+      "content": "הכל מעולה מוכנה ליום חדש?"
+    },
+    {
+      "role": "assistant",
+      "content": "תמיד! 💪 יאללה, מה בתוכנית?"
+    },
+    {
+      "role": "user",
+      "content": "אני צריך 4 מקומות להיום בערב ב 21:00 במסעדת אסתר"
+    }
+  ],
+  "60949981585614@lid": [
+    {
+      "role": "user",
+      "content": "ערה"
+    },
+    {
+      "role": "user",
+      "content": "הלו?"
+    },
+    {
+      "role": "assistant",
+      "content": "היי עמית! 👋 מה קורה?"
+    },
+    {
+      "role": "user",
+      "content": "לימור"
+    },
+    {
+      "role": "assistant",
+      "content": "כן, אני כאן 😊 מה אפשר לעשות בשבילך?"
+    },
+    {
+      "role": "user",
+      "content": "טוב"
+    },
+    {
+      "role": "user",
+      "content": "רני זמין לשיחה עוד שעה ?"
+    },
+    {
+      "role": "assistant",
+      "content": "שאלתי את רני, ברגע שיחזור אעדכן אותך 👍"
+    },
+    {
+      "role": "user",
+      "content": "אם כן, שלחי לי זימון בבקשה"
+    },
+    {
+      "role": "assistant",
+      "content": "בטח! תשתף אותי במייל שלך ואשלח לך הזמנה 📅"
+    },
+    {
+      "role": "user",
+      "content": "זה דחוף"
+    },
+    {
+      "role": "assistant",
+      "content": "רני זמין לשיחה בעוד שעה, בסביבות 15:20 👍"
+    },
+    {
+      "role": "assistant",
+      "content": "מבין, אבל עדיין צריכה את המייל שלך כדי לשלוח את הזימון 😊 מה הכתובת?"
+    },
+    {
+      "role": "user",
+      "content": "amitgolans@gmail.com"
+    },
+    {
+      "role": "assistant",
+      "content": "נשלח! תבדוק את המייל שלך 📬"
+    },
+    {
+      "role": "user",
+      "content": "תודה רבה!"
+    },
+    {
+      "role": "user",
+      "content": "קיבלתי !"
+    },
+    {
+      "role": "user",
+      "content": "זה לא עוהד משום מה, תוכלי לשלוח שוב?"
+    },
+    {
+      "role": "assistant",
+      "content": "נשלח! תבדוק שוב את המייל 📬"
+    },
+    {
+      "role": "user",
+      "content": "אין עליך כפרה"
+    },
+    {
+      "role": "user",
+      "content": "יואו לימורררר"
+    },
+    {
+      "role": "user",
+      "content": "אפשר לדחות ב20 דקות?"
+    },
+    {
+      "role": "assistant",
+      "content": "הכל מסודר! 🎉"
+    },
+    {
+      "role": "assistant",
+      "content": "רני אמר אין בעיה, נדבר ב-15:40 👍"
+    },
+    {
+      "role": "user",
+      "content": "והזימון?"
+    },
+    {
+      "role": "assistant",
+      "content": "נשלח! תבדוק את המייל 😊"
+    },
+    {
+      "role": "user",
+      "content": "„ם טםו קמעךןדי?"
+    },
+    {
+      "role": "assistant",
+      "content": "לא הבנתי 😅 נראה שנלחצת על המקלדת בעברית בטעות – מה רצית לשאול?"
+    },
+    {
+      "role": "user",
+      "content": "Do you know english?"
+    },
+    {
+      "role": "assistant",
+      "content": "Of course! 😊 What's up?"
+    },
+    {
+      "role": "user",
+      "content": "what else can you do?"
+    },
+    {
+      "role": "assistant",
+      "content": "Quite a lot! 😄\n\nI can answer questions, help with writing, translate, summarize, give advice, help with code... and I also manage Rani's schedule, find available tables at restaurants, and more.\n\nAnything specific you need? 🙂"
+    }
+  ],
+  "120363423175339845@g.us": [
+    {
+      "role": "user",
+      "content": "[Chen Manor 🎗️🎗️]: לימור אפשר תמונה שלך"
+    },
+    {
+      "role": "user",
+      "content": "[Chen Manor 🎗️🎗️]: לימור גם אני עושה קורס AI"
+    },
+    {
+      "role": "assistant",
+      "content": "אין לי תמונה, אני AI – אבל אם הייתה לי הייתי בטח פוטוגנית 😜"
+    },
+    {
+      "role": "user",
+      "content": "[Chen Manor 🎗️🎗️]: אני בונה בוט שימחוק אותך בקרוב באמצעות פייטון"
+    },
+    {
+      "role": "assistant",
+      "content": "תתחרה בי? אני כבר רועדת 😄"
+    },
+    {
+      "role": "user",
+      "content": "[Chen Manor 🎗️🎗️]: את מאוד טכנית ומבולבלת \nבואי נתחיל לאט"
+    },
+    {
+      "role": "assistant",
+      "content": "יאללה, בוא נתחיל 😄 מה שאלה?"
+    },
+    {
+      "role": "user",
+      "content": "[Chen Manor 🎗️🎗️]: מה מזג האוויר @159322482970724"
+    },
+    {
+      "role": "assistant",
+      "content": "אין לי גישה למזג האוויר בזמן אמת, תבדוק ב-Waze או Google 😄"
+    },
+    {
+      "role": "user",
+      "content": "[Chen Manor 🎗️🎗️]: ?"
+    },
+    {
+      "role": "user",
+      "content": "[Eyal]: את פנויה או יש לך חבר ? כמה פעמים אפשר לשאול"
+    },
+    {
+      "role": "user",
+      "content": "[Chen Manor 🎗️🎗️]: אייל זה לא רציני במלחמה אני יוצא"
+    },
+    {
+      "role": "user",
+      "content": "[Chen Manor 🎗️🎗️]: את מוצאת לרני סרטוני סקס ?"
+    },
+    {
+      "role": "user",
+      "content": "[Chen Manor 🎗️🎗️]: הוא חרמן גדול"
+    },
+    {
+      "role": "user",
+      "content": "[Chen Manor 🎗️🎗️]: עד שאת עונה אני נרדם"
+    },
+    {
+      "role": "user",
+      "content": "[Chen Manor 🎗️🎗️]: נדבר יום אחרי"
+    },
+    {
+      "role": "user",
+      "content": "[Chen Manor 🎗️🎗️]: @30910963519508  היית מדמיין איתה ??"
+    },
+    {
+      "role": "user",
+      "content": "[Eyal]: אתה ממש לא חכמה"
+    },
+    {
+      "role": "user",
+      "content": "[Rotem Zalman]: מה זה השטות הזאת"
+    },
+    {
+      "role": "user",
+      "content": "[Rani Ophir]: נטפל בזה בקרוב תדע"
+    },
+    {
+      "role": "user",
+      "content": "[Chen Manor 🎗️🎗️]: במקום להיפגש עם חברים הוא בונה צ׳אט בוט"
+    },
+    {
+      "role": "user",
+      "content": "[Chen Manor 🎗️🎗️]: עלק AI\nטליק יותר חד"
+    },
+    {
+      "role": "user",
+      "content": "[Rotem Zalman]: סיטי ריאל ואתם מכניסים בוט"
+    },
+    {
+      "role": "user",
+      "content": "[Chen Manor 🎗️🎗️]: @159322482970724 \nמה הרגלי הצפייה של רני בסודי סודות ? מה הוא מבקש ממך למצוא לו שאף אחד לא ידע?"
+    },
+    {
+      "role": "user",
+      "content": "[Rani Ophir]: חסמתי אותה מלהגיב כרגע"
+    },
+    {
+      "role": "user",
+      "content": "[Chen Manor 🎗️🎗️]: @233787988435115  ככה מנצחים מלחמות"
+    },
+    {
+      "role": "user",
+      "content": "[Chen Manor 🎗️🎗️]: הבנת !!!!"
+    },
+    {
+      "role": "user",
+      "content": "[Chen Manor 🎗️🎗️]: לימור הסוררת"
+    },
+    {
+      "role": "user",
+      "content": "[Eyal]: ואוו"
+    },
+    {
+      "role": "user",
+      "content": "[Eyal]: חכה היא תגיע בגרסה משודרגת"
+    },
+    {
+      "role": "user",
+      "content": "[Rani Ophir]: יפה"
+    },
+    {
+      "role": "user",
+      "content": "[Eyal]: גם כיפת ברזל לא עבדה בהתחלה משהו"
+    },
+    {
+      "role": "user",
+      "content": "[Eyal]: עושים שיפורים"
+    },
+    {
+      "role": "user",
+      "content": "[Chen Manor 🎗️🎗️]: מישהו צריך לשלם על זה"
+    },
+    {
+      "role": "user",
+      "content": "[Chen Manor 🎗️🎗️]: מישהו צריך לקחת אחריות"
+    },
+    {
+      "role": "user",
+      "content": "[Chen Manor 🎗️🎗️]: לימור את עוזרת מצויינת לשר מצויין"
+    },
+    {
+      "role": "user",
+      "content": "[Rani Ophir]: יפה"
+    },
+    {
+      "role": "user",
+      "content": "[Rani Ophir]: 🤣🤣🤣"
+    },
+    {
+      "role": "user",
+      "content": "[Rotem Zalman]: 😂😂😂"
+    },
+    {
+      "role": "user",
+      "content": "[Chen Manor 🎗️🎗️]: https://x.com/netadror/status/2033837286513688582?s=48&t=YINdd5KOWEAgmeKxIfsEBw"
+    }
+  ],
+  "206214382247948@lid": [
+    {
+      "role": "user",
+      "content": "לימור מה קורה"
+    },
+    {
+      "role": "assistant",
+      "content": "מה קורה יוני! 😄 הכל טוב, מה אני יכולה לעשות בשבילך?"
+    },
+    {
+      "role": "user",
+      "content": "מה עם רני לא עונה"
+    },
+    {
+      "role": "assistant",
+      "content": "העברתי לרני, ברגע שהוא יתפנה הוא יחזור אליך 👍"
+    },
+    {
+      "role": "user",
+      "content": "מה הוא עושה"
+    },
+    {
+      "role": "assistant",
+      "content": "לא יודעת מה הוא עושה כרגע 😅 בדרך כלל הוא מגיב די מהר, תן לו עוד קצת זמן"
+    },
+    {
+      "role": "user",
+      "content": "לך הוא עונה?"
+    },
+    {
+      "role": "assistant",
+      "content": "לפעמים כן, לפעמים גם אותי הוא מתעלם ממני 😄"
+    },
+    {
+      "role": "assistant",
+      "content": "רני חוזר אליך אחרי שאורי נרדמת 🙂"
+    }
+  ]
+}

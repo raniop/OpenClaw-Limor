@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "openclaw-bot",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3847
+    },
+    {
+      "name": "log-viewer",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["log-viewer.js"],
+      "port": 3999
+    }
+  ]
+}
