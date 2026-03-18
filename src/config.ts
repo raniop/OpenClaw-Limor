@@ -30,6 +30,10 @@ export const config = {
   ownerName: process.env.OWNER_NAME || "",
   ownerPhone: process.env.OWNER_PHONE || "",
   ownerEmail: process.env.OWNER_EMAIL || "",
+  control4DirectorIp: process.env.CONTROL4_DIRECTOR_IP || "",
+  control4Username: process.env.CONTROL4_USERNAME || "",
+  control4Password: process.env.CONTROL4_PASSWORD || "",
+  control4CommonName: "control4_ea3_000FFF1AE6F2",
 };
 
 export function validateConfig(): void {

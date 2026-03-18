@@ -6,3 +6,4 @@ export { crmTools } from "./crm";
 export { instructionTools } from "./instructions";
 export { fileTools } from "./files";
 export { contactTools } from "./contacts";
+export { smartHomeTools } from "./smarthome";

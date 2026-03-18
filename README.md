@@ -1,6 +1,6 @@
 # Limor - WhatsApp AI Assistant
 
-A personal AI assistant bot for WhatsApp, powered by Claude Opus 4.6.
+A personal AI assistant bot for WhatsApp, powered by Claude Sonnet 4.6.
 
 ## Features
 
@@ -19,7 +19,7 @@ A personal AI assistant bot for WhatsApp, powered by Claude Opus 4.6.
 
 - **Node.js** 18+ (tested on 22)
 - **Chromium/Chrome** (used by Puppeteer for WhatsApp Web and restaurant booking)
-- **Anthropic API key** with access to Claude Opus 4.6
+- **Anthropic API key** with access to Claude Sonnet 4.6
 
 ## Installation
 
@@ -44,7 +44,10 @@ npm run build
 npm start
 ```
 
-On first run, a QR code will appear in the terminal. Scan it with WhatsApp to link the bot.
+On first run:
+- A QR code will appear in the terminal — scan it with WhatsApp to link the bot
+- `workspace/state/` and `workspace/memory/users/` directories are created automatically
+- State files (conversations, contacts, approvals) are initialized on first use
 
 ## Configuration
 

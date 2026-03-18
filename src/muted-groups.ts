@@ -1,7 +1,9 @@
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { writeFileSync } from "fs";
 import { resolve } from "path";
+import { loadWithFallback } from "./state-migration";
 
 const MUTED_FILE = resolve(__dirname, "..", "workspace", "state", "groups.json");
+const OLD_MUTED_FILE = resolve(__dirname, "..", "data", "muted-groups.json");
 
 interface MutedGroups {
   [chatId: string]: {
@@ -30,12 +32,7 @@ export function findGroupChatId(name: string): string | undefined {
 }
 
 function load(): MutedGroups {
-  if (!existsSync(MUTED_FILE)) return {};
-  try {
-    return JSON.parse(readFileSync(MUTED_FILE, "utf-8"));
-  } catch {
-    return {};
-  }
+  return loadWithFallback<MutedGroups>(MUTED_FILE, OLD_MUTED_FILE, {});
 }
 
 function save(data: MutedGroups): void {

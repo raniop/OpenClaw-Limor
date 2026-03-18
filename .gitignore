@@ -4,3 +4,10 @@ dist-test/
 .env
 .wwebjs_auth/
 .wwebjs_cache/
+
+# Personal state data (created at runtime)
+workspace/state/
+workspace/memory/users/
+memory/
+data/
+files/

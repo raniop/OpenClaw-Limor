@@ -29,23 +29,34 @@ function getUserFilePath(chatId: string): string {
 
 function loadUserMemory(chatId: string): UserMemory {
   const filePath = getUserFilePath(chatId);
-  if (!existsSync(filePath)) {
-    // Try old store as fallback
-    return loadFromOldStore(chatId);
+  if (existsSync(filePath)) {
+    try {
+      const content = readFileSync(filePath, "utf-8");
+      return parseUserMarkdown(content);
+    } catch {
+      return { facts: [] };
+    }
   }
-  try {
-    const content = readFileSync(filePath, "utf-8");
-    return parseUserMarkdown(content);
-  } catch {
-    return { facts: [] };
+
+  // Fallback: migrate from old JSON store
+  const oldMem = loadFromOldStore(chatId);
+  if (oldMem.facts.length > 0 || oldMem.name) {
+    saveUserMemory(chatId, oldMem);
+    console.log(`[memory] Migrated user ${sanitizeChatId(chatId)} from JSON → markdown (${oldMem.facts.length} facts)`);
   }
+  return oldMem;
 }
 
 function loadFromOldStore(chatId: string): UserMemory {
   if (!existsSync(OLD_MEMORY_PATH)) return { facts: [] };
   try {
     const store = JSON.parse(readFileSync(OLD_MEMORY_PATH, "utf-8"));
-    return store[chatId] || { facts: [] };
+    const entry = store[chatId];
+    if (!entry) return { facts: [] };
+    return {
+      name: entry.name,
+      facts: Array.isArray(entry.facts) ? entry.facts : [],
+    };
   } catch {
     return { facts: [] };
   }

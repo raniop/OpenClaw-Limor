@@ -78,6 +78,10 @@ const TOPIC_RULES: TopicRule[] = [
     keywords: ["איש קשר", "חסום", "block", "contact", "תוסיפי", "אנשי קשר"],
     files: ["policies/privacy.md"],
   },
+  {
+    keywords: ["אור", "אורות", "light", "וילון", "blind", "מזגן", "מאוורר", "fan", "דוד", "boiler", "בית חכם", "smart home", "הדלק", "כבה", "פתח", "סגור", "control4", "סלון", "מטבח", "חדר שינה", "גינה", "פרגולה"],
+    files: ["policies/smarthome.md"],
+  },
 ];
 
 /**
@@ -92,6 +96,9 @@ export function getRelevantContext(
   const messageLower = message.toLowerCase();
   const loadedFiles = new Set<string>();
   const sections: string[] = [];
+
+  // Always load privacy rules
+  loadedFiles.add("policies/privacy.md");
 
   // Always load owner interaction rules for owner
   if (isOwner) {

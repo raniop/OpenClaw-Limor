@@ -141,4 +141,33 @@ describe("pairing", () => {
       assert.ok(!removeApproved("chat_nonexistent@lid"));
     });
   });
+
+  describe("persistence across reloads", () => {
+    it("approved contact survives file re-read (simulated restart)", () => {
+      // Approve a contact
+      const code = addPending("persist@lid", "+972500000000");
+      approveByCode(code);
+      assert.ok(isApproved("persist@lid"));
+
+      // Verify the file on disk contains the chatId
+      const { readFileSync } = require("fs");
+      const { resolve } = require("path");
+      const filePath = resolve(__dirname, "..", "workspace", "state", "approved.json");
+      const fileContent = JSON.parse(readFileSync(filePath, "utf-8"));
+      assert.ok(fileContent.includes("persist@lid"), "chatId should be persisted to file");
+
+      // Since loadApproved() reads from file each time, this simulates a restart
+      assert.ok(isApproved("persist@lid"), "contact should still be approved after re-read");
+    });
+
+    it("uses consistent key format (chatId as-is, no normalization)", () => {
+      const chatId = "12345678@lid";
+      addApproved(chatId);
+      // The exact same string should match
+      assert.ok(isApproved(chatId));
+      // A different format should NOT match
+      assert.ok(!isApproved("12345678"));
+      assert.ok(!isApproved("12345678@c.us"));
+    });
+  });
 });

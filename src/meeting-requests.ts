@@ -1,5 +1,6 @@
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { writeFileSync } from "fs";
 import { resolve } from "path";
+import { loadWithFallback } from "./state-migration";
 
 interface MeetingRequest {
   requesterChatId: string;
@@ -10,14 +11,10 @@ interface MeetingRequest {
 }
 
 const REQUESTS_PATH = resolve(__dirname, "..", "workspace", "state", "active_tasks.json");
+const OLD_REQUESTS_PATH = resolve(__dirname, "..", "memory", "meeting-requests.json");
 
 function loadRequests(): Record<string, MeetingRequest> {
-  if (!existsSync(REQUESTS_PATH)) return {};
-  try {
-    return JSON.parse(readFileSync(REQUESTS_PATH, "utf-8"));
-  } catch {
-    return {};
-  }
+  return loadWithFallback<Record<string, MeetingRequest>>(REQUESTS_PATH, OLD_REQUESTS_PATH, {});
 }
 
 function saveRequests(data: Record<string, MeetingRequest>): void {

@@ -1,8 +1,23 @@
 import { validateConfig } from "./config";
 import { createWhatsAppClient } from "./whatsapp";
 import { log } from "./logger";
+import { existsSync, readdirSync } from "fs";
+import { resolve } from "path";
+
+// Allow self-signed certificates (Control4 Director uses self-signed SSL)
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 log.systemStarting();
+
+// Workspace verification
+const wsDir = resolve(__dirname, "..", "workspace");
+const stateDir = resolve(wsDir, "state");
+const usersDir = resolve(wsDir, "memory", "users");
+const identityFiles = ["identity/SOUL.md", "identity/VOICE.md", "identity/OPERATING_PRINCIPLES.md"];
+const identityOk = identityFiles.every(f => existsSync(resolve(wsDir, f)));
+const stateFiles = existsSync(stateDir) ? readdirSync(stateDir).filter(f => f.endsWith(".json")).length : 0;
+const userMemFiles = existsSync(usersDir) ? readdirSync(usersDir).filter(f => f.endsWith(".md")).length : 0;
+console.log(`[workspace] identity=${identityOk ? "OK" : "MISSING"} state=${stateFiles} files memory=${userMemFiles} users`);
 
 validateConfig();
 

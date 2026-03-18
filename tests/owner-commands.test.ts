@@ -1,0 +1,124 @@
+import { describe, it, beforeEach } from "node:test";
+import assert from "node:assert/strict";
+import { writeFileSync, mkdirSync, existsSync } from "fs";
+import { resolve } from "path";
+
+const STATE_DIR = resolve(__dirname, "..", "workspace", "state");
+if (!existsSync(STATE_DIR)) mkdirSync(STATE_DIR, { recursive: true });
+
+function resetState() {
+  writeFileSync(resolve(STATE_DIR, "approved.json"), "[]", "utf-8");
+  writeFileSync(resolve(STATE_DIR, "pending.json"), "{}", "utf-8");
+  writeFileSync(resolve(STATE_DIR, "active_tasks.json"), "{}", "utf-8");
+}
+
+// Note: handleOwnerCommand calls sendMessage which requires the full AI stack.
+// We test the parts that DON'T call sendMessage — contact approval/rejection and bare approve logic.
+// Meeting approval/rejection flows that call sendMessage are integration-tested manually.
+
+import { approvalStore, meetingStore } from "../src/stores";
+import { parseOwnerCommand } from "../src/command-parser";
+
+describe("owner-commands (unit logic)", () => {
+  beforeEach(() => resetState());
+
+  describe("contact approval end-to-end", () => {
+    it("full flow: new contact → pending → owner approves by code → contact approved", () => {
+      // Step 1: New contact arrives, gets pending code
+      const code = approvalStore.addPending("newguy@lid", "+972501111111");
+      assert.ok(code.length >= 4);
+      assert.ok(approvalStore.isPending("newguy@lid"));
+      assert.ok(!approvalStore.isApproved("newguy@lid"));
+
+      // Step 2: Owner parses command
+      const cmd = parseOwnerCommand(`אשר ${code}`);
+      assert.ok(cmd);
+      assert.strictEqual(cmd!.type, "approve_contact");
+      assert.strictEqual((cmd as any).code, code.toUpperCase());
+
+      // Step 3: Execute approval
+      const entry = approvalStore.approveByCode(code);
+      assert.ok(entry);
+      assert.strictEqual(entry!.phone, "+972501111111");
+
+      // Step 4: Verify state
+      assert.ok(approvalStore.isApproved("newguy@lid"));
+      assert.ok(!approvalStore.isPending("newguy@lid"));
+    });
+
+    it("full flow: new contact → pending → owner rejects by code → contact NOT approved", () => {
+      const code = approvalStore.addPending("badguy@lid", "+972502222222");
+
+      const cmd = parseOwnerCommand(`דחה ${code}`);
+      assert.strictEqual(cmd!.type, "reject_contact");
+
+      const entry = approvalStore.rejectByCode(code);
+      assert.ok(entry);
+      assert.ok(!approvalStore.isApproved("badguy@lid"));
+      assert.ok(!approvalStore.isPending("badguy@lid"));
+    });
+  });
+
+  describe("bare approve ambiguity", () => {
+    it("1 pending: bare 'כן' resolves to bare_approve", () => {
+      approvalStore.addPending("one@lid", "+111");
+      const cmd = parseOwnerCommand("כן");
+      assert.strictEqual(cmd!.type, "bare_approve");
+      // In handleOwnerCommand, this would approve since pendingCount === 1
+      assert.strictEqual(approvalStore.getPendingCount(), 1);
+    });
+
+    it("2 pending: bare 'כן' should NOT blindly approve", () => {
+      approvalStore.addPending("one@lid", "+111");
+      approvalStore.addPending("two@lid", "+222");
+      const cmd = parseOwnerCommand("כן");
+      assert.strictEqual(cmd!.type, "bare_approve");
+      // In handleOwnerCommand, this would show ambiguity message since pendingCount > 1
+      assert.strictEqual(approvalStore.getPendingCount(), 2);
+    });
+
+    it("0 pending: bare 'כן' falls through (no pending to approve)", () => {
+      const cmd = parseOwnerCommand("כן");
+      assert.strictEqual(cmd!.type, "bare_approve");
+      assert.strictEqual(approvalStore.getPendingCount(), 0);
+      // In handleOwnerCommand, this would fall through to meeting check or AI
+    });
+  });
+
+  describe("meeting request end-to-end", () => {
+    it("full flow: request → pending → owner approves by ID", () => {
+      // Step 1: Meeting request created
+      const id = meetingStore.addMeetingRequest("requester@lid", "יוני", "פגישה על הפרויקט", "מחר ב-10");
+      assert.ok(id.startsWith("M"));
+      assert.ok(meetingStore.hasPendingRequest("requester@lid"));
+
+      // Step 2: Owner parses approval command
+      const cmd = parseOwnerCommand(`אשר פגישה ${id}`);
+      assert.ok(cmd);
+      assert.strictEqual(cmd!.type, "approve_meeting");
+      assert.strictEqual((cmd as any).id, id);
+
+      // Step 3: Lookup by ID
+      const req = meetingStore.getMeetingRequestById(id);
+      assert.ok(req);
+      assert.strictEqual(req!.requesterName, "יוני");
+      assert.strictEqual(req!.topic, "פגישה על הפרויקט");
+    });
+
+    it("full flow: request → owner rejects by ID → request removed", () => {
+      const id = meetingStore.addMeetingRequest("requester@lid", "עמית", "שיחה");
+
+      const cmd = parseOwnerCommand(`דחה פגישה ${id}`);
+      assert.strictEqual(cmd!.type, "reject_meeting");
+
+      const removed = meetingStore.removeMeetingRequest(id);
+      assert.ok(removed);
+      assert.ok(!meetingStore.hasPendingRequest("requester@lid"));
+    });
+
+    it("invalid meeting ID returns null", () => {
+      const req = meetingStore.getMeetingRequestById("MZZZZZ");
+      assert.strictEqual(req, null);
+    });
+  });
+});

@@ -1,7 +1,9 @@
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { writeFileSync } from "fs";
 import { resolve } from "path";
+import { loadWithFallback } from "./state-migration";
 
 const CONTACTS_PATH = resolve(__dirname, "..", "workspace", "state", "contacts.json");
+const OLD_CONTACTS_PATH = resolve(__dirname, "..", "memory", "contacts.json");
 
 interface ContactEntry {
   chatId: string;
@@ -89,12 +91,7 @@ function translateName(name: string): string[] {
 }
 
 function loadContacts(): ContactsStore {
-  if (!existsSync(CONTACTS_PATH)) return {};
-  try {
-    return JSON.parse(readFileSync(CONTACTS_PATH, "utf-8"));
-  } catch {
-    return {};
-  }
+  return loadWithFallback<ContactsStore>(CONTACTS_PATH, OLD_CONTACTS_PATH, {});
 }
 
 function saveContacts(contacts: ContactsStore): void {

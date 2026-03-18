@@ -4,10 +4,12 @@
   "description": "OpenClaw - Personal AI Assistant WhatsApp Bot powered by Claude",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "clean": "rm -rf dist dist-test",
+    "build": "rm -rf dist && tsc",
     "start": "node dist/index.js",
     "dev": "tsc && node dist/index.js",
-    "test": "tsc -p tsconfig.test.json && node --test dist-test/tests/*.test.js"
+    "test": "rm -rf dist-test && tsc -p tsconfig.test.json && ln -sf ../souls dist-test/souls && ln -sf ../workspace dist-test/workspace && ln -sf ../.env dist-test/.env && node --test --test-concurrency=1 dist-test/tests/*.test.js",
+    "verify": "npm run build && node -e \"require('./dist/index.js')\" && echo 'entrypoint OK'"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

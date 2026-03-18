@@ -1,7 +1,9 @@
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { writeFileSync } from "fs";
 import { resolve } from "path";
+import { loadWithFallback } from "./state-migration";
 
 const INSTRUCTIONS_PATH = resolve(__dirname, "..", "workspace", "state", "instructions.json");
+const OLD_INSTRUCTIONS_PATH = resolve(__dirname, "..", "memory", "instructions.json");
 const MAX_INSTRUCTIONS = 50;
 
 interface Instruction {
@@ -14,12 +16,7 @@ interface InstructionsStore {
 }
 
 function loadStore(): InstructionsStore {
-  if (!existsSync(INSTRUCTIONS_PATH)) return { instructions: [] };
-  try {
-    return JSON.parse(readFileSync(INSTRUCTIONS_PATH, "utf-8"));
-  } catch {
-    return { instructions: [] };
-  }
+  return loadWithFallback<InstructionsStore>(INSTRUCTIONS_PATH, OLD_INSTRUCTIONS_PATH, { instructions: [] });
 }
 
 function saveStore(store: InstructionsStore): void {

@@ -12,10 +12,11 @@ import { client, withRetry } from "./client";
 import type { Message, SenderContext } from "./types";
 import {
   calendarTools, travelTools, bookingTools,
-  crmTools, instructionTools, fileTools, contactTools,
+  crmTools, instructionTools, fileTools, contactTools, smartHomeTools,
 } from "./tools";
 import { handleToolCall } from "./handle-tool-call";
 import { log } from "../logger";
+import { startTimer } from "../observability";
 
 export async function sendMessage(
   history: Message[],
@@ -117,7 +118,7 @@ export async function sendMessage(
 
   // Include CRM + instruction + file tools only for owner, travel + booking tools for everyone
   const tools = sender?.isOwner
-    ? [...calendarTools, ...travelTools, ...bookingTools, ...crmTools, ...instructionTools, ...fileTools, ...contactTools]
+    ? [...calendarTools, ...travelTools, ...bookingTools, ...crmTools, ...instructionTools, ...fileTools, ...contactTools, ...smartHomeTools]
     : [...calendarTools, ...travelTools, ...bookingTools];
 
   let response = await withRetry(() => client.messages.create({
@@ -133,15 +134,16 @@ export async function sendMessage(
     const toolBlocks = response.content.filter((b) => b.type === "tool_use") as Anthropic.ToolUseBlock[];
     if (toolBlocks.length === 0) break;
 
-    // Execute all tool calls (in parallel)
+    // Execute all tool calls (in parallel) with timing
     const toolResults = await Promise.all(
       toolBlocks.map(async (toolBlock) => {
+        const timer = startTimer();
         const result = await handleToolCall(
           toolBlock.name,
           toolBlock.input as Record<string, any>,
           sender
         );
-        log.toolCall(toolBlock.name, result);
+        log.toolCall(toolBlock.name, result, timer.stop());
         return { id: toolBlock.id, result };
       })
     );

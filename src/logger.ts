@@ -1,11 +1,12 @@
 /**
  * Structured logger for Limor.
- * Outputs JSON-like structured lines to stdout/stderr.
- * Does NOT log secrets, tokens, or sensitive file contents.
+ * Outputs structured lines to stdout/stderr.
+ * Supports optional trace context for correlation.
  */
+import type { TraceContext, NormalizedError } from "./observability/types";
 
 type LogLevel = "info" | "warn" | "error" | "debug";
-type LogDomain = "msg" | "tool" | "approval" | "api" | "system" | "media" | "memory";
+type LogDomain = "msg" | "tool" | "approval" | "api" | "system" | "media" | "memory" | "trace";
 
 interface LogContext {
   [key: string]: string | number | boolean | undefined;
@@ -33,64 +34,125 @@ function write(level: LogLevel, domain: LogDomain, message: string, ctx?: LogCon
   }
 }
 
+/** Build context with trace info merged in. */
+function withTrace(trace: TraceContext | undefined, extra?: LogContext): LogContext {
+  const base: LogContext = {};
+  if (trace) {
+    base.traceId = trace.traceId;
+    base.chatId = trace.chatId;
+  }
+  return { ...base, ...extra };
+}
+
 export const log = {
+  // --- Trace lifecycle ---
+  traceStart(trace: TraceContext) {
+    write("info", "trace", "Message flow started", {
+      traceId: trace.traceId,
+      chatId: trace.chatId,
+      contact: trace.contactName,
+      isGroup: trace.isGroup,
+      isOwner: trace.isOwner,
+    });
+  },
+  traceEnd(trace: TraceContext, outcome: string, durationMs: number) {
+    write("info", "trace", `Message flow completed: ${outcome}`, {
+      traceId: trace.traceId,
+      chatId: trace.chatId,
+      durationMs,
+      outcome,
+    });
+  },
+  traceError(trace: TraceContext, err: NormalizedError, durationMs: number) {
+    write("error", "trace", `Message flow failed: ${err.operation}`, {
+      traceId: trace.traceId,
+      chatId: trace.chatId,
+      durationMs,
+      error: err.message,
+      operation: err.operation,
+    });
+  },
+
   // --- Message flow ---
-  msgReceived(chatId: string, contactName: string, phone: string, type: string) {
-    write("info", "msg", "Message received", { chatId, contact: contactName, phone: `+${phone}`, type });
+  msgReceived(chatId: string, contactName: string, phone: string, type: string, trace?: TraceContext) {
+    write("info", "msg", "Message received", withTrace(trace, { contact: contactName, phone: `+${phone}`, type }));
   },
-  msgSkipGroup(contactName: string) {
-    write("debug", "msg", "Skipping group message (SKIP response)", { contact: contactName });
+  msgSkipGroup(contactName: string, trace?: TraceContext) {
+    write("debug", "msg", "Skipping group message (SKIP response)", withTrace(trace, { contact: contactName }));
   },
-  msgReact(emoji: string, contactName: string) {
-    write("info", "msg", "Reacted", { emoji, contact: contactName });
+  msgReact(emoji: string, contactName: string, trace?: TraceContext) {
+    write("info", "msg", "Reacted", withTrace(trace, { emoji, contact: contactName }));
+  },
+  msgResponse(type: string, durationMs: number, trace?: TraceContext) {
+    write("info", "msg", `Response dispatched: ${type}`, withTrace(trace, { responseType: type, durationMs }));
   },
 
   // --- Media ---
-  mediaVoice() {
-    write("info", "media", "Voice message received, transcribing");
+  mediaVoice(trace?: TraceContext) {
+    write("info", "media", "Voice message received, transcribing", withTrace(trace));
   },
-  mediaVoiceResult(text: string) {
-    write("info", "media", "Transcription complete", { length: text.length });
+  mediaVoiceResult(text: string, durationMs?: number, trace?: TraceContext) {
+    write("info", "media", "Transcription complete", withTrace(trace, { length: text.length, durationMs }));
   },
-  mediaImage() {
-    write("info", "media", "Image received");
+  mediaImage(trace?: TraceContext) {
+    write("info", "media", "Image received", withTrace(trace));
   },
-  mediaDocument(filename: string) {
-    write("info", "media", "Document saved", { filename });
+  mediaDocument(filename: string, trace?: TraceContext) {
+    write("info", "media", "Document saved", withTrace(trace, { filename }));
   },
-  mediaError(type: string, error: string) {
-    write("error", "media", `${type} processing failed`, { error });
+  mediaError(type: string, error: string, trace?: TraceContext) {
+    write("error", "media", `${type} processing failed`, withTrace(trace, { error }));
   },
 
   // --- Tool calls ---
-  toolCall(name: string, result: string) {
-    write("info", "tool", `Tool executed: ${name}`, { resultPreview: result.substring(0, 150) });
+  toolCall(name: string, result: string, durationMs?: number, trace?: TraceContext) {
+    write("info", "tool", `Tool executed: ${name}`, withTrace(trace, { tool: name, resultPreview: result.substring(0, 120), durationMs }));
+  },
+  toolError(name: string, error: string, durationMs?: number, trace?: TraceContext) {
+    write("error", "tool", `Tool failed: ${name}`, withTrace(trace, { tool: name, error, durationMs }));
+  },
+
+  // --- AI ---
+  aiRequestStart(trace?: TraceContext) {
+    write("info", "api", "AI request started", withTrace(trace));
+  },
+  aiRequestEnd(durationMs: number, toolCalls: number, trace?: TraceContext) {
+    write("info", "api", "AI request completed", withTrace(trace, { durationMs, toolCalls }));
+  },
+  aiRequestError(error: string, durationMs: number, trace?: TraceContext) {
+    write("error", "api", "AI request failed", withTrace(trace, { error, durationMs }));
   },
 
   // --- Approval ---
-  approvalNewContact(contactName: string, phone: string, code: string) {
-    write("info", "approval", "New contact pending approval", { contact: contactName, phone, code });
+  approvalNewContact(contactName: string, phone: string, code: string, trace?: TraceContext) {
+    write("info", "approval", "New contact pending approval", withTrace(trace, { contact: contactName, phone, code }));
   },
-  approvalApproved(code: string, phone: string) {
-    write("info", "approval", "Contact approved", { code, phone });
+  approvalApproved(code: string, phone: string, trace?: TraceContext) {
+    write("info", "approval", "Contact approved", withTrace(trace, { code, phone }));
   },
-  approvalRejected(code: string, phone: string) {
-    write("info", "approval", "Contact rejected", { code, phone });
+  approvalRejected(code: string, phone: string, trace?: TraceContext) {
+    write("info", "approval", "Contact rejected", withTrace(trace, { code, phone }));
   },
-  approvalNotFound(code: string) {
-    write("warn", "approval", "Approval code not found", { code });
+  approvalNotFound(code: string, trace?: TraceContext) {
+    write("warn", "approval", "Approval code not found", withTrace(trace, { code }));
   },
-  approvalAmbiguous(count: number) {
-    write("warn", "approval", "Ambiguous approval — multiple pending", { count });
+  approvalAmbiguous(count: number, trace?: TraceContext) {
+    write("warn", "approval", "Ambiguous approval — multiple pending", withTrace(trace, { count }));
   },
-  meetingApproved(id: string, requester: string) {
-    write("info", "approval", "Meeting approved", { id, requester });
+  approvalGateResult(decision: "approved" | "blocked" | "pending", trace?: TraceContext) {
+    write("info", "approval", `Approval gate: ${decision}`, withTrace(trace, { decision }));
   },
-  meetingRejected(id: string, requester: string) {
-    write("info", "approval", "Meeting rejected", { id, requester });
+  meetingCreated(id: string, requester: string, trace?: TraceContext) {
+    write("info", "approval", "Meeting request created", withTrace(trace, { id, requester }));
+  },
+  meetingApproved(id: string, requester: string, trace?: TraceContext) {
+    write("info", "approval", "Meeting approved", withTrace(trace, { id, requester }));
+  },
+  meetingRejected(id: string, requester: string, trace?: TraceContext) {
+    write("info", "approval", "Meeting rejected", withTrace(trace, { id, requester }));
   },
 
-  // --- API ---
+  // --- API retry ---
   apiRetry(attempt: number, maxRetries: number, delayMs: number) {
     write("warn", "api", "API overloaded, retrying", { attempt, maxRetries, delayMs });
   },

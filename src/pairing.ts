@@ -1,8 +1,11 @@
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { writeFileSync } from "fs";
 import { resolve } from "path";
+import { loadWithFallback } from "./state-migration";
 
 const APPROVED_PATH = resolve(__dirname, "..", "workspace", "state", "approved.json");
+const OLD_APPROVED_PATH = resolve(__dirname, "..", "memory", "approved.json");
 const PENDING_PATH = resolve(__dirname, "..", "workspace", "state", "pending.json");
+const OLD_PENDING_PATH = resolve(__dirname, "..", "memory", "pending.json");
 
 interface PendingEntry {
   chatId: string;
@@ -10,15 +13,18 @@ interface PendingEntry {
   createdAt: string;
 }
 
-// The code (key) is the human-readable approval ID
 type PendingStore = Record<string, PendingEntry>;
 
 function loadApproved(): string[] {
-  if (!existsSync(APPROVED_PATH)) return [];
-  try {
-    return JSON.parse(readFileSync(APPROVED_PATH, "utf-8"));
-  } catch {
-    return [];
+  return loadWithFallback<string[]>(APPROVED_PATH, OLD_APPROVED_PATH, []);
+}
+
+// Log approved count on first load
+let startupLogged = false;
+function logStartupApproved(count: number): void {
+  if (!startupLogged) {
+    startupLogged = true;
+    console.log(`[pairing] Loaded ${count} approved contacts`);
   }
 }
 
@@ -27,12 +33,7 @@ function saveApproved(approved: string[]): void {
 }
 
 function loadPending(): PendingStore {
-  if (!existsSync(PENDING_PATH)) return {};
-  try {
-    return JSON.parse(readFileSync(PENDING_PATH, "utf-8"));
-  } catch {
-    return {};
-  }
+  return loadWithFallback<PendingStore>(PENDING_PATH, OLD_PENDING_PATH, {});
 }
 
 function savePending(pending: PendingStore): void {
@@ -41,6 +42,7 @@ function savePending(pending: PendingStore): void {
 
 export function isApproved(chatId: string): boolean {
   const approved = loadApproved();
+  logStartupApproved(approved.length);
   return approved.includes(chatId);
 }
 

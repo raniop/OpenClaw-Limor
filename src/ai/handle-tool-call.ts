@@ -8,6 +8,7 @@ import { approvalStore, meetingStore } from "../stores";
 import { searchAvailability, bookOntopo } from "../ontopo";
 import { searchTabit, bookTabit } from "../tabit";
 import { findContactByName, getRecentContacts, addManualContact, listAllContacts } from "../contacts";
+import { controlDevice, getDeviceStatus, listRooms, listDevices, findDevice } from "../control4";
 // removeApproved now via approvalStore (imported above)
 import {
   searchPolicyByPersonId,
@@ -269,6 +270,23 @@ export async function handleToolCall(
     if (name === "list_instructions") {
       if (!sender?.isOwner) return "רק רני יכול לראות הוראות.";
       return listInstructions();
+    }
+
+    // Smart home tools (owner only)
+    if (name === "smart_home_control") {
+      if (!sender?.isOwner) return "רק רני יכול לשלוט בבית החכם.";
+      return controlDevice(input.device_name, input.action, input.value);
+    }
+    if (name === "smart_home_status") {
+      if (!sender?.isOwner) return "רק רני יכול לבדוק סטטוס בית חכם.";
+      const device = await findDevice(input.device_name);
+      if (!device) return `❌ לא מצאתי מכשיר בשם "${input.device_name}"`;
+      return getDeviceStatus(device.id);
+    }
+    if (name === "smart_home_list") {
+      if (!sender?.isOwner) return "רק רני יכול לראות מכשירי בית חכם.";
+      if (input.type === "rooms") return listRooms();
+      return listDevices();
     }
 
     return "פעולה לא מוכרת";
