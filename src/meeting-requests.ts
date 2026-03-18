@@ -44,7 +44,7 @@ export function addMeetingRequest(
     console.log(`⚠️ Meeting request from ${requesterName} already exists, skipping duplicate`);
     return existing[0];
   }
-  const id = Date.now().toString();
+  const id = generateMeetingCode();
   requests[id] = {
     requesterChatId,
     requesterName,
@@ -56,6 +56,16 @@ export function addMeetingRequest(
   return id;
 }
 
+/** Look up meeting request by ID. */
+export function getMeetingRequestById(id: string): (MeetingRequest & { id: string }) | null {
+  const requests = loadRequests();
+  const upper = id.toUpperCase();
+  const req = requests[upper];
+  if (!req) return null;
+  return { ...req, id: upper };
+}
+
+/** Get the last meeting request. Legacy fallback. */
 export function getLastMeetingRequest(): (MeetingRequest & { id: string }) | null {
   const requests = loadRequests();
   const entries = Object.entries(requests);
@@ -64,12 +74,28 @@ export function getLastMeetingRequest(): (MeetingRequest & { id: string }) | nul
   return { ...req, id };
 }
 
+/** Count pending meeting requests. */
+export function getMeetingRequestCount(): number {
+  const requests = loadRequests();
+  return Object.keys(requests).length;
+}
+
 export function removeMeetingRequest(id: string): MeetingRequest | null {
   const requests = loadRequests();
-  const req = requests[id] || null;
+  const upper = id.toUpperCase();
+  const req = requests[upper] || null;
   if (req) {
-    delete requests[id];
+    delete requests[upper];
     saveRequests(requests);
   }
   return req;
+}
+
+function generateMeetingCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "M"; // prefix to distinguish from contact codes
+  for (let i = 0; i < 5; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
 }

@@ -4,21 +4,14 @@ import * as QRCode from "qrcode";
 import * as http from "http";
 import { sendMessage, extractFacts, setNotifyOwnerCallback, setSendMessageCallback, setSendFileCallback } from "./ai";
 import { updateContact } from "./contacts";
-import { getLastMeetingRequest, removeMeetingRequest } from "./meeting-requests";
 import { createEvent } from "./calendar";
 import { transcribeAudio } from "./transcribe";
-import { addMessage, getHistory, clearHistory } from "./conversation";
 import { getMemoryContext, saveExtractedFacts } from "./memory";
 import { config } from "./config";
 import { saveFile } from "./files";
-import {
-  isApproved,
-  addApproved,
-  isPending,
-  addPending,
-  getLastPending,
-  approveByChatId,
-} from "./pairing";
+import { log } from "./logger";
+import { approvalStore, meetingStore, conversationStore } from "./stores";
+import { parseOwnerCommand } from "./command-parser";
 import { isGroupMuted, registerGroup } from "./muted-groups";
 
 let latestQR: string | null = null;
@@ -84,14 +77,14 @@ export function createWhatsAppClient(): Client {
     latestQR = null;
     whatsappClient = client;
     if (qrServer) { qrServer.close(); qrServer = null; }
-    console.log("✨ לימור מחוברת ומוכנה! (Limor is ready!)");
+    log.systemReady();
 
     // Set up callback so AI can notify owner about meeting requests
     setNotifyOwnerCallback(async (message: string) => {
       if (config.ownerChatId && whatsappClient) {
         await whatsappClient.sendMessage(config.ownerChatId, message);
         // Add to owner's conversation history so Limor remembers what she sent
-        addMessage(config.ownerChatId, "assistant", message);
+        conversationStore.addMessage(config.ownerChatId, "assistant", message);
       }
     });
 
@@ -100,7 +93,7 @@ export function createWhatsAppClient(): Client {
       if (whatsappClient) {
         await whatsappClient.sendMessage(chatId, message);
         // Add to recipient's conversation history so Limor remembers what she sent
-        addMessage(chatId, "assistant", message);
+        conversationStore.addMessage(chatId, "assistant", message);
       }
     });
 
@@ -109,7 +102,7 @@ export function createWhatsAppClient(): Client {
       if (whatsappClient) {
         const media = new MessageMedia(mimetype, base64, filename);
         await whatsappClient.sendMessage(chatId, media, { caption });
-        addMessage(chatId, "assistant", caption || `📎 ${filename}`);
+        conversationStore.addMessage(chatId, "assistant", caption || `📎 ${filename}`);
       }
     });
   });
@@ -148,12 +141,12 @@ async function handleMessage(msg: Message): Promise<void> {
         const media = await msg.downloadMedia();
         if (media && media.data) {
           const buffer = Buffer.from(media.data, "base64");
-          console.log(`🎤 Voice message received, transcribing...`);
+          log.mediaVoice();
           body = await transcribeAudio(buffer, media.mimetype);
-          console.log(`🎤 Transcribed: "${body}"`);
+          log.mediaVoiceResult(body);
         }
       } catch (err) {
-        console.error("Voice transcription failed:", err);
+        log.mediaError("voice", String(err));
         await msg.reply("לא הצלחתי להבין את ההודעה הקולית 😅 אפשר לנסות שוב או לכתוב?");
         return;
       }
@@ -165,12 +158,12 @@ async function handleMessage(msg: Message): Promise<void> {
       try {
         const media = await msg.downloadMedia();
         if (media && media.data) {
-          console.log(`🖼️ Image received`);
+          log.mediaImage();
           imageData = { base64: media.data, mediaType: media.mimetype };
           if (!body) body = "[תמונה]";
         }
       } catch (err) {
-        console.error("Image download failed:", err);
+        log.mediaError("image", String(err));
       }
     }
 
@@ -183,10 +176,10 @@ async function handleMessage(msg: Message): Promise<void> {
           const buffer = Buffer.from(media.data, "base64");
           saveFile(filename, buffer);
           if (!body) body = `[קובץ: ${filename}]`;
-          console.log(`📎 Document saved: ${filename}`);
+          log.mediaDocument(filename);
         }
       } catch (err) {
-        console.error("Document download failed:", err);
+        log.mediaError("document", String(err));
       }
     }
 
@@ -201,7 +194,7 @@ async function handleMessage(msg: Message): Promise<void> {
     updateContact(chatId, contactName, phone);
 
     // Log chatId for setup
-    console.log(`📩 Message from: ${chatId} (${contactName}, +${phone})`);
+    log.msgReceived(chatId, contactName, phone, isVoiceMessage ? "voice" : msg.type);
 
     // Skip pairing for group messages
     const chat = await msg.getChat();
@@ -217,62 +210,116 @@ async function handleMessage(msg: Message): Promise<void> {
       return;
     }
 
-    // Owner approval flow: if owner replies "כן"/"אשר" to approve pending contact
+    // Owner command flow: ID-based approval/rejection for contacts and meetings
     if (!isGroup && config.ownerChatId && chatId === config.ownerChatId) {
-      const approveWords = ["כן", "אשר", "yes", "approve", "אישור"];
-      if (approveWords.includes(body.toLowerCase())) {
-        const pending = getLastPending();
-        if (pending) {
-          approveByChatId(pending.chatId);
-          await msg.reply(`✅ אישרתי את ${pending.phone}! עכשיו הם יכולים לדבר איתי.`);
-          // Notify the approved contact
+      const cmd = parseOwnerCommand(body);
+
+      if (cmd?.type === "approve_contact") {
+        const entry = approvalStore.approveByCode(cmd.code);
+        if (entry) {
+          log.approvalApproved(cmd.code, entry.phone);
+          await msg.reply(`✅ אישרתי את ${entry.phone}! (קוד: ${cmd.code}) עכשיו הם יכולים לדבר איתי.`);
           if (whatsappClient) {
-            await whatsappClient.sendMessage(
-              pending.chatId,
-              "🎉 אושרת! אני לימור, איך אפשר לעזור? 😊"
-            );
+            await whatsappClient.sendMessage(entry.chatId, "🎉 אושרת! אני לימור, איך אפשר לעזור? 😊");
           }
+        } else {
+          log.approvalNotFound(cmd.code);
+          await msg.reply(`❌ לא מצאתי בקשה עם קוד ${cmd.code}.`);
+        }
+        return;
+      }
+
+      if (cmd?.type === "reject_contact") {
+        const entry = approvalStore.rejectByCode(cmd.code);
+        if (entry) {
+          log.approvalRejected(cmd.code, entry.phone);
+          await msg.reply(`🚫 דחיתי את ${entry.phone} (קוד: ${cmd.code}).`);
+        } else {
+          log.approvalNotFound(cmd.code);
+          await msg.reply(`❌ לא מצאתי בקשה עם קוד ${cmd.code}.`);
+        }
+        return;
+      }
+
+      if (cmd?.type === "bare_approve") {
+        const pendingCount = approvalStore.getPendingCount();
+        if (pendingCount === 1) {
+          const pending = approvalStore.getLastPending();
+          if (pending) {
+            const entry = approvalStore.approveByCode(pending.code);
+            if (entry) {
+              await msg.reply(`✅ אישרתי את ${entry.phone}! עכשיו הם יכולים לדבר איתי.`);
+              if (whatsappClient) {
+                await whatsappClient.sendMessage(entry.chatId, "🎉 אושרת! אני לימור, איך אפשר לעזור? 😊");
+              }
+              return;
+            }
+          }
+        } else if (pendingCount > 1) {
+          log.approvalAmbiguous(pendingCount);
+          const pending = approvalStore.getLastPending();
+          await msg.reply(`⚠️ יש ${pendingCount} בקשות ממתינות. תציין קוד:\nלמשל: *אשר ${pending?.code || "XXXXXX"}*`);
+          return;
+        }
+        // pendingCount === 0: fall through to meeting request check or normal AI
+      }
+
+      if (cmd?.type === "approve_meeting") {
+        const meetingReq = meetingStore.getMeetingRequestById(cmd.id);
+        if (!meetingReq) {
+          await msg.reply(`❌ לא מצאתי בקשת פגישה עם קוד ${cmd.id}.`);
+          return;
+        }
+        // Pass to AI with meeting context (same as before)
+        conversationStore.addMessage(chatId, "user", body);
+        const memoryContext = getMemoryContext(chatId);
+        const history = conversationStore.getHistory(chatId);
+        const meetingContext = `\n\nהקשר: יש בקשת פגישה פתוחה מ-${meetingReq.requesterName} (chatId: ${meetingReq.requesterChatId}) בנושא "${meetingReq.topic}"${meetingReq.preferredTime ? ` (זמן מועדף: ${meetingReq.preferredTime})` : ""}. רני עכשיו מאשר את הפגישה. עשי את שני הדברים האלה: (1) קבעי את הפגישה ביומן עם create_event (2) שלחי הודעה ל-${meetingReq.requesterName} עם send_message שרני אישר ומתי הפגישה. חשוב: עשי את שניהם!`;
+        const response = await sendMessage(history, (memoryContext || "") + meetingContext, { chatId, name: "רני", isOwner: true });
+        conversationStore.addMessage(chatId, "assistant", response);
+        await msg.reply(response);
+        meetingStore.removeMeetingRequest(meetingReq.id);
+        return;
+      }
+
+      if (cmd?.type === "reject_meeting") {
+        const req = meetingStore.removeMeetingRequest(cmd.id);
+        if (req) {
+          await msg.reply(`🚫 דחיתי את בקשת הפגישה מ-${req.requesterName} (${cmd.id}).`);
+        } else {
+          await msg.reply(`❌ לא מצאתי בקשת פגישה עם קוד ${cmd.id}.`);
+        }
+        return;
+      }
+
+      // --- Legacy: if owner sends any message and there's exactly 1 meeting request, treat as response ---
+      const meetingCount = meetingStore.getMeetingRequestCount();
+      if (meetingCount === 1) {
+        const meetingReq = meetingStore.getLastMeetingRequest();
+        if (meetingReq) {
+          conversationStore.addMessage(chatId, "user", body);
+          const memoryContext = getMemoryContext(chatId);
+          const history = conversationStore.getHistory(chatId);
+          const meetingContext = `\n\nהקשר: יש בקשת פגישה פתוחה (${meetingReq.id}) מ-${meetingReq.requesterName} (chatId: ${meetingReq.requesterChatId}) בנושא "${meetingReq.topic}"${meetingReq.preferredTime ? ` (זמן מועדף: ${meetingReq.preferredTime})` : ""}. רני עכשיו עונה לגבי הזמינות שלו. אם הוא אישר או נתן תאריך ושעה – עשי את שני הדברים האלה: (1) קבעי את הפגישה ביומן עם create_event (2) שלחי הודעה ל-${meetingReq.requesterName} עם send_message שרני אישר ומתי הפגישה. חשוב: עשי את שניהם!`;
+          const response = await sendMessage(history, (memoryContext || "") + meetingContext, { chatId, name: "רני", isOwner: true });
+          conversationStore.addMessage(chatId, "assistant", response);
+          await msg.reply(response);
+          meetingStore.removeMeetingRequest(meetingReq.id);
           return;
         }
       }
-
-      // Check if owner is replying to a meeting request
-      const meetingReq = getLastMeetingRequest();
-      if (meetingReq) {
-        // Owner replied with availability - pass to AI to parse and handle
-        // Add context about the meeting request to the message
-        addMessage(chatId, "user", body);
-        const memoryContext = getMemoryContext(chatId);
-        const history = getHistory(chatId);
-
-        // Inject meeting request context
-        const meetingContext = `\n\nהקשר: יש בקשת פגישה פתוחה מ-${meetingReq.requesterName} (chatId: ${meetingReq.requesterChatId}) בנושא "${meetingReq.topic}"${meetingReq.preferredTime ? ` (זמן מועדף: ${meetingReq.preferredTime})` : ""}. רני עכשיו עונה לגבי הזמינות שלו. אם הוא אישר או נתן תאריך ושעה – עשי את שני הדברים האלה: (1) קבעי את הפגישה ביומן עם create_event (2) שלחי הודעה ל-${meetingReq.requesterName} עם send_message שרני אישר ומתי הפגישה. חשוב: עשי את שניהם!`;
-
-        const response = await sendMessage(
-          history,
-          (memoryContext || "") + meetingContext,
-          { chatId, name: "רני", isOwner: true }
-        );
-
-        addMessage(chatId, "assistant", response);
-        await msg.reply(response);
-
-        // Don't manually notify requester - the AI already sends via send_message tool
-        // Remove the handled request
-        removeMeetingRequest(meetingReq.id);
-        return;
-      }
+      // meetingCount > 1 or 0: fall through to normal AI processing
     }
 
     // Pairing check (skip for groups and owner)
-    if (!isGroup && chatId !== config.ownerChatId && !isApproved(chatId)) {
-      if (!isPending(chatId)) {
-        addPending(chatId, `+${phone}`);
-        // Notify owner
+    if (!isGroup && chatId !== config.ownerChatId && !approvalStore.isApproved(chatId)) {
+      if (!approvalStore.isPending(chatId)) {
+        const code = approvalStore.addPending(chatId, `+${phone}`);
+        log.approvalNewContact(contactName, `+${phone}`, code);
         if (config.ownerChatId && whatsappClient) {
           await whatsappClient.sendMessage(
             config.ownerChatId,
-            `🔔 איש קשר חדש מנסה לדבר איתי!\n👤 שם: ${contactName}\n📱 מספר: +${phone}\n💬 הודעה: "${body}"\n\nלאשר? ענה *כן* או *אשר*`
+            `🔔 איש קשר חדש מנסה לדבר איתי!\n👤 שם: ${contactName}\n📱 מספר: +${phone}\n💬 הודעה: "${body}"\n\n✅ לאשר: *אשר ${code}*\n🚫 לדחות: *דחה ${code}*`
           );
         }
       }
@@ -284,7 +331,7 @@ async function handleMessage(msg: Message): Promise<void> {
 
     // Handle commands
     if (body === "/clear" || body === "/נקה") {
-      clearHistory(chatId);
+      conversationStore.clearHistory(chatId);
       await msg.reply("✨ ניקיתי הכל! יאללה מתחילים מחדש 😊");
       return;
     }
@@ -306,14 +353,14 @@ async function handleMessage(msg: Message): Promise<void> {
 
     // In groups, prefix message with sender name so Alma knows who wrote what
     const messageForHistory = isGroup ? `[${contactName}]: ${body}` : body;
-    addMessage(chatId, "user", messageForHistory);
+    conversationStore.addMessage(chatId, "user", messageForHistory);
 
     // Show typing indicator
     await chat.sendStateTyping();
 
     // Load memory and get AI response
     const memoryContext = getMemoryContext(chatId);
-    const history = getHistory(chatId);
+    const history = conversationStore.getHistory(chatId);
     const isOwner = !isGroup && chatId === config.ownerChatId;
     const sender = { chatId, name: contactName, isOwner };
 
@@ -335,7 +382,7 @@ async function handleMessage(msg: Message): Promise<void> {
 
     // In groups, skip if Alma decided not to respond
     if (response.trim() === "[SKIP]") {
-      console.log(`⏭️ Skipping group message from ${contactName}`);
+      log.msgSkipGroup(contactName);
       return;
     }
 
@@ -344,7 +391,7 @@ async function handleMessage(msg: Message): Promise<void> {
     if (reactOnlyMatch) {
       const emoji = reactOnlyMatch[1];
       await msg.react(emoji);
-      console.log(`😀 Reacted with ${emoji} to ${contactName}`);
+      log.msgReact(emoji, contactName);
       return;
     }
 
@@ -354,12 +401,12 @@ async function handleMessage(msg: Message): Promise<void> {
       const emoji = reactTextMatch[1];
       const text = reactTextMatch[2].trim();
       await msg.react(emoji);
-      addMessage(chatId, "assistant", text);
+      conversationStore.addMessage(chatId, "assistant", text);
       await msg.reply(text);
-      console.log(`😀 Reacted with ${emoji} and replied to ${contactName}`);
+      log.msgReact(emoji, contactName);
     } else {
       // Normal text response
-      addMessage(chatId, "assistant", response);
+      conversationStore.addMessage(chatId, "assistant", response);
       await msg.reply(response);
     }
 
@@ -368,9 +415,9 @@ async function handleMessage(msg: Message): Promise<void> {
       if (name || facts.length > 0) {
         saveExtractedFacts(chatId, facts, name || undefined);
       }
-    }).catch((err) => console.error("Memory save error:", err));
+    }).catch((err) => log.memorySaveError(String(err)));
   } catch (error) {
-    console.error("Error handling message:", error);
+    log.systemError("Error handling message", String(error));
     await msg.reply("אוי, משהו השתבש 😅 נסה שוב בבקשה!");
   }
 }

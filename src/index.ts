@@ -1,7 +1,8 @@
 import { validateConfig } from "./config";
 import { createWhatsAppClient } from "./whatsapp";
+import { log } from "./logger";
 
-console.log("🌟 Starting Limor (לימור)...");
+log.systemStarting();
 
 validateConfig();
 
@@ -11,13 +12,13 @@ client.initialize();
 
 // Graceful shutdown
 process.on("SIGINT", async () => {
-  console.log("\nShutting down Limor...");
+  log.systemShutdown();
   await client.destroy();
   process.exit(0);
 });
 
 process.on("SIGTERM", async () => {
-  console.log("\nShutting down Limor...");
+  log.systemShutdown();
   await client.destroy();
   process.exit(0);
 });

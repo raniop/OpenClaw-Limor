@@ -10,6 +10,7 @@ interface PendingEntry {
   createdAt: string;
 }
 
+// The code (key) is the human-readable approval ID
 type PendingStore = Record<string, PendingEntry>;
 
 function loadApproved(): string[] {
@@ -65,10 +66,12 @@ export function isPending(chatId: string): boolean {
   return Object.values(pending).some((p) => p.chatId === chatId);
 }
 
-export function addPending(chatId: string, phone: string): void {
+/** Add a pending contact. Returns the approval code. */
+export function addPending(chatId: string, phone: string): string {
   const pending = loadPending();
-  // Don't add duplicate
-  if (Object.values(pending).some((p) => p.chatId === chatId)) return;
+  // Don't add duplicate — return existing code
+  const existingCode = Object.keys(pending).find((k) => pending[k].chatId === chatId);
+  if (existingCode) return existingCode;
 
   const code = generateCode();
   pending[code] = {
@@ -77,6 +80,7 @@ export function addPending(chatId: string, phone: string): void {
     createdAt: new Date().toISOString(),
   };
   savePending(pending);
+  return code;
 }
 
 export function getPendingByChatId(chatId: string): PendingEntry | null {
@@ -84,6 +88,41 @@ export function getPendingByChatId(chatId: string): PendingEntry | null {
   return Object.values(pending).find((p) => p.chatId === chatId) || null;
 }
 
+/** Look up a pending entry by its approval code. */
+export function getPendingByCode(code: string): (PendingEntry & { code: string }) | null {
+  const pending = loadPending();
+  const upper = code.toUpperCase();
+  const entry = pending[upper];
+  if (!entry) return null;
+  return { ...entry, code: upper };
+}
+
+/** Approve a pending contact by its code. Returns the entry or null. */
+export function approveByCode(code: string): PendingEntry | null {
+  const pending = loadPending();
+  const upper = code.toUpperCase();
+  const entry = pending[upper];
+  if (!entry) return null;
+
+  addApproved(entry.chatId);
+  delete pending[upper];
+  savePending(pending);
+  return entry;
+}
+
+/** Reject (remove) a pending contact by its code. Returns the entry or null. */
+export function rejectByCode(code: string): PendingEntry | null {
+  const pending = loadPending();
+  const upper = code.toUpperCase();
+  const entry = pending[upper];
+  if (!entry) return null;
+
+  delete pending[upper];
+  savePending(pending);
+  return entry;
+}
+
+// Keep for backward compat — used as legacy fallback
 export function approveByChatId(chatId: string): boolean {
   const pending = loadPending();
   const code = Object.keys(pending).find((k) => pending[k].chatId === chatId);
@@ -95,17 +134,25 @@ export function approveByChatId(chatId: string): boolean {
   return true;
 }
 
-export function getLastPending(): PendingEntry | null {
+/** Get the last pending entry with its code. Legacy fallback. */
+export function getLastPending(): (PendingEntry & { code: string }) | null {
   const pending = loadPending();
-  const entries = Object.values(pending);
+  const entries = Object.entries(pending);
   if (entries.length === 0) return null;
-  return entries[entries.length - 1];
+  const [code, entry] = entries[entries.length - 1];
+  return { ...entry, code };
+}
+
+/** Count pending entries. */
+export function getPendingCount(): number {
+  const pending = loadPending();
+  return Object.keys(pending).length;
 }
 
 function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 6; i++) {
     code += chars[Math.floor(Math.random() * chars.length)];
   }
   return code;
