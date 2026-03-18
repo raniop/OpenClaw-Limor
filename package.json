@@ -9,7 +9,8 @@
     "start": "node dist/index.js",
     "dev": "tsc && node dist/index.js",
     "test": "rm -rf dist-test && tsc -p tsconfig.test.json && ln -sf ../souls dist-test/souls && ln -sf ../workspace dist-test/workspace && ln -sf ../.env dist-test/.env && node --test --test-concurrency=1 dist-test/tests/*.test.js",
-    "verify": "npm run build && node -e \"require('./dist/index.js')\" && echo 'entrypoint OK'"
+    "verify": "npm run build && node -e \"require('./dist/index.js')\" && echo 'entrypoint OK'",
+    "setup": "npx ts-node scripts/setup.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

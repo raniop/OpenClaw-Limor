@@ -31,18 +31,19 @@ cd OpenClaw-Limor
 # 2. Install dependencies
 npm install
 
-# 3. Create your .env file
-cp .env.example .env
+# 3. Run the setup wizard
+npm run setup
+# The wizard asks for: assistant name, your name, phone, email, and Anthropic API key
+# It generates a soul file, .env, and workspace identity files
 
-# 4. Edit .env with your API keys (see Configuration below)
-nano .env   # or use any editor
-
-# 5. Build
+# 4. Build
 npm run build
 
-# 6. Run
+# 5. Run
 npm start
 ```
+
+**Manual setup** (alternative): `cp .env.example .env` and edit manually.
 
 On first run:
 - A QR code will appear in the terminal — scan it with WhatsApp to link the bot
