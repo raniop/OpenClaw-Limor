@@ -1,8 +1,8 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { resolve } from "path";
 
-const APPROVED_PATH = resolve(__dirname, "..", "memory", "approved.json");
-const PENDING_PATH = resolve(__dirname, "..", "memory", "pending.json");
+const APPROVED_PATH = resolve(__dirname, "..", "workspace", "state", "approved.json");
+const PENDING_PATH = resolve(__dirname, "..", "workspace", "state", "pending.json");
 
 interface PendingEntry {
   chatId: string;
@@ -49,6 +49,15 @@ export function addApproved(chatId: string): void {
     approved.push(chatId);
     saveApproved(approved);
   }
+}
+
+export function removeApproved(chatId: string): boolean {
+  const approved = loadApproved();
+  const index = approved.indexOf(chatId);
+  if (index === -1) return false;
+  approved.splice(index, 1);
+  saveApproved(approved);
+  return true;
 }
 
 export function isPending(chatId: string): boolean {

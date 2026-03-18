@@ -11,7 +11,7 @@ interface Message {
   };
 }
 
-const HISTORY_PATH = resolve(__dirname, "..", "memory", "conversations.json");
+const HISTORY_PATH = resolve(__dirname, "..", "workspace", "state", "conversations.json");
 
 type ConversationStore = Record<string, Message[]>;
 

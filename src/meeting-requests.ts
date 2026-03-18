@@ -9,7 +9,7 @@ interface MeetingRequest {
   createdAt: string;
 }
 
-const REQUESTS_PATH = resolve(__dirname, "..", "memory", "meeting-requests.json");
+const REQUESTS_PATH = resolve(__dirname, "..", "workspace", "state", "active_tasks.json");
 
 function loadRequests(): Record<string, MeetingRequest> {
   if (!existsSync(REQUESTS_PATH)) return {};

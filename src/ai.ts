@@ -6,7 +6,8 @@ import { sendCalendarInviteEmail } from "./email";
 import { addMeetingRequest, hasPendingRequest } from "./meeting-requests";
 import { searchAvailability, bookOntopo } from "./ontopo";
 import { searchTabit, bookTabit } from "./tabit";
-import { findContactByName, getRecentContacts } from "./contacts";
+import { findContactByName, getRecentContacts, addManualContact, listAllContacts } from "./contacts";
+import { removeApproved } from "./pairing";
 import {
   searchPolicyByPersonId,
   getPolicyDetails,
@@ -21,8 +22,28 @@ import { searchFlights } from "./flights";
 import { searchHotels } from "./hotels";
 import { saveInstruction, removeInstruction, listInstructions, getInstructionsContext } from "./instructions";
 import { listFiles, readFile, saveFile } from "./files";
+import { getRelevantContext } from "./workspace-loader";
 
 const client = new Anthropic({ apiKey: config.anthropicApiKey });
+
+// Retry wrapper for Anthropic API calls (handles 529 overloaded errors)
+async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      const isOverloaded = error?.status === 529 || error?.status === 503;
+      if (isOverloaded && attempt < maxRetries - 1) {
+        const delay = (attempt + 1) * 2000; // 2s, 4s, 6s
+        console.log(`⏳ API overloaded, retrying in ${delay / 1000}s... (attempt ${attempt + 2}/${maxRetries})`);
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new Error("Max retries exceeded");
+}
 
 export interface Message {
   role: "user" | "assistant";
@@ -379,7 +400,7 @@ const bookingTools: Anthropic.Tool[] = [
         restaurant_slug: {
           type: "string",
           description:
-            "slug של המסעדה באונטופו (למשל: 'ocd-restaurant', 'mashya')",
+            "page_slug של המסעדה מתוצאות ontopo_search (למשל: 'ester', 'mashya'). השתמשי בדיוק ב-page_slug שהוחזר מ-booking_data!",
         },
         date: {
           type: "string",
@@ -621,6 +642,44 @@ const fileTools: Anthropic.Tool[] = [
   },
 ];
 
+const contactTools: Anthropic.Tool[] = [
+  {
+    name: "add_contact",
+    description: "הוספת איש קשר חדש. השתמשי כשרני מלמד אותך על אנשי קשר חדשים.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        name: { type: "string", description: "שם איש הקשר" },
+        phone: { type: "string", description: "מספר טלפון" },
+      },
+      required: ["name", "phone"],
+    },
+  },
+  {
+    name: "list_contacts",
+    description: "הצגת כל אנשי הקשר השמורים",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "block_contact",
+    description: "חסימת איש קשר - הוא לא יוכל לדבר עם לימור יותר (עד שרני יאשר מחדש)",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        contact_name: {
+          type: "string",
+          description: "שם איש הקשר לחסימה",
+        },
+      },
+      required: ["contact_name"],
+    },
+  },
+];
+
 export interface SenderContext {
   chatId: string;
   name: string;
@@ -708,7 +767,18 @@ async function handleToolCall(
         return `❌ נכשל: לא מצאתי איש קשר בשם "${input.contact_name}". ההודעה לא נשלחה! אנשי קשר זמינים: ${names || "אין"}. נסי שוב עם אחד מהשמות האלה.`;
       }
       if (sendMessageCallback) {
-        await sendMessageCallback(contact.chatId, input.message);
+        // Use personal chatId if available, otherwise try phone number
+        let targetChatId = contact.chatId;
+        if (targetChatId.startsWith("manual_") || targetChatId.endsWith("@g.us")) {
+          // Can't send to manual/group chatId - try phone number instead
+          const phone = contact.phone.replace(/\D/g, "");
+          if (phone) {
+            targetChatId = `${phone}@c.us`;
+          } else {
+            return `❌ נכשל: אין ל-${contact.name} chatId אישי. הוא צריך לשלוח הודעה ללימור קודם.`;
+          }
+        }
+        await sendMessageCallback(targetChatId, input.message);
         return `✅ ההודעה נשלחה ל-${contact.name} בהצלחה!`;
       }
       return "❌ נכשל: לא הצלחתי לשלוח את ההודעה.";
@@ -830,6 +900,29 @@ async function handleToolCall(
       }
     }
 
+    // Contact tools (owner only)
+    if (name === "add_contact") {
+      if (!sender?.isOwner) return "רק רני יכול להוסיף אנשי קשר.";
+      return addManualContact(input.name, input.phone);
+    }
+    if (name === "list_contacts") {
+      if (!sender?.isOwner) return "רק רני יכול לראות אנשי קשר.";
+      return listAllContacts();
+    }
+    if (name === "block_contact") {
+      if (!sender?.isOwner) return "רק רני יכול לחסום אנשי קשר.";
+      const contact = findContactByName(input.contact_name);
+      if (!contact) return `❌ לא מצאתי איש קשר בשם "${input.contact_name}"`;
+      if (contact.chatId.startsWith("manual_") || contact.chatId.endsWith("@g.us")) {
+        return `❌ ${contact.name} לא מאושר כרגע (הוא מקבוצה או manual). אין מה לחסום.`;
+      }
+      const removed = removeApproved(contact.chatId);
+      if (removed) {
+        return `✅ חסמתי את ${contact.name}. הוא לא יוכל לדבר איתי עד שתאשר אותו מחדש.`;
+      }
+      return `${contact.name} לא היה מאושר.`;
+    }
+
     // File tools (owner only)
     if (name === "list_files") {
       if (!sender?.isOwner) return "רק רני יכול לגשת לקבצים.";
@@ -879,6 +972,14 @@ export async function sendMessage(
   const instructionsContext = getInstructionsContext();
   if (instructionsContext) {
     systemPrompt += "\n\n" + instructionsContext;
+  }
+
+  // Selective workspace context based on message content
+  const lastUserMsg = history.filter((m) => m.role === "user").pop()?.content || "";
+  const isGroup = !!(sender && !sender.isOwner && sender.chatId.endsWith("@g.us"));
+  const workspaceContext = getRelevantContext(lastUserMsg, isGroup, !!sender?.isOwner);
+  if (workspaceContext) {
+    systemPrompt += "\n\n" + workspaceContext;
   }
 
   // Add current date/time context
@@ -957,16 +1058,16 @@ export async function sendMessage(
 
   // Include CRM + instruction + file tools only for owner, travel + booking tools for everyone
   const tools = sender?.isOwner
-    ? [...calendarTools, ...travelTools, ...bookingTools, ...crmTools, ...instructionTools, ...fileTools]
+    ? [...calendarTools, ...travelTools, ...bookingTools, ...crmTools, ...instructionTools, ...fileTools, ...contactTools]
     : [...calendarTools, ...travelTools, ...bookingTools];
 
-  let response = await client.messages.create({
+  let response = await withRetry(() => client.messages.create({
     model: config.model,
     max_tokens: config.maxTokens,
     system: systemPrompt,
     messages,
     tools,
-  });
+  }));
 
   // Handle tool use loop (supports multiple parallel tool calls)
   while (response.stop_reason === "tool_use") {
@@ -997,13 +1098,13 @@ export async function sendMessage(
       })),
     });
 
-    response = await client.messages.create({
+    response = await withRetry(() => client.messages.create({
       model: config.model,
       max_tokens: config.maxTokens,
       system: systemPrompt,
       messages,
       tools,
-    });
+    }));
   }
 
   const textBlock = response.content.find((block) => block.type === "text");

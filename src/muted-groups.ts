@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { resolve } from "path";
 
-const MUTED_FILE = resolve(__dirname, "..", "data", "muted-groups.json");
+const MUTED_FILE = resolve(__dirname, "..", "workspace", "state", "groups.json");
 
 interface MutedGroups {
   [chatId: string]: {

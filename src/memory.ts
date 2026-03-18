@@ -1,7 +1,12 @@
-import { readFileSync, writeFileSync, existsSync } from "fs";
-import { resolve } from "path";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
+import { resolve, join } from "path";
 
-const MEMORY_PATH = resolve(__dirname, "..", "memory", "memories.json");
+const USERS_DIR = resolve(__dirname, "..", "workspace", "memory", "users");
+// Fallback: old path for migration
+const OLD_MEMORY_PATH = resolve(__dirname, "..", "memory", "memories.json");
+
+// Ensure users directory exists
+if (!existsSync(USERS_DIR)) mkdirSync(USERS_DIR, { recursive: true });
 
 interface Fact {
   text: string;
@@ -13,24 +18,75 @@ interface UserMemory {
   facts: Fact[];
 }
 
-type MemoryStore = Record<string, UserMemory>;
+// Sanitize chatId for filename (replace special chars)
+function sanitizeChatId(chatId: string): string {
+  return chatId.replace(/[^a-zA-Z0-9_-]/g, "_");
+}
 
-function loadStore(): MemoryStore {
-  if (!existsSync(MEMORY_PATH)) return {};
+function getUserFilePath(chatId: string): string {
+  return join(USERS_DIR, `${sanitizeChatId(chatId)}.md`);
+}
+
+function loadUserMemory(chatId: string): UserMemory {
+  const filePath = getUserFilePath(chatId);
+  if (!existsSync(filePath)) {
+    // Try old store as fallback
+    return loadFromOldStore(chatId);
+  }
   try {
-    return JSON.parse(readFileSync(MEMORY_PATH, "utf-8"));
+    const content = readFileSync(filePath, "utf-8");
+    return parseUserMarkdown(content);
   } catch {
-    return {};
+    return { facts: [] };
   }
 }
 
-function saveStore(store: MemoryStore): void {
-  writeFileSync(MEMORY_PATH, JSON.stringify(store, null, 2), "utf-8");
+function loadFromOldStore(chatId: string): UserMemory {
+  if (!existsSync(OLD_MEMORY_PATH)) return { facts: [] };
+  try {
+    const store = JSON.parse(readFileSync(OLD_MEMORY_PATH, "utf-8"));
+    return store[chatId] || { facts: [] };
+  } catch {
+    return { facts: [] };
+  }
+}
+
+function parseUserMarkdown(content: string): UserMemory {
+  const mem: UserMemory = { facts: [] };
+  const lines = content.split("\n");
+
+  for (const line of lines) {
+    const nameMatch = line.match(/^Name:\s*(.+)$/);
+    if (nameMatch) {
+      mem.name = nameMatch[1].trim();
+      continue;
+    }
+    const factMatch = line.match(/^- (.+)$/);
+    if (factMatch && !line.includes("Name:")) {
+      mem.facts.push({ text: factMatch[1].trim(), savedAt: "" });
+    }
+  }
+  return mem;
+}
+
+function saveUserMemory(chatId: string, mem: UserMemory): void {
+  const lines: string[] = [];
+  lines.push("# User Profile");
+  if (mem.name) {
+    lines.push(`Name: ${mem.name}`);
+  }
+  lines.push("");
+  if (mem.facts.length > 0) {
+    lines.push("## Known Facts");
+    for (const fact of mem.facts) {
+      lines.push(`- ${fact.text}`);
+    }
+  }
+  writeFileSync(getUserFilePath(chatId), lines.join("\n"), "utf-8");
 }
 
 export function getMemoryContext(chatId: string): string {
-  const store = loadStore();
-  const mem = store[chatId];
+  const mem = loadUserMemory(chatId);
   if (!mem || mem.facts.length === 0) return "";
 
   const lines: string[] = [];
@@ -49,9 +105,7 @@ function isSimilar(a: string, b: string): boolean {
   const na = normalize(a);
   const nb = normalize(b);
   if (na === nb) return true;
-  // Check if one contains the other (for near-duplicates)
   if (na.includes(nb) || nb.includes(na)) return true;
-  // Check word overlap
   const wordsA = new Set(na.split(/\s+/).filter(w => w.length > 2));
   const wordsB = new Set(nb.split(/\s+/).filter(w => w.length > 2));
   if (wordsA.size === 0 || wordsB.size === 0) return false;
@@ -72,29 +126,23 @@ export function saveExtractedFacts(
 ): void {
   if (facts.length === 0 && !userName) return;
 
-  const store = loadStore();
-  if (!store[chatId]) {
-    store[chatId] = { facts: [] };
-  }
-
+  const mem = loadUserMemory(chatId);
   if (userName) {
-    store[chatId].name = userName;
+    mem.name = userName;
   }
 
   const today = new Date().toISOString().split("T")[0];
 
   for (const fact of facts) {
-    // Skip if similar fact already exists
-    const hasSimilar = store[chatId].facts.some((f) => isSimilar(f.text, fact));
+    const hasSimilar = mem.facts.some((f) => isSimilar(f.text, fact));
     if (!hasSimilar) {
-      store[chatId].facts.push({ text: fact, savedAt: today });
+      mem.facts.push({ text: fact, savedAt: today });
     }
   }
 
-  // Keep only the most recent facts if over limit
-  if (store[chatId].facts.length > MAX_FACTS_PER_USER) {
-    store[chatId].facts = store[chatId].facts.slice(-MAX_FACTS_PER_USER);
+  if (mem.facts.length > MAX_FACTS_PER_USER) {
+    mem.facts = mem.facts.slice(-MAX_FACTS_PER_USER);
   }
 
-  saveStore(store);
+  saveUserMemory(chatId, mem);
 }

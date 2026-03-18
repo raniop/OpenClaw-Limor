@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { resolve } from "path";
 
-const INSTRUCTIONS_PATH = resolve(__dirname, "..", "memory", "instructions.json");
+const INSTRUCTIONS_PATH = resolve(__dirname, "..", "workspace", "state", "instructions.json");
 const MAX_INSTRUCTIONS = 50;
 
 interface Instruction {

@@ -190,14 +190,14 @@ export async function searchAvailability(
         result += `\nזמנים זמינים: ${allTimes.slice(0, 8).join(", ")}`;
       }
 
-      result += `\n[booking_data: slug=${numericSlug}]`;
+      result += `\n[booking_data: page_slug=${pageSlug}, numeric_slug=${numericSlug}]`;
       return result;
     }
 
     // Fallback: if no areas but also no standby/disabled, still might be available
     let result = `יש שולחן פנוי! ✅\nמסעדה: ${displayName}\nתאריך: ${formatDate(date)}\nשעה: ${formatTime(time)}\nסועדים: ${partySize}`;
     result += `\nלהזמנה: ${restaurantUrl}`;
-    result += `\n[booking_data: slug=${restaurantSlug}, numeric_slug=${numericSlug}]`;
+    result += `\n[booking_data: page_slug=${pageSlug}, numeric_slug=${numericSlug}]`;
     return result;
   } catch (error: any) {
     return `שגיאה בחיפוש אונטופו: ${error.message}`;
@@ -234,13 +234,30 @@ export async function bookOntopo(params: {
   let browser = null as Awaited<ReturnType<typeof launchBookingBrowser>> | null;
 
   try {
-    // Resolve slug (AI may send "esther" but URL needs "ester")
+    // Resolve slug for booking URL
+    // Strategy: try the given slug directly first (it may already be a valid page slug like "ester")
+    // Then fall back to resolveNumericSlug for Hebrew names
     let urlSlug = params.restaurantSlug;
-    const resolved = await resolveNumericSlug(params.restaurantSlug);
-    if (resolved?.textSlug) {
-      urlSlug = resolved.textSlug;
-      console.log(`🔄 Ontopo booking: resolved slug "${params.restaurantSlug}" → "${urlSlug}"`);
+
+    // First, try fetching the page directly with the given slug
+    const directUrl = `https://ontopo.com/he/il/page/${params.restaurantSlug}`;
+    try {
+      const directCheck = await fetch(directUrl, { method: "HEAD", headers: { "User-Agent": USER_AGENT }, redirect: "follow" });
+      if (directCheck.ok) {
+        console.log(`✅ Ontopo booking: slug "${params.restaurantSlug}" is a valid page URL`);
+        urlSlug = params.restaurantSlug;
+      } else {
+        throw new Error("not found");
+      }
+    } catch {
+      // Slug doesn't work as direct URL, try resolution
+      const resolved = await resolveNumericSlug(params.restaurantSlug);
+      if (resolved?.textSlug) {
+        urlSlug = resolved.textSlug;
+        console.log(`🔄 Ontopo booking: resolved slug "${params.restaurantSlug}" → "${urlSlug}"`);
+      }
     }
+
     const restaurantUrl = `https://ontopo.com/he/il/page/${urlSlug}`;
 
     browser = await launchBookingBrowser();

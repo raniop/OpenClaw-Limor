@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { resolve } from "path";
 
-const CONTACTS_PATH = resolve(__dirname, "..", "memory", "contacts.json");
+const CONTACTS_PATH = resolve(__dirname, "..", "workspace", "state", "contacts.json");
 
 interface ContactEntry {
   chatId: string;
@@ -137,15 +137,22 @@ export function findContactByName(name: string): ContactEntry | null {
   const searchVariants = [searchLower, ...translateName(searchLower)];
   const allNames = (c: ContactEntry) => [c.name, ...(c.aliases || [])].map(n => n.toLowerCase());
 
+  // Sort contacts: prefer personal chatIds (not groups, not manual) over group aliases
+  const sorted = Object.values(contacts).sort((a, b) => {
+    const aIsPersonal = !a.chatId.endsWith("@g.us") && !a.chatId.startsWith("manual_") ? 0 : 1;
+    const bIsPersonal = !b.chatId.endsWith("@g.us") && !b.chatId.startsWith("manual_") ? 0 : 1;
+    return aIsPersonal - bIsPersonal;
+  });
+
   // Try exact match first (name or alias, including translated variants)
-  for (const c of Object.values(contacts)) {
+  for (const c of sorted) {
     const cNames = allNames(c);
     for (const variant of searchVariants) {
       if (cNames.some(n => n === variant)) return c;
     }
   }
   // Try partial match with translated variants
-  for (const c of Object.values(contacts)) {
+  for (const c of sorted) {
     const cNames = allNames(c);
     for (const variant of searchVariants) {
       if (cNames.some(n => n.includes(variant) || variant.includes(n))) return c;
@@ -153,7 +160,7 @@ export function findContactByName(name: string): ContactEntry | null {
   }
   // Phonetic fallback: compare Hebrew input to English names (or vice versa)
   const searchPhonetic = phoneticKey(searchLower);
-  for (const c of Object.values(contacts)) {
+  for (const c of sorted) {
     const nameParts = c.name.toLowerCase().split(/\s+/);
     // Check if phonetic key of search matches first name
     if (nameParts.some(part => phoneticKey(part) === searchPhonetic)) return c;
@@ -170,6 +177,51 @@ export function findContactByPhone(phone: string): ContactEntry | null {
     if (c.phone.replace(/\D/g, "").includes(clean) || clean.includes(c.phone.replace(/\D/g, ""))) return c;
   }
   return null;
+}
+
+export function addManualContact(name: string, phone: string, notes?: string): string {
+  const contacts = loadContacts();
+  // Generate a placeholder chatId from phone (will be updated when they actually message)
+  const cleanPhone = phone.replace(/\D/g, "");
+  // Check if contact already exists by phone
+  const existing = Object.values(contacts).find(
+    (c) => c.phone.replace(/\D/g, "") === cleanPhone
+  );
+  if (existing) {
+    // Update name if different
+    if (existing.name !== name) {
+      const aliases = existing.aliases || [];
+      if (!aliases.includes(existing.name)) aliases.push(existing.name);
+      existing.name = name;
+      existing.aliases = aliases.length > 0 ? aliases : undefined;
+      saveContacts(contacts);
+      return `עדכנתי את ${name} (${phone})`;
+    }
+    return `${name} (${phone}) כבר קיים`;
+  }
+  // Create with placeholder chatId
+  const placeholderChatId = `manual_${cleanPhone}`;
+  contacts[placeholderChatId] = {
+    chatId: placeholderChatId,
+    name,
+    phone: cleanPhone,
+    lastSeen: new Date().toISOString(),
+  };
+  saveContacts(contacts);
+  return `✅ נשמר: ${name} (${phone})`;
+}
+
+export function listAllContacts(): string {
+  const contacts = loadContacts();
+  const entries = Object.values(contacts)
+    .sort((a, b) => a.name.localeCompare(b.name, "he"));
+  if (entries.length === 0) return "אין אנשי קשר שמורים.";
+  return entries
+    .map((c) => {
+      const aliases = c.aliases?.length ? ` (${c.aliases.join(", ")})` : "";
+      return `- ${c.name}${aliases}: ${c.phone}`;
+    })
+    .join("\n");
 }
 
 export function getRecentContacts(limit: number = 10): ContactEntry[] {
