@@ -1,5 +1,6 @@
 import { getPendingApprovals, getFollowups, getActivityLog, getCapabilities, getContacts, getLogs, isLimorRunning } from "@/lib/data";
 import Link from "next/link";
+import { BotControl } from "./components/bot-control";
 
 export const dynamic = "force-dynamic";
 
@@ -34,20 +35,7 @@ export default function DashboardHome() {
           <h1>Dashboard</h1>
           <h2>System overview</h2>
         </div>
-        <div className="card" style={{ padding: "10px 18px", marginBottom: 0, display: "inline-flex", alignItems: "center", gap: 10 }}>
-          <span style={{
-            width: 10, height: 10, borderRadius: "50%",
-            background: running ? "var(--success)" : "var(--danger)",
-            boxShadow: running
-              ? "0 0 10px var(--success-glow), 0 0 20px var(--success-glow)"
-              : "0 0 10px var(--danger-glow)",
-            animation: running ? "pulseGlow 2s ease-in-out infinite" : "none",
-            display: "inline-block",
-          }} />
-          <span style={{ fontWeight: 600, fontSize: 13, color: running ? "var(--success)" : "var(--danger)" }}>
-            {running ? "Limor Online" : "Limor Offline"}
-          </span>
-        </div>
+        <BotControl initialRunning={running} />
       </div>
 
       <div className="grid grid-3">
