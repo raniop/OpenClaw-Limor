@@ -107,6 +107,11 @@ export function createWhatsAppClient(): Client {
         conversationStore.addMessage(chatId, "assistant", caption || `📎 ${filename}`);
       }
     });
+
+    // Process unread messages that arrived while bot was offline
+    processUnreadMessages(client).catch((err) =>
+      console.error("[unread] Failed to process unread messages:", err)
+    );
   });
 
   client.on("authenticated", () => { console.log("WhatsApp authenticated successfully."); });
@@ -119,6 +124,55 @@ export function createWhatsAppClient(): Client {
   });
 
   return client;
+}
+
+/**
+ * Process unread messages that arrived while the bot was offline.
+ * Fetches all chats with unread messages and processes each one.
+ */
+async function processUnreadMessages(client: Client): Promise<void> {
+  console.log("[unread] Checking for unread messages...");
+  try {
+    const chats = await client.getChats();
+    const unreadChats = chats.filter((chat) => chat.unreadCount > 0);
+
+    if (unreadChats.length === 0) {
+      console.log("[unread] No unread messages found");
+      return;
+    }
+
+    console.log(`[unread] Found ${unreadChats.length} chats with unread messages`);
+
+    for (const chat of unreadChats) {
+      try {
+        // Fetch unread messages from this chat
+        const messages = await chat.fetchMessages({ limit: chat.unreadCount });
+        const unreadFromOthers = messages.filter((m) => !m.fromMe);
+
+        if (unreadFromOthers.length === 0) continue;
+
+        console.log(`[unread] Processing ${unreadFromOthers.length} unread messages from ${chat.name || chat.id._serialized}`);
+
+        // Process each unread message through the normal flow
+        for (const msg of unreadFromOthers) {
+          try {
+            await withChatLock(msg.from, () => handleMessage(msg));
+          } catch (err) {
+            console.error(`[unread] Error processing message from ${msg.from}:`, err);
+          }
+        }
+
+        // Mark chat as read
+        await chat.sendSeen();
+      } catch (err) {
+        console.error(`[unread] Error processing chat ${chat.name}:`, err);
+      }
+    }
+
+    console.log("[unread] Finished processing unread messages");
+  } catch (err) {
+    console.error("[unread] Error fetching chats:", err);
+  }
 }
 
 async function handleMessage(msg: Message): Promise<void> {
