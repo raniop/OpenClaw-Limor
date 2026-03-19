@@ -18,7 +18,9 @@ export function LiveLogs() {
       try {
         const res = await fetch("/api/logs?limit=5");
         const data = await res.json();
-        setLogs((data.logs || []).reverse());
+        // Only show properly formatted log lines (skip raw QR/stack traces)
+        const parsed = (data.logs || []).filter((l: LogLine) => l.timestamp && l.level && l.domain);
+        setLogs(parsed.reverse());
       } catch {}
     }
 

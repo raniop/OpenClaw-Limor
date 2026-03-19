@@ -22,7 +22,7 @@ const DOMAIN_COLORS: Record<string, string> = {
 
 export default function LogsPage() {
   const running = isLimorRunning();
-  const logs = getLogs(300);
+  const logs = getLogs(300).filter((l) => l.timestamp && l.level && l.domain);
 
   return (
     <div>
