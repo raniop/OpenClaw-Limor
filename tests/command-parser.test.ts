@@ -141,4 +141,19 @@ describe("parseOwnerCommand", () => {
       assert.deepStrictEqual(cmd, { type: "approve_contact", code: "A7F3K2" });
     });
   });
+
+  // --- Digest command ---
+  describe("digest", () => {
+    it("parses 'תקציר'", () => {
+      assert.deepStrictEqual(parseOwnerCommand("תקציר"), { type: "digest" });
+    });
+
+    it("parses 'digest'", () => {
+      assert.deepStrictEqual(parseOwnerCommand("digest"), { type: "digest" });
+    });
+
+    it("parses 'סכם לי את היום'", () => {
+      assert.deepStrictEqual(parseOwnerCommand("סכם לי את היום"), { type: "digest" });
+    });
+  });
 });

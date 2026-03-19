@@ -8,6 +8,7 @@ import { approvalStore, meetingStore, conversationStore } from "../stores";
 import { log } from "../logger";
 import type { TraceContext } from "../observability";
 import { approveSpec, rejectSpec, getSpec } from "../capabilities";
+import { generateDailyDigest } from "../digest";
 
 interface OwnerCommandContext {
   chatId: string;
@@ -116,6 +117,13 @@ export async function handleOwnerCommand(ctx: OwnerCommandContext): Promise<bool
     } else {
       await ctx.reply(`❌ לא מצאתי בקשת יכולת עם מזהה ${cmd.id}`);
     }
+    return true;
+  }
+
+  // --- Digest command ---
+  if (cmd?.type === "digest") {
+    const digest = await generateDailyDigest();
+    await ctx.reply(digest);
     return true;
   }
 

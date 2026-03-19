@@ -73,4 +73,22 @@ export const contactTools: Anthropic.Tool[] = [
       required: ["group_name"],
     },
   },
+  {
+    name: "summarize_group_activity",
+    description: "סיכום פעילות בקבוצת וואטסאפ — מה קרה, מי הזכיר את רני, מה צריך תשומת לב. השתמשי כשרני שואל 'מה קרה בקבוצה X?' או 'תסכמי לי את הקבוצה'.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        group_name: {
+          type: "string",
+          description: "שם הקבוצה (או חלק ממנו)",
+        },
+        since_hours: {
+          type: "number",
+          description: "כמה שעות אחורה לסכם (ברירת מחדל: 24)",
+        },
+      },
+      required: ["group_name"],
+    },
+  },
 ];

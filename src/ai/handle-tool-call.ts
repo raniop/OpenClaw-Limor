@@ -1,6 +1,7 @@
 /**
  * Unified tool call dispatcher.
- * Extracted from ai-core.ts — exact same logic, no behavior changes.
+ * Uses centralized permission service for access control.
+ * Logs tool calls to audit log.
  */
 import { createEvent, listEvents } from "../calendar";
 import { sendCalendarInviteEmail } from "../email";
@@ -12,9 +13,9 @@ import { getHistory } from "../conversation";
 import { controlDevice, getDeviceStatus, listRooms, listDevices, findDevice } from "../control4";
 import { createSpec, listPending, listApproved } from "../capabilities";
 import { createWorktree, runInWorktree, readProjectFile, writeProjectFile, buildAndTest, getDiff, applyWorktree, cleanupWorktree } from "../capabilities/sandbox";
+import { runCapabilityImplementation } from "../capabilities/capability-runner";
 import { bookRide, getRideStatus, cancelRide } from "../gett";
 import { implementCapability } from "../capabilities/claude-code";
-// removeApproved now via approvalStore (imported above)
 import {
   searchPolicyByPersonId,
   getPolicyDetails,
@@ -31,6 +32,8 @@ import { saveInstruction, removeInstruction, listInstructions } from "../instruc
 import { listFiles, readFile, saveFile } from "../files";
 import { getNotifyOwnerCallback, getSendMessageCallback } from "./callbacks";
 import type { SenderContext } from "./types";
+import { canUseTool, getPermissionDeniedMessage } from "../permissions/permission-service";
+import { logAudit } from "../audit/audit-log";
 
 export async function handleToolCall(
   name: string,
@@ -38,6 +41,15 @@ export async function handleToolCall(
   sender?: SenderContext
 ): Promise<string> {
   try {
+    // --- Centralized permission check ---
+    if (!canUseTool(name, sender)) {
+      return getPermissionDeniedMessage(name);
+    }
+
+    // Log tool call to audit
+    const actor = sender?.name || "unknown";
+    logAudit(actor, "tool_call", name, "started", { input: Object.keys(input) });
+
     if (name === "create_event") {
       const start = new Date(input.start_date);
       const durationMs = (input.duration_minutes || 60) * 60 * 1000;
@@ -53,7 +65,6 @@ export async function handleToolCall(
       const requesterName = sender?.name || "מישהו";
       const chatId = sender?.chatId || "";
 
-      // Check if there's already a pending request from this person
       if (meetingStore.hasPendingRequest(chatId)) {
         return `כבר שלחתי בקשה לרני בנושא הזה. מחכים לתשובה שלו – לא צריך לשלוח שוב.`;
       }
@@ -61,7 +72,7 @@ export async function handleToolCall(
       const meetingId = meetingStore.addMeetingRequest(chatId, requesterName, input.topic, input.preferred_time);
 
       const timeInfo = input.preferred_time ? `\n⏰ זמן מועדף: ${input.preferred_time}` : "";
-      const ownerMsg = `📅 בקשת פגישה חדשה! (${meetingId})\n👤 ${requesterName} רוצה לקבוע פגישה עם רני\n📋 נושא: ${input.topic}${timeInfo}\n\n✅ לאשר: *אשר פגישה ${meetingId}*\nאו פשוט ענה עם תאריך ושעה ואני אסדר הכל 😊`;
+      const ownerMsg = `📅 בקשת פגישה חדשה! (${meetingId})\n👤 ${requesterName} רוצה לקבוע פגישה עם רני\n📋 נושא: ${input.topic}${timeInfo}\n\n✅ לאשר: *אשר פגישה ${meetingId}*\nאו פשוט ענה עם תאריך ושעה ואני אסדר הכל 😊\n\n💡 הצעות: *אשר* / *דחה פגישה ${meetingId}* / *נדבר מחר*`;
 
       if (getNotifyOwnerCallback()) {
         getNotifyOwnerCallback()!(ownerMsg).catch((err) =>
@@ -69,6 +80,7 @@ export async function handleToolCall(
         );
       }
 
+      logAudit(requesterName, "meeting_request", meetingId, "created");
       return `בקשת פגישה נשלחה לרני. הוא יחזור עם זמן מתאים.`;
     }
     if (name === "notify_owner") {
@@ -80,11 +92,8 @@ export async function handleToolCall(
       return `ההודעה הועברה לרני.`;
     }
 
-    // Send message to contact (owner only)
+    // Send message to contact (owner only — already checked by canUseTool)
     if (name === "send_message") {
-      if (!sender?.isOwner) {
-        return "רק רני יכול לבקש לשלוח הודעות לאנשי קשר.";
-      }
       const contact = findContactByName(input.contact_name);
       if (!contact) {
         const recent = getRecentContacts(5);
@@ -92,10 +101,8 @@ export async function handleToolCall(
         return `❌ נכשל: לא מצאתי איש קשר בשם "${input.contact_name}". ההודעה לא נשלחה! אנשי קשר זמינים: ${names || "אין"}. נסי שוב עם אחד מהשמות האלה.`;
       }
       if (getSendMessageCallback()) {
-        // Use personal chatId if available, otherwise try phone number
         let targetChatId = contact.chatId;
         if (targetChatId.startsWith("manual_") || targetChatId.endsWith("@g.us")) {
-          // Can't send to manual/group chatId - try phone number instead
           const phone = contact.phone.replace(/\D/g, "");
           if (phone) {
             targetChatId = `${phone}@c.us`;
@@ -104,21 +111,20 @@ export async function handleToolCall(
           }
         }
         await getSendMessageCallback()!(targetChatId, input.message);
+        logAudit(actor, "message_sent", contact.name, "success");
         return `✅ ההודעה נשלחה ל-${contact.name} בהצלחה!`;
       }
       return "❌ נכשל: לא הצלחתי לשלוח את ההודעה.";
     }
 
-    // Mute/unmute groups (owner only)
+    // Mute/unmute groups
     if (name === "mute_group") {
-      if (!sender?.isOwner) return "רק רני יכול להשתיק קבוצות.";
       const chatId = input.group_chat_id || findGroupChatId(input.group_name);
       if (!chatId) return `❌ לא מצאתי קבוצה בשם "${input.group_name}". תוסיף אותי קודם לקבוצה.`;
       muteGroup(chatId, input.group_name);
       return `✅ השתקתי את הקבוצה "${input.group_name}". לא אגיב שם יותר.`;
     }
     if (name === "unmute_group") {
-      if (!sender?.isOwner) return "רק רני יכול לבטל השתקת קבוצות.";
       const muted = getMutedGroups();
       const match = muted.find((g) => g.name.includes(input.group_name) || input.group_name.includes(g.name));
       if (!match) return `❌ הקבוצה "${input.group_name}" לא מושתקת.`;
@@ -197,11 +203,8 @@ export async function handleToolCall(
       );
     }
 
-    // CRM tools - owner only
+    // CRM tools
     if (name.startsWith("crm_")) {
-      if (!sender?.isOwner) {
-        return "אין לך הרשאה לגשת ל-CRM. רק רני יכול לבקש מידע זה.";
-      }
       if (name === "crm_search_policy") {
         return await searchPolicyByPersonId(input.person_id);
       }
@@ -225,17 +228,14 @@ export async function handleToolCall(
       }
     }
 
-    // Contact tools (owner only)
+    // Contact tools
     if (name === "add_contact") {
-      if (!sender?.isOwner) return "רק רני יכול להוסיף אנשי קשר.";
       return addManualContact(input.name, input.phone);
     }
     if (name === "list_contacts") {
-      if (!sender?.isOwner) return "רק רני יכול לראות אנשי קשר.";
       return listAllContacts();
     }
     if (name === "block_contact") {
-      if (!sender?.isOwner) return "רק רני יכול לחסום אנשי קשר.";
       const contact = findContactByName(input.contact_name);
       if (!contact) return `❌ לא מצאתי איש קשר בשם "${input.contact_name}"`;
       if (contact.chatId.startsWith("manual_") || contact.chatId.endsWith("@g.us")) {
@@ -249,7 +249,6 @@ export async function handleToolCall(
     }
 
     if (name === "get_contact_history") {
-      if (!sender?.isOwner) return "רק רני יכול לראות היסטוריית שיחות.";
       const contact = findContactByName(input.contact_name);
       if (!contact) return `❌ לא מצאתי איש קשר בשם "${input.contact_name}"`;
       const history = getHistory(contact.chatId);
@@ -260,8 +259,6 @@ export async function handleToolCall(
     }
 
     if (name === "get_group_history") {
-      if (!sender?.isOwner) return "רק רני יכול לראות היסטוריית קבוצות.";
-      // Find group chatId by name
       const groupChatId = findGroupChatId(input.group_name);
       if (!groupChatId) return `❌ לא מצאתי קבוצה בשם "${input.group_name}". אני צריכה לראות הודעה בקבוצה קודם כדי לזהות אותה.`;
       const history = getHistory(groupChatId);
@@ -271,55 +268,58 @@ export async function handleToolCall(
       return recent.map((m: any) => m.content).join("\n");
     }
 
-    // File tools (owner only)
+    // Group summary (owner only — uses AI summarization)
+    if (name === "summarize_group_activity") {
+      const groupChatId = findGroupChatId(input.group_name);
+      if (!groupChatId) return `❌ לא מצאתי קבוצה בשם "${input.group_name}".`;
+      const history = getHistory(groupChatId);
+      if (history.length === 0) return `אין היסטוריית שיחה בקבוצה "${input.group_name}".`;
+      const sinceHours = input.since_hours || 24;
+      const lastN = Math.min(history.length, sinceHours * 2); // rough estimate
+      const recent = history.slice(-lastN);
+      const messages = recent.map((m: any) => m.content).join("\n");
+      return `📋 סיכום קבוצה "${input.group_name}" (${sinceHours} שעות אחרונות):\n\n${messages}\n\n---\nסה"כ ${recent.length} הודעות. סכם את ההודעות למעלה: מה קרה, מי הזכיר את רני, מה דורש פעולה.`;
+    }
+
+    // File tools
     if (name === "list_files") {
-      if (!sender?.isOwner) return "רק רני יכול לגשת לקבצים.";
       return listFiles(input.directory);
     }
     if (name === "read_file") {
-      if (!sender?.isOwner) return "רק רני יכול לגשת לקבצים.";
       return readFile(input.path);
     }
     if (name === "save_file") {
-      if (!sender?.isOwner) return "רק רני יכול לשמור קבצים.";
       return saveFile(input.path, input.content);
     }
 
-    // Instruction tools (owner only)
+    // Instruction tools
     if (name === "learn_instruction") {
-      if (!sender?.isOwner) return "רק רני יכול ללמד אותי דברים חדשים.";
       saveInstruction(input.instruction);
       return `✅ שמרתי! מעכשיו אזכור: "${input.instruction}"`;
     }
     if (name === "forget_instruction") {
-      if (!sender?.isOwner) return "רק רני יכול למחוק הוראות.";
       return removeInstruction(input.query);
     }
     if (name === "list_instructions") {
-      if (!sender?.isOwner) return "רק רני יכול לראות הוראות.";
       return listInstructions();
     }
 
-    // Smart home tools (owner only)
+    // Smart home tools
     if (name === "smart_home_control") {
-      if (!sender?.isOwner) return "רק רני יכול לשלוט בבית החכם.";
       return controlDevice(input.device_name, input.action, input.value);
     }
     if (name === "smart_home_status") {
-      if (!sender?.isOwner) return "רק רני יכול לבדוק סטטוס בית חכם.";
       const device = await findDevice(input.device_name);
       if (!device) return `❌ לא מצאתי מכשיר בשם "${input.device_name}"`;
       return getDeviceStatus(device.id);
     }
     if (name === "smart_home_list") {
-      if (!sender?.isOwner) return "רק רני יכול לראות מכשירי בית חכם.";
       if (input.type === "rooms") return listRooms();
       return listDevices();
     }
 
-    // Model switching (owner only)
+    // Model switching
     if (name === "switch_model") {
-      if (!sender?.isOwner) return "רק רני יכול להחליף מודל.";
       const MODEL_MAP: Record<string, string> = {
         sonnet: "claude-sonnet-4-6",
         opus: "claude-opus-4-6",
@@ -339,12 +339,11 @@ export async function handleToolCall(
       return `המודל הנוכחי: **${name_}** (${config.model})`;
     }
 
-    // Capability learning tools (owner only)
+    // Capability learning tools
     if (name === "create_capability_request") {
-      if (!sender?.isOwner) return "רק רני יכול לבקש יכולות חדשות.";
       const spec = createSpec({
         title: input.title,
-        requestedBy: sender.name,
+        requestedBy: sender!.name,
         problem: input.problem,
         whyCurrentSystemCantDoIt: input.why_cant_do_it,
         proposedSolution: input.proposed_solution,
@@ -355,10 +354,10 @@ export async function handleToolCall(
         level: input.level || "code_change",
       });
       console.log(`[capability] New capability request: ${spec.id} — ${spec.title}`);
+      logAudit(actor, "capability_created", spec.id, "success");
       return `✅ בקשת יכולת נוצרה!\n\n📋 **${spec.title}** (${spec.id})\nסטטוס: ממתין לאישור\nרמה: ${spec.level}\n\nהבעיה: ${spec.problem}\nפתרון מוצע: ${spec.proposedSolution}\n\nכדי לאשר: *אשר יכולת ${spec.id}*`;
     }
     if (name === "list_capability_requests") {
-      if (!sender?.isOwner) return "רק רני יכול לראות בקשות יכולת.";
       const status = input.status || "pending";
       const specs = status === "approved" ? listApproved() :
         status === "all" ? [...listPending(), ...listApproved()] : listPending();
@@ -366,49 +365,45 @@ export async function handleToolCall(
       return specs.map(s => `- **${s.title}** (${s.id}) [${s.status}] — ${s.level}`).join("\n");
     }
 
-    // Coding / self-programming tools (owner only)
+    // Run capability implementation (full lifecycle)
+    if (name === "run_capability") {
+      console.log(`[capability] Running full implementation for: ${input.capability_id}`);
+      return runCapabilityImplementation(input.capability_id);
+    }
+
+    // Coding / self-programming tools
     if (name === "code_start_session") {
-      if (!sender?.isOwner) return "רק רני יכול להתחיל session תכנות.";
       return createWorktree(input.capability_id);
     }
     if (name === "code_read") {
-      if (!sender?.isOwner) return "רק רני יכול לקרוא קוד.";
       return readProjectFile(input.path, input.capability_id);
     }
     if (name === "code_write") {
-      if (!sender?.isOwner) return "רק רני יכול לכתוב קוד.";
       return writeProjectFile(input.capability_id, input.path, input.content);
     }
     if (name === "code_execute") {
-      if (!sender?.isOwner) return "רק רני יכול להריץ פקודות.";
       return runInWorktree(input.capability_id, input.command);
     }
     if (name === "code_build_test") {
-      if (!sender?.isOwner) return "רק רני יכול לבנות ולבדוק.";
       return buildAndTest(input.capability_id);
     }
     if (name === "code_show_diff") {
-      if (!sender?.isOwner) return "רק רני יכול לראות שינויים.";
       return getDiff(input.capability_id);
     }
     if (name === "code_apply") {
-      if (!sender?.isOwner) return "רק רני יכול להחיל שינויים.";
       return applyWorktree(input.capability_id);
     }
     if (name === "code_cleanup") {
-      if (!sender?.isOwner) return "רק רני יכול לנקות worktree.";
       return cleanupWorktree(input.capability_id);
     }
 
     if (name === "code_implement") {
-      if (!sender?.isOwner) return "רק רני יכול להפעיל Claude Code.";
       console.log(`[claude-code] Implementation requested for: ${input.capability_id}`);
       return implementCapability(input.capability_id);
     }
 
-    // Gett taxi tools (owner only)
+    // Gett taxi tools
     if (name === "gett_book_ride") {
-      if (!sender?.isOwner) return "רק רני יכול להזמין מונית.";
       return bookRide({
         pickupAddress: input.pickup_address,
         dropoffAddress: input.dropoff_address,
@@ -417,11 +412,9 @@ export async function handleToolCall(
       });
     }
     if (name === "gett_ride_status") {
-      if (!sender?.isOwner) return "רק רני יכול לבדוק סטטוס מונית.";
       return getRideStatus(input.order_id);
     }
     if (name === "gett_cancel_ride") {
-      if (!sender?.isOwner) return "רק רני יכול לבטל מונית.";
       return cancelRide(input.order_id);
     }
 

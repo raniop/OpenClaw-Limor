@@ -11,6 +11,7 @@ export type OwnerCommand =
   | { type: "approve_capability"; id: string }
   | { type: "reject_capability"; id: string }
   | { type: "bare_approve" }
+  | { type: "digest" }
   | null;
 
 /**
@@ -53,6 +54,12 @@ export function parseOwnerCommand(body: string): OwnerCommand {
   const capReject = lower.match(/^(?:דחה(?:\s+יכולת)?|reject\s+capability)\s+(cap-[a-z0-9-]+)$/i);
   if (capReject) {
     return { type: "reject_capability", id: capReject[1] };
+  }
+
+  // Digest command
+  const digestWords = ["תקציר", "digest", "סכם לי את היום"];
+  if (digestWords.includes(lower)) {
+    return { type: "digest" };
   }
 
   // Bare approval words

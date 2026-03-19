@@ -20,6 +20,10 @@ import { processMedia } from "./media-handler";
 import { handleOwnerCommand } from "./owner-commands";
 import { checkApprovalGate } from "./approval-gate";
 import { handleResponse } from "./response-handler";
+import { classifyGroupMessage } from "./group-classifier";
+import { extractFollowups } from "../followups";
+import { updateFromMessage } from "../relationship-memory";
+import { approvalStore } from "../stores";
 
 let latestQR: string | null = null;
 let qrServer: http.Server | null = null;
@@ -143,6 +147,19 @@ async function handleMessage(msg: Message): Promise<void> {
   if (isGroup) registerGroup(chat.name, chatId);
   const isOwner = !isGroup && chatId === config.ownerChatId;
 
+  // --- Update relationship memory ---
+  if (!isGroup) {
+    try {
+      updateFromMessage(chatId, contactName, body, {
+        isOwner,
+        isGroup,
+        isApprovedContact: approvalStore.isApproved(chatId),
+      });
+    } catch (err) {
+      console.error("[relationship] Update error:", err);
+    }
+  }
+
   // --- Create trace context ---
   const trace = createTrace({ chatId, contactName, phone, isGroup, isOwner });
   log.traceStart(trace);
@@ -155,6 +172,15 @@ async function handleMessage(msg: Message): Promise<void> {
     if (isGroup && isGroupMuted(chatId)) {
       log.traceEnd(trace, "muted_group", elapsed(trace));
       return;
+    }
+
+    // --- Group classifier pre-filter ---
+    if (isGroup) {
+      const classification = classifyGroupMessage(body, contactName);
+      if (!classification.shouldRespond) {
+        log.traceEnd(trace, "group_filtered", elapsed(trace));
+        return;
+      }
     }
 
     // --- Owner commands ---
@@ -245,6 +271,13 @@ async function handleMessage(msg: Message): Promise<void> {
     extractFacts(history).then(({ name, facts }) => {
       if (name || facts.length > 0) saveExtractedFacts(chatId, facts, name || undefined);
     }).catch((err) => log.memorySaveError(String(err)));
+
+    // Background followup extraction
+    try {
+      extractFollowups(response, chatId, contactName);
+    } catch (err) {
+      console.error("[followup] Extraction error:", err);
+    }
 
   } catch (error) {
     const normalized = normalizeError(error, "handleMessage", trace.traceId);

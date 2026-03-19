@@ -14,9 +14,11 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
+    "@types/cron": "^2.0.1",
     "@types/nodemailer": "^7.0.11",
     "dotenv": "^16.4.7",
     "googleapis": "^171.4.0",
+    "node-cron": "^4.2.1",
     "nodemailer": "^8.0.2",
     "openai": "^6.29.0",
     "openclaw": "^2026.3.13",

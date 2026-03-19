@@ -3,6 +3,7 @@ import { createWhatsAppClient } from "./whatsapp";
 import { log } from "./logger";
 import { existsSync, readdirSync } from "fs";
 import { resolve } from "path";
+import { startDigestScheduler } from "./digest";
 
 // Allow self-signed certificates (Control4 Director uses self-signed SSL)
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
@@ -31,6 +32,9 @@ validateConfig();
 const client = createWhatsAppClient();
 
 client.initialize();
+
+// Start daily digest scheduler
+startDigestScheduler();
 
 // Graceful shutdown
 process.on("SIGINT", async () => {

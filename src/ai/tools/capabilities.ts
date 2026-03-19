@@ -59,4 +59,18 @@ export const capabilityTools: Anthropic.Tool[] = [
       required: [],
     },
   },
+  {
+    name: "run_capability",
+    description: "הרצת תהליך מימוש מלא ליכולת שאושרה — יוצר סשן, מממש עם Claude Code, בונה ובודק, מחיל שינויים ומנקה. השתמשי כשרני רוצה לממש יכולת שכבר אושרה.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        capability_id: {
+          type: "string",
+          description: "מזהה היכולת (למשל: cap-xxx)",
+        },
+      },
+      required: ["capability_id"],
+    },
+  },
 ];
