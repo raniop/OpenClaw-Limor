@@ -56,7 +56,7 @@ export default function DashboardHome() {
         </Link>
       </div>
 
-      <div className="grid grid-2 mt-4">
+      <div className="grid grid-2 mt-4" style={{ alignItems: "start" }}>
         <div>
           <div className="section-header">Recent Activity</div>
           {activity.length === 0 ? (
