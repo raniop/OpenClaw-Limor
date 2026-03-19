@@ -91,4 +91,26 @@ export const contactTools: Anthropic.Tool[] = [
       required: ["group_name"],
     },
   },
+  {
+    name: "create_reminder",
+    description: "יצירת תזכורת/מעקב. השתמשי כשמישהו מבקש לתזכר את רני, או כשרני מבקש תזכורת, או כשיש משימה שצריך לעקוב אחריה. חובה לציין מי ביקש (from_name) ומה בדיוק הבקשה (task).",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        task: {
+          type: "string",
+          description: "תיאור מלא של המשימה/תזכורת. למשל: 'לקנות כבל HDMI לאלי' או 'להתקשר לליאור'",
+        },
+        from_name: {
+          type: "string",
+          description: "מי ביקש את התזכורת — שם האדם שממנו הגיעה הבקשה. למשל: 'רני', 'אלי אופיר', 'עמית'",
+        },
+        due_hours: {
+          type: "number",
+          description: "בעוד כמה שעות להזכיר (ברירת מחדל: 24)",
+        },
+      },
+      required: ["task", "from_name"],
+    },
+  },
 ];

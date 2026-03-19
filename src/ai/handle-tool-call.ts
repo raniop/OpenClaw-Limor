@@ -281,6 +281,17 @@ export async function handleToolCall(
       return `📋 סיכום קבוצה "${input.group_name}" (${sinceHours} שעות אחרונות):\n\n${messages}\n\n---\nסה"כ ${recent.length} הודעות. סכם את ההודעות למעלה: מה קרה, מי הזכיר את רני, מה דורש פעולה.`;
     }
 
+    // Create reminder / followup
+    if (name === "create_reminder") {
+      const { addFollowup } = require("../followups/followup-store");
+      const dueHours = input.due_hours || 24;
+      const dueAt = new Date(Date.now() + dueHours * 60 * 60 * 1000);
+      const reason = `[מ-${input.from_name}] ${input.task}`;
+      const entry = addFollowup(sender?.chatId || "", input.from_name, reason, dueAt);
+      logAudit(actor, "reminder_created", input.from_name, "success", { task: input.task });
+      return `✅ תזכורת נוצרה!\n📝 ${input.task}\n👤 מבקש: ${input.from_name}\n⏰ עד: ${dueAt.toLocaleString("he-IL")}`;
+    }
+
     // File tools
     if (name === "list_files") {
       return listFiles(input.directory);
