@@ -57,7 +57,7 @@
   ],
 
   "model": {
-    "name": "claude-sonnet-4-6",
+    "name": "claude-opus-4-6",
     "maxTokens": 1024
   }
 }
