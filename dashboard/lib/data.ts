@@ -348,18 +348,18 @@ export function getLogs(limit: number = 200, level?: string, domain?: string): L
   if (!existsSync(LOG_PATH)) return [];
   try {
     const content = readFileSync(LOG_PATH, "utf-8");
-    let lines = content.split("\n").filter((l) => l.trim().length > 0);
+    const lines = content.split("\n").filter((l) => l.trim().length > 0);
 
-    // Parse each line
-    let parsed: LogLine[] = lines.map((raw) => {
+    // Parse and keep only structured log lines (skip QR codes, stack traces, raw text)
+    let parsed: LogLine[] = [];
+    for (const raw of lines) {
       const match = raw.match(/^\[([^\]]+)\] \[([^\]]+)\] \[([^\]]+)\] (.*)$/);
       if (match) {
-        return { raw, timestamp: match[1], level: match[2], domain: match[3], message: match[4] };
+        parsed.push({ raw, timestamp: match[1], level: match[2], domain: match[3], message: match[4] });
       }
-      return { raw };
-    });
+    }
 
-    // Filter
+    // Filter by level/domain
     if (level) {
       parsed = parsed.filter((l) => l.level?.toUpperCase() === level.toUpperCase());
     }

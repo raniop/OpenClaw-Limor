@@ -62,17 +62,28 @@ export default function DashboardHome() {
           {activity.length === 0 ? (
             <div className="card empty-state">No recent activity</div>
           ) : (
-            activity.map((a, i) => (
-              <div key={i} className="card">
-                <div className="text-sm">
-                  <span className="text-muted">{new Date(a.timestamp).toLocaleString("he-IL")}</span>
-                </div>
-                <div className="text-sm mt-1">
-                  <strong>{a.actor}</strong> &rarr; {a.action}: {a.target}
-                </div>
-                <div className="text-xs text-muted mt-1">{a.result}</div>
-              </div>
-            ))
+            <table className="glass-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Action</th>
+                  <th>Result</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activity.map((a, i) => (
+                  <tr key={i}>
+                    <td style={{ whiteSpace: "nowrap", fontSize: 11 }}>{new Date(a.timestamp).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}</td>
+                    <td style={{ fontSize: 12 }}>{a.actor} &rarr; {a.action}</td>
+                    <td style={{ fontSize: 11 }}>
+                      <span className={a.result.includes("error") ? "text-danger" : a.result === "success" || a.result === "started" ? "text-success" : "text-muted"}>
+                        {a.result}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
           <Link href="/activity" className="text-sm">View all &rarr;</Link>
         </div>

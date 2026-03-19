@@ -16,11 +16,11 @@ export function LiveLogs() {
   useEffect(() => {
     async function fetchLogs() {
       try {
-        const res = await fetch("/api/logs?limit=5");
+        const res = await fetch("/api/logs?limit=50");
         const data = await res.json();
         // Only show properly formatted log lines (skip raw QR/stack traces)
         const parsed = (data.logs || []).filter((l: LogLine) => l.timestamp && l.level && l.domain);
-        setLogs(parsed.reverse());
+        setLogs(parsed.slice(0, 5).reverse());
       } catch {}
     }
 
