@@ -364,9 +364,11 @@ async function handleMessage(msg: Message): Promise<void> {
       if (name || facts.length > 0) saveExtractedFacts(chatId, facts, name || undefined);
     }).catch((err) => log.memorySaveError(String(err)));
 
-    // Background followup extraction
+    // Background followup extraction (skip if create_reminder tool was already used)
     try {
-      extractFollowups(response, chatId, contactName, body);
+      if (!response.includes("תזכורת נוצרה")) {
+        extractFollowups(response, chatId, contactName, body);
+      }
     } catch (err) {
       console.error("[followup] Extraction error:", err);
     }
