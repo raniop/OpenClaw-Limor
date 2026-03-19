@@ -63,7 +63,8 @@ export function BotControl({ initialRunning }: { initialRunning: boolean }) {
     setLoading(false);
   }
 
-  const isConnected = running && whatsappStatus === "connected";
+  // "offline" from QR API means QR server is down — which means WhatsApp already connected (QR server shuts down after connect)
+  const isConnected = running && (whatsappStatus === "connected" || whatsappStatus === "offline");
   const needsQR = running && whatsappStatus === "qr";
 
   return (
