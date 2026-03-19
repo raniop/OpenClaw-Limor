@@ -101,6 +101,7 @@ function saveContacts(contacts: ContactsStore): void {
 }
 
 export function updateContact(chatId: string, name: string, phone: string): void {
+
   const contacts = loadContacts();
   const existing = contacts[chatId];
   const aliases = existing?.aliases || [];

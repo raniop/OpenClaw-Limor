@@ -11,14 +11,15 @@ interface ToolIntentInput {
   actionPlan: ActionPlan;
 }
 
-const MESSAGING_VERBS = /(תשלחי|תכתבי|תגידי\s+ל|תעני\s+ל|send\b)/i;
+const MESSAGING_VERBS = /(תשלחי|תכתבי|תגידי\s+ל|תעני\s+ל|תעבירי|send\b|forward)/i;
 const CALENDAR_PATTERNS = /(תקבעי|תתאמי|ביומן|פגישה|זימון|calendar|meeting)/i;
 const BOOKING_PATTERNS = /(מסעדה|להזמין מקום|שולחן|booking|book restaurant)/i;
 const TRAVEL_PATTERNS = /(טיסה|מלון|חופשה|flight|hotel)/i;
 const CRM_PATTERNS = /(פוליסה|ביטוח|לקוח|crm|policy|insurance)/i;
 const FILE_PATTERNS = /(קובץ|מסמך|לשמור|למחוק קובץ|file|document)/i;
-const CONTACT_PATTERNS = /(איש קשר|מספר של|טלפון של|contact)/i;
+const CONTACT_PATTERNS = /(איש קשר|מספר של|טלפון של|contact|אנשי קשר)/i;
 const CAPABILITY_PATTERNS = /(תלמדי|תלמד|capability|יכולת חדשה)/i;
+const WHATSAPP_MGMT_PATTERNS = /(מי בקבוצ|חברי הקבוצ|רשימת.*קבוצ|group members|תמחקי.*הודע|תערכי.*הודע|edit message|delete message|תחפשי.*הודע|search messages|סקר|poll|תצמידי|pin|נקרא|read status|תבדקי.*מספר|check.*number|בוואטסאפ|label|תייגי|תוסיפי.*לקבוצ|תסירי.*מקבוצ|מי שם\??)/i;
 
 /**
  * Resolve whether a tool is likely needed based on message content and context.
@@ -91,6 +92,9 @@ function matchToolCategory(message: string): ToolMatch | null {
   }
   if (CAPABILITY_PATTERNS.test(message)) {
     return { type: "capability", label: "יכולות", reason: "יש בקשת יכולת חדשה", confidence: 0.85 };
+  }
+  if (WHATSAPP_MGMT_PATTERNS.test(message)) {
+    return { type: "whatsapp_management", label: "ניהול וואטסאפ", reason: "יש בקשה הקשורה לניהול וואטסאפ", confidence: 0.9 };
   }
   return null;
 }

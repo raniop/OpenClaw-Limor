@@ -161,7 +161,8 @@ export type ToolIntentType =
   | "crm"
   | "file"
   | "contact_lookup"
-  | "capability";
+  | "capability"
+  | "whatsapp_management";
 
 export interface ToolIntent {
   type: ToolIntentType;
