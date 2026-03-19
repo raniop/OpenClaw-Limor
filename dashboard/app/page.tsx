@@ -1,6 +1,7 @@
-import { getPendingApprovals, getFollowups, getActivityLog, getCapabilities, getContacts, getLogs, isLimorRunning } from "@/lib/data";
+import { getPendingApprovals, getFollowups, getActivityLog, getCapabilities, getContacts, isLimorRunning } from "@/lib/data";
 import Link from "next/link";
 import { BotControl } from "./components/bot-control";
+import { LiveLogs } from "./components/live-logs";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,6 @@ export default function DashboardHome() {
   const capabilities = getCapabilities().filter((c) => c.status === "pending");
   const contacts = getContacts();
   const running = isLimorRunning();
-  const recentLogs = getLogs(5);
   const ownerChatId = process.env.OWNER_CHAT_ID || "";
 
   return (
@@ -94,33 +94,11 @@ export default function DashboardHome() {
         </div>
       </div>
 
-      {/* Recent Logs */}
+      {/* Recent Logs — live updating */}
       <div className="mt-4">
         <div className="section-header">Recent Logs</div>
         <Link href="/logs" className="card" style={{ display: "block", textDecoration: "none" }}>
-          {recentLogs.length === 0 ? (
-            <div className="text-muted text-sm" style={{ textAlign: "center", padding: "12px 0" }}>
-              No logs yet — start Limor to see activity
-            </div>
-          ) : (
-            <div style={{ fontFamily: "'SF Mono', 'Fira Code', monospace", fontSize: 11, lineHeight: 1.8 }}>
-              {recentLogs.slice(0, 5).map((line, i) => (
-                <div key={i} style={{ color: "var(--text-secondary)" }}>
-                  {line.timestamp && (
-                    <span style={{ color: "var(--text-tertiary)" }}>
-                      {new Date(line.timestamp).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                    </span>
-                  )}{" "}
-                  <span style={{ color: line.level === "ERROR" ? "var(--danger)" : line.level === "WARN" ? "var(--warning)" : "var(--text-primary)", fontWeight: line.level === "ERROR" ? 700 : 400 }}>
-                    {line.level}
-                  </span>{" "}
-                  <span style={{ fontWeight: 600, color: "var(--accent)" }}>[{line.domain}]</span>{" "}
-                  <span style={{ color: "var(--text-primary)" }}>{line.message?.substring(0, 80)}</span>
-                </div>
-              ))}
-              <div className="text-xs text-muted mt-2">View all logs &rarr;</div>
-            </div>
-          )}
+          <LiveLogs />
         </Link>
       </div>
     </div>
