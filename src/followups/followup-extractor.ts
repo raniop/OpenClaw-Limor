@@ -66,8 +66,8 @@ export function extractFollowups(
     for (const pattern of USER_PATTERNS) {
       if (pattern.regex.test(userMessage)) {
         const dueAt = new Date(now.getTime() + pattern.dueOffsetHours * 60 * 60 * 1000);
-        // Use the user's message as the reason (truncated)
-        const reason = userMessage.length > 60 ? userMessage.substring(0, 60) + "..." : userMessage;
+        // Use the full user message as the reason
+        const reason = userMessage;
         const entry = addFollowup(chatId, contactName, reason, dueAt);
         created.push(entry);
         break;

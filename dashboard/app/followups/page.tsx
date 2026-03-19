@@ -25,7 +25,7 @@ export default function FollowupsPage() {
                   <span className={`badge ${isOverdue ? "badge-overdue" : f.status === "completed" ? "badge-completed" : "badge-pending"}`}>
                     {isOverdue ? "Overdue" : f.status}
                   </span>
-                  <div className="text-sm mt-2">{f.reason}</div>
+                  <div className="pre mt-2" style={{ fontSize: 13, padding: "10px 14px" }}>{f.reason}</div>
                   <div className="card-meta">
                     Due: {new Date(f.dueAt).toLocaleString("he-IL")} &middot; Created: {new Date(f.createdAt).toLocaleString("he-IL")}
                   </div>
