@@ -56,42 +56,44 @@ export default function DashboardHome() {
         </Link>
       </div>
 
-      <div className="grid grid-2 mt-4" style={{ alignItems: "start" }}>
-        <div>
+      <div className="grid grid-2 mt-4" style={{ alignItems: "stretch" }}>
+        <div style={{ display: "flex", flexDirection: "column" }}>
           <div className="section-header">Recent Activity</div>
-          {activity.length === 0 ? (
-            <div className="card empty-state">No recent activity</div>
-          ) : (
-            <table className="glass-table">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Action</th>
-                  <th>Result</th>
-                </tr>
-              </thead>
-              <tbody>
-                {activity.map((a, i) => (
-                  <tr key={i}>
-                    <td style={{ whiteSpace: "nowrap", fontSize: 11 }}>{new Date(a.timestamp).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}</td>
-                    <td style={{ fontSize: 12 }}>{a.actor} &rarr; {a.action}</td>
-                    <td style={{ fontSize: 11 }}>
-                      <span className={a.result.includes("error") ? "text-danger" : a.result === "success" || a.result === "started" ? "text-success" : "text-muted"}>
-                        {a.result}
-                      </span>
-                    </td>
+          <div className="card" style={{ flex: 1, padding: 0, overflow: "hidden" }}>
+            {activity.length === 0 ? (
+              <div className="empty-state">No recent activity</div>
+            ) : (
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr>
+                    <th style={{ padding: "10px 14px", fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "start", borderBottom: "1px solid var(--glass-border)" }}>Time</th>
+                    <th style={{ padding: "10px 14px", fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "start", borderBottom: "1px solid var(--glass-border)" }}>Action</th>
+                    <th style={{ padding: "10px 14px", fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", textAlign: "start", borderBottom: "1px solid var(--glass-border)" }}>Result</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                </thead>
+                <tbody>
+                  {activity.map((a, i) => (
+                    <tr key={i}>
+                      <td style={{ padding: "8px 14px", whiteSpace: "nowrap", fontSize: 11, borderBottom: "1px solid rgba(128,128,128,0.06)" }}>{new Date(a.timestamp).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}</td>
+                      <td style={{ padding: "8px 14px", fontSize: 12, borderBottom: "1px solid rgba(128,128,128,0.06)" }}>{a.actor} &rarr; {a.action}</td>
+                      <td style={{ padding: "8px 14px", fontSize: 11, borderBottom: "1px solid rgba(128,128,128,0.06)" }}>
+                        <span className={a.result.includes("error") ? "text-danger" : a.result === "success" || a.result === "started" ? "text-success" : "text-muted"}>
+                          {a.result}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
           <Link href="/activity" className="text-sm">View all &rarr;</Link>
         </div>
 
-        <div>
+        <div style={{ display: "flex", flexDirection: "column" }}>
           <div className="section-header">Contacts ({contacts.length})</div>
-          <div className="card" style={{ padding: "8px 16px", overflow: "hidden" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 24px" }}>
+          <div className="card" style={{ flex: 1, padding: "8px 16px", overflow: "hidden", display: "flex", alignItems: "center" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 24px", width: "100%" }}>
               {contacts.map((c) => (
                 <div key={c.chatId} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 0", fontSize: 13 }}>
                   <ContactIcon chatId={c.chatId} isApproved={c.isApproved} ownerChatId={ownerChatId} />
