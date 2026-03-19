@@ -284,13 +284,47 @@ export function getContacts(): ContactWithRelationship[] {
     }
   }
 
-  return Object.values(contacts)
+  const allContacts = Object.values(contacts)
     .map((c) => ({
       ...c,
       relationship: relationships[c.chatId],
       facts: facts[c.chatId],
       isApproved: approved.includes(c.chatId),
-    }))
+    }));
+
+  // Dedup by phone: if same phone exists on both manual_ and real chatId, keep the real one.
+  // Also dedup personal vs group chatIds with the same phone — prefer personal.
+  const byPhone = new Map<string, ContactWithRelationship>();
+  for (const c of allContacts) {
+    const phone = c.phone?.replace(/\D/g, "");
+    if (!phone) { continue; }
+    const existing = byPhone.get(phone);
+    if (!existing) {
+      byPhone.set(phone, c);
+      continue;
+    }
+    // Prefer non-manual over manual
+    const existingIsManual = existing.chatId.startsWith("manual_");
+    const newIsManual = c.chatId.startsWith("manual_");
+    if (existingIsManual && !newIsManual) {
+      // Merge aliases from manual entry
+      if (existing.name && existing.name !== c.name) {
+        c.aliases = [...(c.aliases || []), existing.name, ...(existing.aliases || [])];
+      }
+      byPhone.set(phone, c);
+      continue;
+    }
+    // Prefer personal (@lid/@c.us) over group (@g.us)
+    const existingIsGroup = existing.chatId.endsWith("@g.us");
+    const newIsGroup = c.chatId.endsWith("@g.us");
+    if (existingIsGroup && !newIsGroup) {
+      byPhone.set(phone, c);
+      continue;
+    }
+    // Otherwise keep existing (first seen)
+  }
+
+  return Array.from(byPhone.values())
     .sort((a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime());
 }
 
