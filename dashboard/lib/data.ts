@@ -6,10 +6,53 @@ import { readFileSync, writeFileSync, existsSync, readdirSync } from "fs";
 import { resolve, join } from "path";
 
 const STATE_DIR = resolve(process.cwd(), "..", "workspace", "state");
+const LEGACY_DIR = resolve(process.cwd(), "..", "memory");
 const MEMORY_DIR = resolve(process.cwd(), "..", "workspace", "memory", "users");
 const CAP_DIR = resolve(process.cwd(), "..", "workspace", "capability_requests");
 
+/**
+ * Read JSON with fallback to legacy memory/ directory.
+ * Merges data from both sources when both exist (same logic as bot's state-migration).
+ */
 function readJSON<T>(filename: string, fallback: T): T {
+  const newPath = resolve(STATE_DIR, filename);
+  const oldPath = resolve(LEGACY_DIR, filename);
+
+  let newData: T | null = null;
+  let oldData: T | null = null;
+
+  if (existsSync(newPath)) {
+    try { newData = JSON.parse(readFileSync(newPath, "utf-8")); } catch {}
+  }
+  if (existsSync(oldPath)) {
+    try { oldData = JSON.parse(readFileSync(oldPath, "utf-8")); } catch {}
+  }
+
+  // If both exist, merge
+  if (newData !== null && oldData !== null) {
+    return mergeData(newData, oldData);
+  }
+  if (newData !== null) return newData;
+  if (oldData !== null) return oldData;
+  return fallback;
+}
+
+function mergeData<T>(primary: T, secondary: T): T {
+  // Arrays: union
+  if (Array.isArray(primary) && Array.isArray(secondary)) {
+    const set = new Set((primary as any[]).map(String));
+    const missing = (secondary as any[]).filter((item: any) => !set.has(String(item)));
+    return [...primary, ...missing] as T;
+  }
+  // Objects: merge missing keys from secondary
+  if (typeof primary === "object" && typeof secondary === "object" && !Array.isArray(primary)) {
+    const merged = { ...(secondary as any), ...(primary as any) };
+    return merged as T;
+  }
+  return primary;
+}
+
+function readJSONStrict<T>(filename: string, fallback: T): T {
   const path = resolve(STATE_DIR, filename);
   if (!existsSync(path)) return fallback;
   try {
