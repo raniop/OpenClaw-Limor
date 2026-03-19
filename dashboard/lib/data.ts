@@ -356,6 +356,23 @@ export function getContactById(chatId: string): ContactWithRelationship | null {
   return all.find((c) => c.chatId === chatId) || null;
 }
 
+// --- Deliveries ---
+export interface DeliveryStoreEntry {
+  id: string;
+  carrier: string;
+  trackingNumber?: string;
+  summary: string;
+  smsText: string;
+  sender: string;
+  smsTimestamp: string;
+  status: "pending" | "received";
+  receivedAt?: string;
+}
+
+export function getDeliveryStore(): DeliveryStoreEntry[] {
+  return readJSONStrict<DeliveryStoreEntry[]>("deliveries.json", []);
+}
+
 // --- Logs ---
 export interface LogLine {
   raw: string;

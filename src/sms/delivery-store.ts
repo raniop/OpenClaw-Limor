@@ -65,6 +65,8 @@ export function addDelivery(
   const entries = readStore();
   // Dedup by smsId
   if (entries.some((e) => e.smsId === smsId)) return null;
+  // Dedup by tracking number — if same tracking already exists, skip (it's an update on same package)
+  if (trackingNumber && entries.some((e) => e.trackingNumber === trackingNumber && e.status === "pending")) return null;
   const entry: DeliveryEntry = {
     id: generateId(),
     smsId,

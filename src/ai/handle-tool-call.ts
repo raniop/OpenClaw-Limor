@@ -758,7 +758,8 @@ export async function handleToolCall(
       if (pending.length > 0) {
         parts.push(`📦 ${pending.length} משלוחים ממתינים:`);
         for (const d of pending) {
-          parts.push(`  - ${d.summary} (${d.smsTimestamp})`);
+          const track = d.trackingNumber ? ` | מספר מעקב: ${d.trackingNumber}` : "";
+          parts.push(`  - ${d.carrier}: ${d.summary}${track} (${d.smsTimestamp})`);
         }
       }
       if (alerts.length > 0 && pending.length === 0) {

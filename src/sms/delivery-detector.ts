@@ -59,6 +59,9 @@ const TRACKING_PATTERNS = [
   /\b\d{10,22}\b/,  // Generic long number (DHL, etc.)
 ];
 
+// Israel Post: extract both tracking number and postal code (e.g. "ג 1077")
+const ISRAEL_POST_TRACKING = /משלוח\s+([A-Z]{2}\d+[A-Z]*)\s*\n?\s*(ג\s*\d+)?/i;
+
 /**
  * Check if an SMS message is about a delivery/package.
  */
@@ -138,6 +141,13 @@ function detectDeliveryType(text: string): DeliveryAlert["type"] {
 }
 
 function extractTrackingNumber(text: string): string | undefined {
+  // Israel Post special: extract both tracking + postal code
+  const ipMatch = text.match(ISRAEL_POST_TRACKING);
+  if (ipMatch) {
+    const tracking = ipMatch[1];
+    const postalCode = ipMatch[2]?.trim();
+    return postalCode ? `${tracking} | ${postalCode}` : tracking;
+  }
   for (const pattern of TRACKING_PATTERNS) {
     const match = text.match(pattern);
     if (match) return match[1] || match[0];

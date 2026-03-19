@@ -1,4 +1,4 @@
-import { getPendingApprovals, getFollowups, getActivityLog, getCapabilities, getContacts, isLimorRunning } from "@/lib/data";
+import { getPendingApprovals, getFollowups, getActivityLog, getCapabilities, getContacts, isLimorRunning, getDeliveryStore } from "@/lib/data";
 import Link from "next/link";
 import { BotControl } from "./components/bot-control";
 import { LiveLogs } from "./components/live-logs";
@@ -27,6 +27,7 @@ export default function DashboardHome() {
   const activity = getActivityLog(5);
   const capabilities = getCapabilities().filter((c) => c.status === "pending");
   const contacts = getContacts();
+  const pendingDeliveries = getDeliveryStore().filter((d) => d.status === "pending");
   const running = isLimorRunning();
   const ownerChatId = process.env.OWNER_CHAT_ID || "";
 
@@ -54,9 +55,9 @@ export default function DashboardHome() {
             {overdue.length > 0 && <span className="text-danger text-xs" style={{ marginInlineStart: 8 }}>({overdue.length} overdue)</span>}
           </div>
         </Link>
-        <Link href="/capabilities" className="stat-card">
-          <div className="stat-label">Pending Capabilities</div>
-          <div className="stat-value">{capabilities.length}</div>
+        <Link href="/sms" className="stat-card">
+          <div className="stat-label">📦 Pending Deliveries</div>
+          <div className="stat-value">{pendingDeliveries.length}</div>
         </Link>
       </div>
 
