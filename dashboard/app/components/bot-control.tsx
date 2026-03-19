@@ -7,16 +7,33 @@ export function BotControl({ initialRunning }: { initialRunning: boolean }) {
   const [loading, setLoading] = useState(false);
   const [statusText, setStatusText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [qrSvg, setQrSvg] = useState<string | null>(null);
+  const [whatsappStatus, setWhatsappStatus] = useState<"connected" | "qr" | "waiting" | "offline">("waiting");
 
-  // Poll status every 5 seconds
+  // Poll bot status + QR every 5 seconds
   useEffect(() => {
-    const interval = setInterval(async () => {
+    async function poll() {
       try {
-        const res = await fetch("/api/bot");
-        const data = await res.json();
-        setRunning(data.running);
+        const [botRes, qrRes] = await Promise.all([
+          fetch("/api/bot"),
+          fetch("/api/qr"),
+        ]);
+        const botData = await botRes.json();
+        const qrData = await qrRes.json();
+
+        setRunning(botData.running);
+        setWhatsappStatus(qrData.status);
+
+        if (qrData.status === "qr" && qrData.svg) {
+          setQrSvg(qrData.svg);
+        } else {
+          setQrSvg(null);
+        }
       } catch {}
-    }, 5000);
+    }
+
+    poll();
+    const interval = setInterval(poll, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -34,7 +51,6 @@ export function BotControl({ initialRunning }: { initialRunning: boolean }) {
       if (data.success) {
         setRunning(action !== "stop");
         setStatusText(data.message || "");
-        // Clear message after 3s
         setTimeout(() => setStatusText(""), 3000);
       } else {
         setError(data.error || "Failed");
@@ -47,41 +63,58 @@ export function BotControl({ initialRunning }: { initialRunning: boolean }) {
     setLoading(false);
   }
 
-  return (
-    <div className="card" style={{ padding: "10px 18px", marginBottom: 0, display: "inline-flex", alignItems: "center", gap: 12 }}>
-      <span style={{
-        width: 10, height: 10, borderRadius: "50%",
-        background: loading ? "var(--warning)" : running ? "var(--success)" : "var(--danger)",
-        boxShadow: loading
-          ? "0 0 10px var(--warning-glow)"
-          : running
-            ? "0 0 10px var(--success-glow), 0 0 20px var(--success-glow)"
-            : "0 0 10px var(--danger-glow)",
-        animation: "pulseGlow 2s ease-in-out infinite",
-        display: "inline-block",
-        flexShrink: 0,
-      }} />
-      <span style={{ fontWeight: 600, fontSize: 13, color: loading ? "var(--warning)" : running ? "var(--success)" : "var(--danger)" }}>
-        {loading ? statusText : running ? "Online" : "Offline"}
-      </span>
+  const isConnected = running && whatsappStatus === "connected";
+  const needsQR = running && whatsappStatus === "qr";
 
-      {!running && !loading && (
-        <button className="btn btn-approve" style={{ padding: "4px 12px", fontSize: 12 }} onClick={() => handleAction("start")}>
-          Start
-        </button>
-      )}
-      {running && !loading && (
-        <>
-          <button className="btn btn-reject" style={{ padding: "4px 12px", fontSize: 12 }} onClick={() => handleAction("stop")}>
-            Stop
+  return (
+    <div>
+      <div className="card" style={{ padding: "10px 18px", marginBottom: 0, display: "inline-flex", alignItems: "center", gap: 12 }}>
+        <span style={{
+          width: 10, height: 10, borderRadius: "50%",
+          background: loading ? "var(--warning)" : needsQR ? "var(--warning)" : isConnected ? "var(--success)" : running ? "var(--warning)" : "var(--danger)",
+          boxShadow: `0 0 10px ${loading || needsQR ? "var(--warning-glow)" : isConnected ? "var(--success-glow)" : "var(--danger-glow)"}`,
+          animation: "pulseGlow 2s ease-in-out infinite",
+          display: "inline-block",
+          flexShrink: 0,
+        }} />
+        <span style={{
+          fontWeight: 600, fontSize: 13,
+          color: loading ? "var(--warning)" : needsQR ? "var(--warning)" : isConnected ? "var(--success)" : running ? "var(--warning)" : "var(--danger)",
+        }}>
+          {loading ? statusText : needsQR ? "Scan QR" : isConnected ? "Online" : running ? "Connecting..." : "Offline"}
+        </span>
+
+        {!running && !loading && (
+          <button className="btn btn-approve" style={{ padding: "4px 12px", fontSize: 12 }} onClick={() => handleAction("start")}>
+            Start
           </button>
-          <button className="btn btn-action" style={{ padding: "4px 12px", fontSize: 12 }} onClick={() => handleAction("restart")}>
-            Restart
-          </button>
-        </>
-      )}
-      {error && (
-        <span className="text-xs text-danger" style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis" }}>{error}</span>
+        )}
+        {running && !loading && (
+          <>
+            <button className="btn btn-reject" style={{ padding: "4px 12px", fontSize: 12 }} onClick={() => handleAction("stop")}>
+              Stop
+            </button>
+            <button className="btn btn-action" style={{ padding: "4px 12px", fontSize: 12 }} onClick={() => handleAction("restart")}>
+              Restart
+            </button>
+          </>
+        )}
+        {error && (
+          <span className="text-xs text-danger" style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis" }}>{error}</span>
+        )}
+      </div>
+
+      {/* QR Code display */}
+      {needsQR && qrSvg && (
+        <div className="card mt-3" style={{ textAlign: "center", padding: "24px" }}>
+          <div style={{ marginBottom: 12, fontWeight: 600, fontSize: 14 }}>Scan with WhatsApp</div>
+          <div style={{ display: "inline-block", background: "#fff", padding: 16, borderRadius: 12 }}
+            dangerouslySetInnerHTML={{ __html: qrSvg }}
+          />
+          <div className="text-sm text-muted" style={{ marginTop: 12 }}>
+            WhatsApp &rarr; Settings &rarr; Linked Devices &rarr; Link a Device
+          </div>
+        </div>
       )}
     </div>
   );
