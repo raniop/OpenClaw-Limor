@@ -22,6 +22,7 @@ import { handleOwnerCommand } from "./owner-commands";
 import { checkApprovalGate } from "./approval-gate";
 import { handleResponse } from "./response-handler";
 import { classifyGroupMessage } from "./group-classifier";
+import { getContextBundle, formatContextForPrompt } from "../context";
 import { extractFollowups } from "../followups";
 import { updateFromMessage } from "../relationship-memory";
 import { approvalStore } from "../stores";
@@ -335,9 +336,17 @@ async function handleMessage(msg: Message): Promise<void> {
       if (lastMsg.role === "user") lastMsg.imageData = imageData;
     }
 
+    // --- Build context engine ---
     let extraContext = "";
+    try {
+      const contextBundle = getContextBundle(chatId, body, { name: contactName, isOwner, isGroup });
+      extraContext = "\n\n" + formatContextForPrompt(contextBundle);
+    } catch (err) {
+      console.error("[context] Failed to build context:", err);
+    }
+
     if (isGroup) {
-      extraContext = `\n\nזו קבוצת וואטסאפ. ההודעה האחרונה נכתבה על ידי ${contactName}. תגיבי (טקסט בלבד, 1-2 משפטים) רק אם: (1) פונים אלייך בשם (לימור/Limor) (2) שואלים שאלה שמופנית אלייך (3) מגיבים למשהו שאמרת (4) שואלים שאלה כללית שלא פונה לאף אחד ספציפי. ⚠️ תחזירי [SKIP] (ולא ריאקציה!) אם: ההודעה פונה למישהו אחר, או שהיא שיחה בין אנשים שלא קשורה אלייך. אל תגיבי בריאקציה (אמוג'י) על הודעות בקבוצות שלא מכוונות אלייך! ריאקציה היא תגובה – אם לא היית עונה בטקסט, גם אל תגיבי בריאקציה. [SKIP] = שתיקה מוחלטת.`;
+      extraContext += `\n\nזו קבוצת וואטסאפ. ההודעה האחרונה נכתבה על ידי ${contactName}. תגיבי (טקסט בלבד, 1-2 משפטים) רק אם: (1) פונים אלייך בשם (לימור/Limor) (2) שואלים שאלה שמופנית אלייך (3) מגיבים למשהו שאמרת (4) שואלים שאלה כללית שלא פונה לאף אחד ספציפי. ⚠️ תחזירי [SKIP] (ולא ריאקציה!) אם: ההודעה פונה למישהו אחר, או שהיא שיחה בין אנשים שלא קשורה אלייך. אל תגיבי בריאקציה (אמוג'י) על הודעות בקבוצות שלא מכוונות אלייך! ריאקציה היא תגובה – אם לא היית עונה בטקסט, גם אל תגיבי בריאקציה. [SKIP] = שתיקה מוחלטת.`;
     }
 
     log.aiRequestStart(trace);
