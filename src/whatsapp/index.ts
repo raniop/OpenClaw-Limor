@@ -328,7 +328,7 @@ async function handleMessage(msg: Message): Promise<void> {
 
     // Background followup extraction
     try {
-      extractFollowups(response, chatId, contactName);
+      extractFollowups(response, chatId, contactName, body);
     } catch (err) {
       console.error("[followup] Extraction error:", err);
     }
