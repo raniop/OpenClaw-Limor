@@ -327,7 +327,22 @@ export function getContacts(): ContactWithRelationship[] {
   }
 
   return Array.from(byPhone.values())
-    .sort((a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime());
+    .sort((a, b) => {
+      // Owner first
+      const ownerChatId = process.env.OWNER_CHAT_ID || "";
+      if (a.chatId === ownerChatId && b.chatId !== ownerChatId) return -1;
+      if (b.chatId === ownerChatId && a.chatId !== ownerChatId) return 1;
+      // Approved personal contacts before groups
+      const aIsGroup = a.chatId.endsWith("@g.us");
+      const bIsGroup = b.chatId.endsWith("@g.us");
+      if (!aIsGroup && bIsGroup) return -1;
+      if (aIsGroup && !bIsGroup) return 1;
+      // Approved before unapproved
+      if (a.isApproved && !b.isApproved) return -1;
+      if (!a.isApproved && b.isApproved) return 1;
+      // Then by last seen
+      return new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime();
+    });
 }
 
 export function getContactById(chatId: string): ContactWithRelationship | null {

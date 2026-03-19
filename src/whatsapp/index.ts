@@ -224,9 +224,20 @@ async function handleMessage(msg: Message): Promise<void> {
     await msg.reply(mediaResult.error);
     return;
   }
-  const { body, imageData } = mediaResult.result;
+  let { body, imageData } = mediaResult.result;
   if (!body) return;
   const mediaDurationMs = mediaTimer.stop();
+
+  // --- Quoted message context ---
+  if (msg.hasQuotedMsg) {
+    try {
+      const quotedMsg = await msg.getQuotedMessage();
+      const quotedText = quotedMsg.body || "(מדיה)";
+      body = `[בתגובה ל: ${quotedText}]\n${body}`;
+    } catch (err) {
+      console.error("[quoted] Failed to get quoted message:", err);
+    }
+  }
 
   // --- Contact info ---
   const chatId = msg.from;

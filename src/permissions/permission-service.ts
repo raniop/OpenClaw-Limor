@@ -77,6 +77,22 @@ const TOOL_PERMISSIONS: Record<string, Role[]> = {
 
   // Group summary
   summarize_group_activity: ["owner"],
+
+  // WhatsApp extras
+  list_group_members: ["owner"],
+  search_messages: ["owner"],
+  edit_message: ["owner"],
+  delete_message: ["owner"],
+  check_read_status: ["owner"],
+  get_contact_info: ["owner"],
+  list_labels: ["owner"],
+  add_label: ["owner"],
+  pin_message: ["owner"],
+  create_poll: ["owner"],
+  forward_message: ["owner"],
+  group_add_member: ["owner"],
+  group_remove_member: ["owner"],
+  check_whatsapp_number: ["owner"],
 };
 
 // Tools available to approved contacts (in addition to universal tools)

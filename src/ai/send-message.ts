@@ -12,7 +12,7 @@ import { client, withRetry } from "./client";
 import type { Message, SenderContext } from "./types";
 import {
   calendarTools, travelTools, bookingTools,
-  crmTools, instructionTools, fileTools, contactTools, smartHomeTools, capabilityTools, modelTools, codingTools, gettTools,
+  crmTools, instructionTools, fileTools, contactTools, smartHomeTools, capabilityTools, modelTools, codingTools, gettTools, whatsappExtraTools,
 } from "./tools";
 import { handleToolCall } from "./handle-tool-call";
 import { log } from "../logger";
@@ -130,7 +130,7 @@ export async function sendMessage(
   let tools = !toolsEnabled
     ? []
     : sender?.isOwner
-      ? [...calendarTools, ...travelTools, ...bookingTools, ...crmTools, ...instructionTools, ...fileTools, ...contactTools, ...smartHomeTools, ...capabilityTools, ...modelTools, ...codingTools, ...gettTools]
+      ? [...calendarTools, ...travelTools, ...bookingTools, ...crmTools, ...instructionTools, ...fileTools, ...contactTools, ...smartHomeTools, ...capabilityTools, ...modelTools, ...codingTools, ...gettTools, ...whatsappExtraTools]
       : [...calendarTools, ...travelTools, ...bookingTools];
 
   // Apply tool routing filter — narrow to only allowed tool names

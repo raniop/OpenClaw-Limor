@@ -11,3 +11,4 @@ export { capabilityTools } from "./capabilities";
 export { modelTools } from "./model";
 export { codingTools } from "./coding";
 export { gettTools } from "./gett";
+export { whatsappExtraTools } from "./whatsapp-extras";

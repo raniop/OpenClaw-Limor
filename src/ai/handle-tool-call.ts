@@ -26,6 +26,7 @@ import {
   sendSms,
 } from "../crm";
 import { muteGroup, unmuteGroup, getMutedGroups, findGroupChatId } from "../muted-groups";
+import { getClient } from "../whatsapp";
 import { searchFlights } from "../flights";
 import { searchHotels } from "../hotels";
 import { saveInstruction, removeInstruction, listInstructions } from "../instructions";
@@ -439,6 +440,272 @@ export async function handleToolCall(
     }
     if (name === "gett_cancel_ride") {
       return cancelRide(input.order_id);
+    }
+
+    // ==========================================
+    // WhatsApp Extra Tools
+    // ==========================================
+
+    // 1. List Group Members
+    if (name === "list_group_members") {
+      const waClient = getClient();
+      if (!waClient) return "❌ לקוח וואטסאפ לא מחובר.";
+      const groupChatId = findGroupChatId(input.group_name);
+      if (!groupChatId) return `❌ לא מצאתי קבוצה בשם "${input.group_name}".`;
+      const chat = await waClient.getChatById(groupChatId) as any;
+      if (!chat.isGroup) return `❌ "${input.group_name}" הוא לא קבוצה.`;
+      const participants = chat.participants || [];
+      const members = await Promise.all(
+        participants.map(async (p: any) => {
+          try {
+            const contact = await waClient.getContactById(p.id._serialized);
+            return {
+              name: contact.pushname || contact.name || "לא ידוע",
+              phone: contact.number || p.id.user,
+              isAdmin: p.isAdmin || p.isSuperAdmin,
+            };
+          } catch {
+            return { name: "לא ידוע", phone: p.id.user, isAdmin: p.isAdmin || false };
+          }
+        })
+      );
+      const lines = members.map((m: any) => `${m.isAdmin ? "👑 " : "👤 "}${m.name} (${m.phone})`);
+      return `📋 חברי הקבוצה "${input.group_name}" (${members.length}):\n${lines.join("\n")}`;
+    }
+
+    // 2. Search Messages
+    if (name === "search_messages") {
+      const waClient = getClient();
+      if (!waClient) return "❌ לקוח וואטסאפ לא מחובר.";
+      const options: any = { limit: 20 };
+      if (input.contact_name) {
+        const contact = findContactByName(input.contact_name);
+        if (contact) {
+          options.chatId = contact.chatId;
+        } else {
+          const groupId = findGroupChatId(input.contact_name);
+          if (groupId) options.chatId = groupId;
+        }
+      }
+      const results = await waClient.searchMessages(input.query, options);
+      if (results.length === 0) return `לא נמצאו הודעות עבור "${input.query}".`;
+      const lines = await Promise.all(
+        results.slice(0, 20).map(async (m: any) => {
+          const contact = await m.getContact();
+          const name_ = contact.pushname || contact.name || contact.number || "לא ידוע";
+          const time = new Date(m.timestamp * 1000).toLocaleString("he-IL");
+          return `[${time}] ${name_}: ${m.body}`;
+        })
+      );
+      return `🔍 תוצאות חיפוש "${input.query}" (${results.length}):\n${lines.join("\n")}`;
+    }
+
+    // 3. Edit Message
+    if (name === "edit_message") {
+      const waClient = getClient();
+      if (!waClient) return "❌ לקוח וואטסאפ לא מחובר.";
+      const contact = findContactByName(input.chat_name);
+      let chatId = contact?.chatId;
+      if (!chatId) chatId = findGroupChatId(input.chat_name);
+      if (!chatId) return `❌ לא מצאתי צ'אט בשם "${input.chat_name}".`;
+      const chat = await waClient.getChatById(chatId);
+      const messages = await chat.fetchMessages({ limit: 30 });
+      const myMsg = messages.reverse().find((m: any) => m.fromMe && m.body.includes(input.old_text));
+      if (!myMsg) return `❌ לא מצאתי הודעה שלי שמכילה "${input.old_text}" ב-30 ההודעות האחרונות.`;
+      await myMsg.edit(input.new_text);
+      return `✅ ההודעה עודכנה בהצלחה!`;
+    }
+
+    // 4. Delete Message
+    if (name === "delete_message") {
+      const waClient = getClient();
+      if (!waClient) return "❌ לקוח וואטסאפ לא מחובר.";
+      const contact = findContactByName(input.chat_name);
+      let chatId = contact?.chatId;
+      if (!chatId) chatId = findGroupChatId(input.chat_name);
+      if (!chatId) return `❌ לא מצאתי צ'אט בשם "${input.chat_name}".`;
+      const chat = await waClient.getChatById(chatId);
+      const messages = await chat.fetchMessages({ limit: 30 });
+      const myMsg = messages.reverse().find((m: any) => m.fromMe && m.body.includes(input.message_text));
+      if (!myMsg) return `❌ לא מצאתי הודעה שלי שמכילה "${input.message_text}" ב-30 ההודעות האחרונות.`;
+      await myMsg.delete(true);
+      return `✅ ההודעה נמחקה בהצלחה!`;
+    }
+
+    // 6. Check Read Receipt
+    if (name === "check_read_status") {
+      const waClient = getClient();
+      if (!waClient) return "❌ לקוח וואטסאפ לא מחובר.";
+      const contact = findContactByName(input.chat_name);
+      let chatId = contact?.chatId;
+      if (!chatId) chatId = findGroupChatId(input.chat_name);
+      if (!chatId) return `❌ לא מצאתי צ'אט בשם "${input.chat_name}".`;
+      const chat = await waClient.getChatById(chatId);
+      const messages = await chat.fetchMessages({ limit: 20 });
+      let targetMsg: any;
+      if (input.message_text) {
+        targetMsg = messages.reverse().find((m: any) => m.fromMe && m.body.includes(input.message_text));
+      } else {
+        targetMsg = messages.reverse().find((m: any) => m.fromMe);
+      }
+      if (!targetMsg) return "❌ לא מצאתי הודעה שלי לבדיקה.";
+      const info = await targetMsg.getInfo();
+      if (!info) return "❌ לא הצלחתי לקבל מידע על ההודעה.";
+      const readBy = info.read?.length || 0;
+      const deliveredTo = info.delivery?.length || 0;
+      if (readBy > 0) return `✅ ההודעה נקראה (${readBy} קוראים).`;
+      if (deliveredTo > 0) return `📨 ההודעה נמסרה (${deliveredTo}) אבל עדיין לא נקראה.`;
+      return `📤 ההודעה נשלחה אבל עדיין לא נמסרה.`;
+    }
+
+    // 7. Contact Profile Info
+    if (name === "get_contact_info") {
+      const waClient = getClient();
+      if (!waClient) return "❌ לקוח וואטסאפ לא מחובר.";
+      let contactId: string;
+      const knownContact = findContactByName(input.phone_or_name);
+      if (knownContact) {
+        const phone = knownContact.phone.replace(/\D/g, "");
+        contactId = `${phone}@c.us`;
+      } else {
+        const phone = input.phone_or_name.replace(/\D/g, "");
+        contactId = `${phone}@c.us`;
+      }
+      try {
+        const waContact = await waClient.getContactById(contactId);
+        const profilePic = await waContact.getProfilePicUrl().catch(() => null);
+        const about = await waContact.getAbout().catch(() => null);
+        const name_ = waContact.pushname || waContact.name || "לא ידוע";
+        const lines = [`👤 ${name_}`, `📱 ${waContact.number}`];
+        if (about) lines.push(`📝 ביו: ${about}`);
+        if (profilePic) lines.push(`🖼️ תמונת פרופיל: ${profilePic}`);
+        return lines.join("\n");
+      } catch {
+        return `❌ לא מצאתי איש קשר "${input.phone_or_name}" בוואטסאפ.`;
+      }
+    }
+
+    // 8a. List Labels
+    if (name === "list_labels") {
+      const waClient = getClient();
+      if (!waClient) return "❌ לקוח וואטסאפ לא מחובר.";
+      const labels = await waClient.getLabels();
+      if (labels.length === 0) return "אין תוויות מוגדרות.";
+      const lines = labels.map((l: any) => `🏷️ ${l.name} (ID: ${l.id})`);
+      return `📋 תוויות (${labels.length}):\n${lines.join("\n")}`;
+    }
+
+    // 8b. Add Label
+    if (name === "add_label") {
+      const waClient = getClient();
+      if (!waClient) return "❌ לקוח וואטסאפ לא מחובר.";
+      const labels = await waClient.getLabels();
+      const label = labels.find((l: any) => l.name.includes(input.label_name) || input.label_name.includes(l.name));
+      if (!label) return `❌ לא מצאתי תווית בשם "${input.label_name}". השתמשי ב-list_labels כדי לראות תוויות זמינות.`;
+      const contact = findContactByName(input.chat_name);
+      let chatId = contact?.chatId;
+      if (!chatId) chatId = findGroupChatId(input.chat_name);
+      if (!chatId) return `❌ לא מצאתי צ'אט בשם "${input.chat_name}".`;
+      await waClient.addOrRemoveLabels([label.id], [chatId]);
+      return `✅ התווית "${label.name}" נוספה לצ'אט "${input.chat_name}".`;
+    }
+
+    // 9. Pin Message
+    if (name === "pin_message") {
+      const waClient = getClient();
+      if (!waClient) return "❌ לקוח וואטסאפ לא מחובר.";
+      const contact = findContactByName(input.chat_name);
+      let chatId = contact?.chatId;
+      if (!chatId) chatId = findGroupChatId(input.chat_name);
+      if (!chatId) return `❌ לא מצאתי צ'אט בשם "${input.chat_name}".`;
+      const chat = await waClient.getChatById(chatId);
+      const messages = await chat.fetchMessages({ limit: 30 });
+      const targetMsg = messages.reverse().find((m: any) => m.body.includes(input.message_text));
+      if (!targetMsg) return `❌ לא מצאתי הודעה שמכילה "${input.message_text}".`;
+      const durationSec = (input.duration_days || 7) * 86400;
+      await targetMsg.pin(durationSec);
+      return `📌 ההודעה הוצמדה בהצלחה ל-${input.duration_days || 7} ימים!`;
+    }
+
+    // 10. Create Poll
+    if (name === "create_poll") {
+      const waClient = getClient();
+      if (!waClient) return "❌ לקוח וואטסאפ לא מחובר.";
+      const contact = findContactByName(input.chat_name);
+      let chatId = contact?.chatId;
+      if (!chatId) chatId = findGroupChatId(input.chat_name);
+      if (!chatId) return `❌ לא מצאתי צ'אט בשם "${input.chat_name}".`;
+      const { Poll } = require("whatsapp-web.js");
+      const poll = new Poll(input.question, input.options, {
+        allowMultipleAnswers: input.allow_multiple || false,
+      });
+      await waClient.sendMessage(chatId, poll);
+      return `✅ הסקר "${input.question}" נשלח עם ${input.options.length} אפשרויות!`;
+    }
+
+    // 11. Forward Message
+    if (name === "forward_message") {
+      const waClient = getClient();
+      if (!waClient) return "❌ לקוח וואטסאפ לא מחובר.";
+      // Find source chat
+      const sourceContact = findContactByName(input.source_chat);
+      let sourceChatId = sourceContact?.chatId;
+      if (!sourceChatId) sourceChatId = findGroupChatId(input.source_chat);
+      if (!sourceChatId) return `❌ לא מצאתי צ'אט מקור בשם "${input.source_chat}".`;
+      // Find target chat
+      const targetContact = findContactByName(input.target_chat);
+      let targetChatId = targetContact?.chatId;
+      if (!targetChatId) targetChatId = findGroupChatId(input.target_chat);
+      if (!targetChatId) return `❌ לא מצאתי צ'אט יעד בשם "${input.target_chat}".`;
+      const chat = await waClient.getChatById(sourceChatId);
+      const messages = await chat.fetchMessages({ limit: 30 });
+      const targetMsg = messages.reverse().find((m: any) => m.body.includes(input.message_text));
+      if (!targetMsg) return `❌ לא מצאתי הודעה שמכילה "${input.message_text}" בצ'אט "${input.source_chat}".`;
+      await targetMsg.forward(targetChatId);
+      return `✅ ההודעה הועברה בהצלחה מ-"${input.source_chat}" ל-"${input.target_chat}"!`;
+    }
+
+    // 12a. Group Add Member
+    if (name === "group_add_member") {
+      const waClient = getClient();
+      if (!waClient) return "❌ לקוח וואטסאפ לא מחובר.";
+      const groupChatId = findGroupChatId(input.group_name);
+      if (!groupChatId) return `❌ לא מצאתי קבוצה בשם "${input.group_name}".`;
+      const chat = await waClient.getChatById(groupChatId) as any;
+      if (!chat.isGroup) return `❌ "${input.group_name}" הוא לא קבוצה.`;
+      const phone = input.phone.replace(/\D/g, "");
+      const participantId = `${phone}@c.us`;
+      await chat.addParticipants([participantId]);
+      return `✅ ${phone} נוסף לקבוצה "${input.group_name}"!`;
+    }
+
+    // 12b. Group Remove Member
+    if (name === "group_remove_member") {
+      const waClient = getClient();
+      if (!waClient) return "❌ לקוח וואטסאפ לא מחובר.";
+      const groupChatId = findGroupChatId(input.group_name);
+      if (!groupChatId) return `❌ לא מצאתי קבוצה בשם "${input.group_name}".`;
+      const chat = await waClient.getChatById(groupChatId) as any;
+      if (!chat.isGroup) return `❌ "${input.group_name}" הוא לא קבוצה.`;
+      const phone = input.phone.replace(/\D/g, "");
+      const participantId = `${phone}@c.us`;
+      await chat.removeParticipants([participantId]);
+      return `✅ ${phone} הוסר מהקבוצה "${input.group_name}"!`;
+    }
+
+    // 13. Check WhatsApp Number
+    if (name === "check_whatsapp_number") {
+      const waClient = getClient();
+      if (!waClient) return "❌ לקוח וואטסאפ לא מחובר.";
+      const phone = input.phone.replace(/\D/g, "");
+      const contactId = `${phone}@c.us`;
+      const isRegistered = await waClient.isRegisteredUser(contactId);
+      if (isRegistered) {
+        const numberId = await waClient.getNumberId(phone);
+        const formatted = numberId ? numberId._serialized.replace("@c.us", "") : phone;
+        return `✅ המספר ${formatted} רשום בוואטסאפ!`;
+      }
+      return `❌ המספר ${phone} לא רשום בוואטסאפ.`;
     }
 
     return "פעולה לא מוכרת";

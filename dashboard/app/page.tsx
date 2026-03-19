@@ -3,6 +3,7 @@ import Link from "next/link";
 import { BotControl } from "./components/bot-control";
 import { LiveLogs } from "./components/live-logs";
 import { SystemStatus } from "./components/system-status";
+import { StatusFeed } from "./components/status-feed";
 
 export const dynamic = "force-dynamic";
 
@@ -116,6 +117,11 @@ export default function DashboardHome() {
         <Link href="/logs" className="card" style={{ display: "block", textDecoration: "none" }}>
           <LiveLogs />
         </Link>
+      </div>
+
+      {/* Live Message Feed — below logs */}
+      <div className="mt-4">
+        <StatusFeed />
       </div>
     </div>
   );
