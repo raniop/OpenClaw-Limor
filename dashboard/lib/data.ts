@@ -118,6 +118,8 @@ export interface FollowupEntry {
   dueAt: string;
   createdAt: string;
   status: "pending" | "completed";
+  requesterChatId?: string;
+  requesterName?: string;
 }
 
 export function getFollowups(): FollowupEntry[] {

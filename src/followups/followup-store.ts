@@ -38,7 +38,9 @@ export function addFollowup(
   chatId: string,
   contactName: string,
   reason: string,
-  dueAt: Date
+  dueAt: Date,
+  requesterChatId?: string,
+  requesterName?: string
 ): FollowupEntry {
   const entries = readStore();
   const entry: FollowupEntry = {
@@ -49,6 +51,8 @@ export function addFollowup(
     dueAt: dueAt.toISOString(),
     createdAt: new Date().toISOString(),
     status: "pending",
+    requesterChatId,
+    requesterName,
   };
   entries.push(entry);
   writeStore(entries);

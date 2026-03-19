@@ -2,6 +2,7 @@
  * WhatsApp client setup and message routing.
  * Sub-modules handle media, owner commands, approval gating, and response dispatch.
  */
+import { resolve } from "path";
 import { Client, LocalAuth, Message, MessageMedia } from "whatsapp-web.js";
 import qrcode from "qrcode-terminal";
 import * as QRCode from "qrcode";
@@ -112,6 +113,9 @@ export function createWhatsAppClient(): Client {
     processUnreadMessages(client).catch((err) =>
       console.error("[unread] Failed to process unread messages:", err)
     );
+
+    // Poll for pending notifications from dashboard (e.g., followup completion)
+    startNotificationPoller(client);
   });
 
   client.on("authenticated", () => { console.log("WhatsApp authenticated successfully."); });
@@ -130,6 +134,40 @@ export function createWhatsAppClient(): Client {
  * Process unread messages that arrived while the bot was offline.
  * Fetches all chats with unread messages and processes each one.
  */
+/**
+ * Poll for pending notifications from the dashboard (e.g., followup completed → notify requester).
+ */
+function startNotificationPoller(client: Client): void {
+  const notifyPath = resolve(__dirname, "..", "..", "workspace", "state", "pending-notifications.json");
+  const { readFileSync, writeFileSync, existsSync } = require("fs");
+
+  setInterval(() => {
+    try {
+      if (!existsSync(notifyPath)) return;
+      const content = readFileSync(notifyPath, "utf-8").trim();
+      if (!content || content === "[]") return;
+
+      const notifications = JSON.parse(content);
+      if (!Array.isArray(notifications) || notifications.length === 0) return;
+
+      // Send each notification
+      for (const n of notifications) {
+        if (n.chatId && n.message) {
+          client.sendMessage(n.chatId, n.message).catch((err: any) =>
+            console.error(`[notify] Failed to send to ${n.chatId}:`, err.message)
+          );
+          console.log(`[notify] Sent completion notification to ${n.chatId}`);
+        }
+      }
+
+      // Clear the file
+      writeFileSync(notifyPath, "[]", "utf-8");
+    } catch {}
+  }, 5000); // Check every 5 seconds
+
+  console.log("[notify] Notification poller started");
+}
+
 async function processUnreadMessages(client: Client): Promise<void> {
   console.log("[unread] Checking for unread messages...");
   try {

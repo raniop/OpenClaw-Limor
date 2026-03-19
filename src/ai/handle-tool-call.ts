@@ -297,7 +297,9 @@ export async function handleToolCall(
       const dueHours = input.due_hours || 24;
       const dueAt = new Date(Date.now() + dueHours * 60 * 60 * 1000);
       const reason = `[מ-${input.from_name}] ${input.task}`;
-      const entry = addFollowup(sender?.chatId || "", input.from_name, reason, dueAt);
+      // Find requester's chatId so we can notify them when completed
+      const requesterContact = findContactByName(input.from_name);
+      const entry = addFollowup(sender?.chatId || "", input.from_name, reason, dueAt, requesterContact?.chatId, input.from_name);
       logAudit(actor, "reminder_created", input.from_name, "success", { task: input.task });
       return `✅ תזכורת נוצרה!\n📝 ${input.task}\n👤 מבקש: ${input.from_name}\n⏰ עד: ${dueAt.toLocaleString("he-IL")}`;
     }
