@@ -26,6 +26,9 @@ import { resolveToolRoutingPolicy } from "./tool-routing-policy";
 import { buildCompressedPrompt } from "./prompt-compressor";
 import { resolveMemoryCommitDecision } from "./memory-commit-policy";
 import { evaluateOutcome } from "./outcome-tracker";
+import { buildDebugTrace } from "./debug-trace";
+import { resolveFollowupAutomationDecision } from "./followup-automation";
+import { resolveDomainPolicy } from "./domain-policy-resolver";
 
 interface BuildParams {
   chatId: string;
@@ -78,7 +81,13 @@ export function buildResolvedContext(params: BuildParams): ResolvedContext {
   const toolRoutingPolicy = resolveToolRoutingPolicy({ ...fullPartial, conversationState, contradictions, responseStrategy, executionDecision });
   const compressedPrompt = buildCompressedPrompt({ bundle, primaryFocus, responseMode, actionPlan, toolIntent, memoryWriteDecision, memoryCommitDecision, conversationState, contradictions, responseStrategy, executionDecision, toolRoutingPolicy });
   const outcomeEvaluation = evaluateOutcome({ bundle, primaryFocus, responseMode, actionPlan, toolIntent, memoryWriteDecision, memoryCommitDecision, conversationState, contradictions, responseStrategy, executionDecision, toolRoutingPolicy, compressedPrompt });
-  return { bundle, primaryFocus, responseMode, actionPlan, toolIntent, memoryWriteDecision, memoryCommitDecision, conversationState, contradictions, responseStrategy, executionDecision, toolRoutingPolicy, compressedPrompt, outcomeEvaluation };
+  const preTrace = { bundle, primaryFocus, responseMode, actionPlan, toolIntent, memoryWriteDecision, memoryCommitDecision, conversationState, contradictions, responseStrategy, executionDecision, toolRoutingPolicy, compressedPrompt, outcomeEvaluation };
+  const debugTrace = buildDebugTrace(preTrace);
+  const preFollowup = { ...preTrace, debugTrace };
+  const followupAutomationDecision = resolveFollowupAutomationDecision(preFollowup);
+  const preDomain = { ...preFollowup, followupAutomationDecision };
+  const domainPolicy = resolveDomainPolicy(preDomain);
+  return { ...preDomain, domainPolicy };
 }
 
 function buildPersonContext(params: BuildParams): PersonContext {

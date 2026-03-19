@@ -6,7 +6,7 @@
  */
 import type { ResolvedContext, ExecutionDecision } from "./context-types";
 
-type GuardrailInput = Omit<ResolvedContext, "executionDecision" | "toolRoutingPolicy" | "compressedPrompt" | "outcomeEvaluation">;
+type GuardrailInput = Omit<ResolvedContext, "executionDecision" | "toolRoutingPolicy" | "compressedPrompt" | "outcomeEvaluation" | "debugTrace" | "followupAutomationDecision" | "domainPolicy">;
 
 /**
  * Resolve the execution decision based on all resolved context layers.

@@ -29,6 +29,13 @@ console.log(`[workspace] identity=${identityOk ? "OK" : "MISSING"} state=${state
 
 validateConfig();
 
+// Sync contacts with relationships on startup
+import { syncContacts } from "./sync-contacts";
+const syncResult = syncContacts();
+if (syncResult.added > 0 || syncResult.updated > 0) {
+  console.log(`[sync] Contacts synced: ${syncResult.added} added, ${syncResult.updated} updated`);
+}
+
 const client = createWhatsAppClient();
 
 // Initialize with auto-retry on session corruption
@@ -79,19 +86,31 @@ initWithRetry();
 // Start daily digest scheduler
 startDigestScheduler();
 
-// Graceful shutdown — give Chrome time to close properly
-async function gracefulShutdown() {
+// Graceful shutdown — close WhatsApp session and kill Chrome cleanly
+let isShuttingDown = false;
+function gracefulShutdown(signal: string) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.log(`[shutdown] Received ${signal}, closing WhatsApp session cleanly...`);
   log.systemShutdown();
-  try {
-    await Promise.race([
-      client.destroy(),
-      new Promise(r => setTimeout(r, 10000)), // Max 10s wait
-    ]);
-  } catch (err) {
-    console.error("[shutdown] Error during destroy:", err);
-  }
-  process.exit(0);
+
+  const timeout = new Promise<void>(r => setTimeout(() => {
+    console.error("[shutdown] Timeout waiting for client.destroy(), forcing exit");
+    r();
+  }, 8000));
+
+  Promise.race([client.destroy(), timeout])
+    .catch(err => console.error("[shutdown] Error during destroy:", err))
+    .finally(() => {
+      // Kill any leftover Chromium processes spawned by puppeteer
+      try {
+        const { execSync } = require("child_process");
+        execSync("pkill -f '.wwebjs_auth.*chrome' 2>/dev/null || true", { timeout: 3000 });
+      } catch {}
+      console.log("[shutdown] Done, exiting.");
+      process.exit(0);
+    });
 }
 
-process.on("SIGINT", gracefulShutdown);
-process.on("SIGTERM", gracefulShutdown);
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));

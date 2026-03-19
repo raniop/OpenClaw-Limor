@@ -1,8 +1,8 @@
 import { writeFileSync } from "fs";
 import { resolve } from "path";
 import { loadWithFallback } from "./state-migration";
+import { statePath } from "./state-dir";
 
-const MUTED_FILE = resolve(__dirname, "..", "workspace", "state", "groups.json");
 const OLD_MUTED_FILE = resolve(__dirname, "..", "data", "muted-groups.json");
 
 interface MutedGroups {
@@ -17,20 +17,19 @@ interface GroupRegistry {
 }
 
 // Persisted group name → chatId registry (survives restarts)
-const REGISTRY_FILE = resolve(__dirname, "..", "workspace", "state", "group_registry.json");
 
 function loadRegistry(): GroupRegistry {
   try {
     const { readFileSync, existsSync } = require("fs");
-    if (existsSync(REGISTRY_FILE)) {
-      return JSON.parse(readFileSync(REGISTRY_FILE, "utf-8"));
+    if (existsSync(statePath("group_registry.json"))) {
+      return JSON.parse(readFileSync(statePath("group_registry.json"), "utf-8"));
     }
   } catch {}
   return {};
 }
 
 function saveRegistry(registry: GroupRegistry): void {
-  writeFileSync(REGISTRY_FILE, JSON.stringify(registry, null, 2), "utf-8");
+  writeFileSync(statePath("group_registry.json"), JSON.stringify(registry, null, 2), "utf-8");
 }
 
 // In-memory cache (initialized from file)
@@ -56,11 +55,11 @@ export function findGroupChatId(name: string): string | undefined {
 }
 
 function load(): MutedGroups {
-  return loadWithFallback<MutedGroups>(MUTED_FILE, OLD_MUTED_FILE, {});
+  return loadWithFallback<MutedGroups>(statePath("groups.json"), OLD_MUTED_FILE, {});
 }
 
 function save(data: MutedGroups): void {
-  writeFileSync(MUTED_FILE, JSON.stringify(data, null, 2), "utf-8");
+  writeFileSync(statePath("groups.json"), JSON.stringify(data, null, 2), "utf-8");
 }
 
 export function muteGroup(chatId: string, name: string): void {

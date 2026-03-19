@@ -6,7 +6,7 @@
  */
 import type { ResolvedContext, CompressedPrompt, PromptSection, PromptPriorityLevel } from "./context-types";
 
-type CompressorInput = Omit<ResolvedContext, "compressedPrompt" | "outcomeEvaluation">;
+type CompressorInput = Omit<ResolvedContext, "compressedPrompt" | "outcomeEvaluation" | "debugTrace" | "followupAutomationDecision" | "domainPolicy">;
 
 const PRIORITY_ORDER: PromptPriorityLevel[] = ["critical", "high", "medium", "low"];
 const MAX_SECTIONS = 8;

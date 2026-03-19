@@ -3,15 +3,14 @@
  * Loads once into memory, persists on change.
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import { resolve, dirname } from "path";
+import { dirname } from "path";
+import { statePath } from "../state-dir";
 import type { RelationshipProfile } from "./relationship-types";
-
-const STORE_PATH = resolve(__dirname, "..", "..", "workspace", "state", "relationships.json");
 
 let cache: Map<string, RelationshipProfile> | null = null;
 
 function ensureDir(): void {
-  const dir = dirname(STORE_PATH);
+  const dir = dirname(statePath("relationships.json"));
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
 
@@ -19,9 +18,10 @@ function loadCache(): Map<string, RelationshipProfile> {
   if (cache) return cache;
   ensureDir();
   cache = new Map();
-  if (existsSync(STORE_PATH)) {
+  const p = statePath("relationships.json");
+  if (existsSync(p)) {
     try {
-      const data: Record<string, RelationshipProfile> = JSON.parse(readFileSync(STORE_PATH, "utf-8"));
+      const data: Record<string, RelationshipProfile> = JSON.parse(readFileSync(p, "utf-8"));
       for (const [key, profile] of Object.entries(data)) {
         cache.set(key, profile);
       }
@@ -38,7 +38,7 @@ function persist(): void {
   for (const [key, profile] of loadCache()) {
     data[key] = profile;
   }
-  writeFileSync(STORE_PATH, JSON.stringify(data, null, 2), "utf-8");
+  writeFileSync(statePath("relationships.json"), JSON.stringify(data, null, 2), "utf-8");
 }
 
 export function getProfile(chatId: string): RelationshipProfile | null {

@@ -1,8 +1,8 @@
 import { writeFileSync } from "fs";
 import { resolve } from "path";
 import { loadWithFallback } from "./state-migration";
+import { statePath } from "./state-dir";
 
-const CONTACTS_PATH = resolve(__dirname, "..", "workspace", "state", "contacts.json");
 const OLD_CONTACTS_PATH = resolve(__dirname, "..", "memory", "contacts.json");
 
 interface ContactEntry {
@@ -93,14 +93,16 @@ function translateName(name: string): string[] {
 }
 
 function loadContacts(): ContactsStore {
-  return loadWithFallback<ContactsStore>(CONTACTS_PATH, OLD_CONTACTS_PATH, {});
+  return loadWithFallback<ContactsStore>(statePath("contacts.json"), OLD_CONTACTS_PATH, {});
 }
 
 function saveContacts(contacts: ContactsStore): void {
-  writeFileSync(CONTACTS_PATH, JSON.stringify(contacts, null, 2), "utf-8");
+  writeFileSync(statePath("contacts.json"), JSON.stringify(contacts, null, 2), "utf-8");
 }
 
 export function updateContact(chatId: string, name: string, phone: string): void {
+  // Don't add group chats to contacts — only personal chats
+  if (chatId.endsWith("@g.us")) return;
 
   const contacts = loadContacts();
   const existing = contacts[chatId];
@@ -195,24 +197,52 @@ export function findContactByPhone(phone: string): ContactEntry | null {
 
 export function addManualContact(name: string, phone: string, notes?: string): string {
   const contacts = loadContacts();
-  // Generate a placeholder chatId from phone (will be updated when they actually message)
   const cleanPhone = phone.replace(/\D/g, "");
+
   // Check if contact already exists by phone
-  const existing = Object.values(contacts).find(
-    (c) => c.phone.replace(/\D/g, "") === cleanPhone
-  );
+  let existing = cleanPhone
+    ? Object.entries(contacts).find(([, c]) => c.phone.replace(/\D/g, "") === cleanPhone)
+    : undefined;
+
+  // Also check by name (for contacts added without phone)
+  if (!existing) {
+    const nameLower = name.toLowerCase();
+    existing = Object.entries(contacts).find(([, c]) => {
+      const allNames = [c.name, ...(c.aliases || [])].map(n => n.toLowerCase());
+      return allNames.includes(nameLower);
+    });
+  }
+
   if (existing) {
+    const [existingKey, existingContact] = existing;
+    let changed = false;
+    // Update phone if missing
+    if (cleanPhone && !existingContact.phone) {
+      existingContact.phone = cleanPhone;
+      changed = true;
+    }
     // Update name if different
-    if (existing.name !== name) {
-      const aliases = existing.aliases || [];
-      if (!aliases.includes(existing.name)) aliases.push(existing.name);
-      existing.name = name;
-      existing.aliases = aliases.length > 0 ? aliases : undefined;
+    if (existingContact.name !== name) {
+      const aliases = existingContact.aliases || [];
+      if (!aliases.includes(existingContact.name)) aliases.push(existingContact.name);
+      existingContact.name = name;
+      existingContact.aliases = aliases.length > 0 ? aliases : undefined;
+      changed = true;
+    }
+    // If phone was added and chatId is a non-phone manual_, migrate to phone-based key
+    if (cleanPhone && existingKey.startsWith("manual_") && !existingKey.includes(cleanPhone)) {
+      const newKey = `manual_${cleanPhone}`;
+      contacts[newKey] = { ...existingContact, chatId: newKey };
+      delete contacts[existingKey];
+      changed = true;
+    }
+    if (changed) {
       saveContacts(contacts);
       return `עדכנתי את ${name} (${phone})`;
     }
     return `${name} (${phone}) כבר קיים`;
   }
+
   // Create with placeholder chatId
   const placeholderChatId = `manual_${cleanPhone}`;
   contacts[placeholderChatId] = {

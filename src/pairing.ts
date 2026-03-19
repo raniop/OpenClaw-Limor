@@ -1,10 +1,9 @@
 import { writeFileSync } from "fs";
 import { resolve } from "path";
 import { loadWithFallback } from "./state-migration";
+import { statePath } from "./state-dir";
 
-const APPROVED_PATH = resolve(__dirname, "..", "workspace", "state", "approved.json");
 const OLD_APPROVED_PATH = resolve(__dirname, "..", "memory", "approved.json");
-const PENDING_PATH = resolve(__dirname, "..", "workspace", "state", "pending.json");
 const OLD_PENDING_PATH = resolve(__dirname, "..", "memory", "pending.json");
 
 interface PendingEntry {
@@ -16,7 +15,7 @@ interface PendingEntry {
 type PendingStore = Record<string, PendingEntry>;
 
 function loadApproved(): string[] {
-  return loadWithFallback<string[]>(APPROVED_PATH, OLD_APPROVED_PATH, []);
+  return loadWithFallback<string[]>(statePath("approved.json"), OLD_APPROVED_PATH, []);
 }
 
 // Log approved count on first load
@@ -29,15 +28,15 @@ function logStartupApproved(count: number): void {
 }
 
 function saveApproved(approved: string[]): void {
-  writeFileSync(APPROVED_PATH, JSON.stringify(approved, null, 2), "utf-8");
+  writeFileSync(statePath("approved.json"), JSON.stringify(approved, null, 2), "utf-8");
 }
 
 function loadPending(): PendingStore {
-  return loadWithFallback<PendingStore>(PENDING_PATH, OLD_PENDING_PATH, {});
+  return loadWithFallback<PendingStore>(statePath("pending.json"), OLD_PENDING_PATH, {});
 }
 
 function savePending(pending: PendingStore): void {
-  writeFileSync(PENDING_PATH, JSON.stringify(pending, null, 2), "utf-8");
+  writeFileSync(statePath("pending.json"), JSON.stringify(pending, null, 2), "utf-8");
 }
 
 export function isApproved(chatId: string): boolean {

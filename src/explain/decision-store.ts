@@ -3,22 +3,22 @@
  * Ring-buffer style, persisted to JSON.
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import { resolve, dirname } from "path";
+import { dirname } from "path";
+import { statePath } from "../state-dir";
 import type { DecisionRecord, DecisionCategory } from "./explain-types";
-
-const STORE_PATH = resolve(__dirname, "..", "..", "workspace", "state", "decisions.json");
 const MAX_ENTRIES = 200;
 
 function ensureDir(): void {
-  const dir = dirname(STORE_PATH);
+  const dir = dirname(statePath("decisions.json"));
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
 
 function readStore(): DecisionRecord[] {
   ensureDir();
-  if (!existsSync(STORE_PATH)) return [];
+  const p = statePath("decisions.json");
+  if (!existsSync(p)) return [];
   try {
-    return JSON.parse(readFileSync(STORE_PATH, "utf-8"));
+    return JSON.parse(readFileSync(p, "utf-8"));
   } catch {
     return [];
   }
@@ -26,7 +26,7 @@ function readStore(): DecisionRecord[] {
 
 function writeStore(entries: DecisionRecord[]): void {
   ensureDir();
-  writeFileSync(STORE_PATH, JSON.stringify(entries, null, 2), "utf-8");
+  writeFileSync(statePath("decisions.json"), JSON.stringify(entries, null, 2), "utf-8");
 }
 
 function generateId(): string {

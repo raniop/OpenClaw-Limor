@@ -5,7 +5,7 @@
  */
 import type { ResolvedContext, OutcomeEvaluation } from "./context-types";
 
-type OutcomeInput = Omit<ResolvedContext, "outcomeEvaluation">;
+type OutcomeInput = Omit<ResolvedContext, "outcomeEvaluation" | "debugTrace" | "followupAutomationDecision" | "domainPolicy">;
 
 /**
  * Evaluate the expected outcome of the current turn.

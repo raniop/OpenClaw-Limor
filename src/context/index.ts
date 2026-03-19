@@ -1,6 +1,6 @@
-export type { ContextBundle, PersonContext, ConversationContext, UrgencyContext, SystemContext, OpenLoopContext, TurnIntent, TurnIntentCategory, PrimaryFocus, ResponseMode, ResolvedContext, ActionPlan, PlannedActionType, ResolvedReference, MissingInfo, MissingDetailType, ToolIntent, ToolIntentType, MemoryWriteDecision, MemoryWriteType, MemoryCommitDecision, MemoryCommitAction, ConversationState, ConversationStateType, ContradictionFlag, ResponseStrategy, ResponseStrategyType, ExecutionDecision, ExecutionDecisionType, ToolRoutingPolicy, ToolRouteGroup, CompressedPrompt, PromptSection, PromptPriorityLevel, OutcomeEvaluation, OutcomeStatus } from "./context-types";
+export type { ContextBundle, PersonContext, ConversationContext, UrgencyContext, SystemContext, OpenLoopContext, TurnIntent, TurnIntentCategory, PrimaryFocus, ResponseMode, ResolvedContext, ActionPlan, PlannedActionType, ResolvedReference, MissingInfo, MissingDetailType, ToolIntent, ToolIntentType, MemoryWriteDecision, MemoryWriteType, MemoryCommitDecision, MemoryCommitAction, ConversationState, ConversationStateType, ContradictionFlag, ResponseStrategy, ResponseStrategyType, ExecutionDecision, ExecutionDecisionType, ToolRoutingPolicy, ToolRouteGroup, CompressedPrompt, PromptSection, PromptPriorityLevel, OutcomeEvaluation, OutcomeStatus, DebugTrace, DebugTraceItem, DebugTraceStep, ReplayTurnInput, ReplayTurnResult, ReplayScenario, ReplayScenarioResult, FollowupAutomationAction, FollowupAutomationDecision, DomainType, DomainPolicy } from "./context-types";
 export { buildContext, buildResolvedContext } from "./context-builder";
-export { getContextBundle, getResolvedContext, formatContextForPrompt, formatResolvedContextForPrompt, formatCompressedContextForPrompt } from "./context-service";
+export { getContextBundle, getResolvedContext, formatContextForPrompt, formatResolvedContextForPrompt, formatCompressedContextForPrompt, formatDebugTrace } from "./context-service";
 export { classifyTurnIntent } from "./turn-intent";
 export { resolveOpenLoops } from "./open-loop-resolver";
 export { generateResponseGuidance } from "./response-guidance";
@@ -19,3 +19,7 @@ export { resolveToolRoutingPolicy } from "./tool-routing-policy";
 export { buildCompressedPrompt } from "./prompt-compressor";
 export { resolveMemoryCommitDecision } from "./memory-commit-policy";
 export { evaluateOutcome } from "./outcome-tracker";
+export { buildDebugTrace } from "./debug-trace";
+export { runReplayTurn, runReplayScenario } from "./replay-runner";
+export { resolveFollowupAutomationDecision, applyFollowupAutomation } from "./followup-automation";
+export { resolveDomainPolicy } from "./domain-policy-resolver";

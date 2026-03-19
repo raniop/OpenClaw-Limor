@@ -2,6 +2,7 @@ import { writeFileSync } from "fs";
 import { resolve } from "path";
 import { config } from "./config";
 import { loadWithFallback } from "./state-migration";
+import { statePath } from "./state-dir";
 
 interface Message {
   role: "user" | "assistant";
@@ -12,17 +13,16 @@ interface Message {
   };
 }
 
-const HISTORY_PATH = resolve(__dirname, "..", "workspace", "state", "conversations.json");
 const OLD_HISTORY_PATH = resolve(__dirname, "..", "memory", "conversations.json");
 
 type ConversationStore = Record<string, Message[]>;
 
 function loadStore(): ConversationStore {
-  return loadWithFallback<ConversationStore>(HISTORY_PATH, OLD_HISTORY_PATH, {});
+  return loadWithFallback<ConversationStore>(statePath("conversations.json"), OLD_HISTORY_PATH, {});
 }
 
 function saveStore(store: ConversationStore): void {
-  writeFileSync(HISTORY_PATH, JSON.stringify(store, null, 2), "utf-8");
+  writeFileSync(statePath("conversations.json"), JSON.stringify(store, null, 2), "utf-8");
 }
 
 export function addMessage(chatId: string, role: "user" | "assistant", content: string): void {

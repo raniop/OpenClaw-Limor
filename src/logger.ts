@@ -4,7 +4,8 @@
  * at workspace/state/limor.log (read by the dashboard).
  */
 import { appendFileSync, existsSync, statSync, renameSync, mkdirSync } from "fs";
-import { resolve, dirname } from "path";
+import { dirname } from "path";
+import { statePath } from "./state-dir";
 import type { TraceContext, NormalizedError } from "./observability/types";
 
 type LogLevel = "info" | "warn" | "error" | "debug";
@@ -14,11 +15,10 @@ interface LogContext {
   [key: string]: string | number | boolean | undefined;
 }
 
-const LOG_PATH = resolve(__dirname, "..", "workspace", "state", "limor.log");
 const MAX_LOG_SIZE = 2 * 1024 * 1024; // 2MB — rotate when exceeded
 
 function ensureLogDir(): void {
-  const dir = dirname(LOG_PATH);
+  const dir = dirname(statePath("limor.log"));
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
 
@@ -38,15 +38,16 @@ function formatLine(level: LogLevel, domain: LogDomain, message: string, ctx?: L
 function writeToFile(line: string): void {
   try {
     ensureLogDir();
+    const logFile = statePath("limor.log");
     // Rotate if too large
-    if (existsSync(LOG_PATH)) {
-      const stats = statSync(LOG_PATH);
+    if (existsSync(logFile)) {
+      const stats = statSync(logFile);
       if (stats.size > MAX_LOG_SIZE) {
-        const backupPath = LOG_PATH + ".1";
-        try { renameSync(LOG_PATH, backupPath); } catch {}
+        const backupPath = logFile + ".1";
+        try { renameSync(logFile, backupPath); } catch {}
       }
     }
-    appendFileSync(LOG_PATH, line + "\n", "utf-8");
+    appendFileSync(logFile, line + "\n", "utf-8");
   } catch {
     // Silently fail — don't break the bot for log I/O errors
   }

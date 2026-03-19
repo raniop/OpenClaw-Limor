@@ -2,7 +2,7 @@
  * Context service v3 — high-level API for building and formatting context.
  * Includes resolved context with primary focus and response mode.
  */
-import type { ContextBundle, ResolvedContext } from "./context-types";
+import type { ContextBundle, ResolvedContext, DebugTrace } from "./context-types";
 import { buildContext, buildResolvedContext } from "./context-builder";
 
 export function getContextBundle(
@@ -198,6 +198,18 @@ export function formatResolvedContextForPrompt(resolved: ResolvedContext): strin
     lines.push(`  - ${outcome.summary}${followupHint}`);
   }
 
+  // Domain policy section (only when domain !== "general" or has rules)
+  const dp = resolved.domainPolicy;
+  if (dp.domain !== "general" || dp.rules.length > 0) {
+    lines.push("");
+    lines.push(`🧩 מדיניות דומיין:`);
+    lines.push(`  - ${dp.summary}`);
+    lines.push(`  - סיבה: ${dp.reason}`);
+    for (const rule of dp.rules.slice(0, 3)) {
+      lines.push(`  - ${rule}`);
+    }
+  }
+
   return lines.join("\n");
 }
 
@@ -226,6 +238,17 @@ export function formatCompressedContextForPrompt(resolved: ResolvedContext): str
     lines.push(`📊 מצב משימה:`);
     const followupHint = outcome.followupSuggestedMinutes ? ` — כדאי לבדוק בעוד ${outcome.followupSuggestedMinutes} דקות` : "";
     lines.push(`  - ${outcome.summary}${followupHint}`);
+  }
+
+  // Domain policy section (only for non-general domains)
+  const dp = resolved.domainPolicy;
+  if (dp.domain !== "general") {
+    lines.push(`🧩 מדיניות דומיין:`);
+    lines.push(`  - ${dp.summary}`);
+    lines.push(`  - סיבה: ${dp.reason}`);
+    for (const rule of dp.rules.slice(0, 2)) {
+      lines.push(`  - ${rule}`);
+    }
   }
 
   lines.push("");
@@ -306,6 +329,23 @@ function formatBundleSection(bundle: ContextBundle): string {
 
   // --- Summary ---
   lines.push(`  • סיכום: ${bundle.historySummary}`);
+
+  return lines.join("\n");
+}
+
+/**
+ * Format a DebugTrace into a compact readable block for logging.
+ */
+export function formatDebugTrace(resolved: ResolvedContext): string {
+  const { debugTrace } = resolved;
+  const lines: string[] = [];
+
+  lines.push("🧠 Debug Trace:");
+  for (const item of debugTrace.items) {
+    lines.push(`  - [${item.step}] ${item.summary}`);
+  }
+  lines.push(`🧾 Summary:`);
+  lines.push(`  - ${debugTrace.summary}`);
 
   return lines.join("\n");
 }

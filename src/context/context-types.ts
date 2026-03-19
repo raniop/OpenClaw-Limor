@@ -345,6 +345,69 @@ export interface OutcomeEvaluation {
   followupSuggestedMinutes?: number;
 }
 
+// --- v14 debug trace ---
+
+export type DebugTraceStep =
+  | "bundle"
+  | "primary_focus"
+  | "response_mode"
+  | "action_plan"
+  | "tool_intent"
+  | "memory_write"
+  | "memory_commit"
+  | "conversation_state"
+  | "contradictions"
+  | "response_strategy"
+  | "execution_decision"
+  | "tool_routing"
+  | "compressed_prompt"
+  | "outcome";
+
+export interface DebugTraceItem {
+  step: DebugTraceStep;
+  summary: string;
+  reason: string;
+}
+
+export interface DebugTrace {
+  items: DebugTraceItem[];
+  summary: string;
+}
+
+// --- v16 followup automation ---
+
+export type FollowupAutomationAction =
+  | "create_followup"
+  | "skip_existing"
+  | "skip_not_needed";
+
+export interface FollowupAutomationDecision {
+  action: FollowupAutomationAction;
+  summary: string;
+  reason: string;
+  confidence: number;
+  suggestedDueAt?: string;
+  suggestedReason?: string;
+}
+
+// --- v17 domain policies ---
+
+export type DomainType =
+  | "general"
+  | "messaging"
+  | "calendar"
+  | "crm"
+  | "booking"
+  | "travel";
+
+export interface DomainPolicy {
+  domain: DomainType;
+  summary: string;
+  reason: string;
+  confidence: number;
+  rules: string[];
+}
+
 export interface ResolvedContext {
   bundle: ContextBundle;
   primaryFocus: PrimaryFocus;
@@ -360,4 +423,35 @@ export interface ResolvedContext {
   toolRoutingPolicy: ToolRoutingPolicy;
   compressedPrompt: CompressedPrompt;
   outcomeEvaluation: OutcomeEvaluation;
+  debugTrace: DebugTrace;
+  followupAutomationDecision: FollowupAutomationDecision;
+  domainPolicy: DomainPolicy;
+}
+
+// --- v15 replay runner ---
+
+export interface ReplayTurnInput {
+  chatId: string;
+  message: string;
+  sender: {
+    name: string;
+    isOwner: boolean;
+    isGroup: boolean;
+  };
+}
+
+export interface ReplayTurnResult {
+  input: ReplayTurnInput;
+  resolved: ResolvedContext;
+}
+
+export interface ReplayScenario {
+  name: string;
+  turns: ReplayTurnInput[];
+}
+
+export interface ReplayScenarioResult {
+  name: string;
+  turns: ReplayTurnResult[];
+  summary: string;
 }

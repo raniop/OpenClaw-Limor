@@ -3,21 +3,21 @@
  * Persists follow-up entries to workspace/state/followups.json.
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import { resolve, dirname } from "path";
+import { dirname } from "path";
+import { statePath } from "../state-dir";
 import type { FollowupEntry } from "./followup-types";
 
-const STORE_PATH = resolve(__dirname, "..", "..", "workspace", "state", "followups.json");
-
 function ensureDir(): void {
-  const dir = dirname(STORE_PATH);
+  const dir = dirname(statePath("followups.json"));
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
 
 function readStore(): FollowupEntry[] {
   ensureDir();
-  if (!existsSync(STORE_PATH)) return [];
+  const p = statePath("followups.json");
+  if (!existsSync(p)) return [];
   try {
-    return JSON.parse(readFileSync(STORE_PATH, "utf-8"));
+    return JSON.parse(readFileSync(p, "utf-8"));
   } catch {
     return [];
   }
@@ -25,7 +25,7 @@ function readStore(): FollowupEntry[] {
 
 function writeStore(entries: FollowupEntry[]): void {
   ensureDir();
-  writeFileSync(STORE_PATH, JSON.stringify(entries, null, 2), "utf-8");
+  writeFileSync(statePath("followups.json"), JSON.stringify(entries, null, 2), "utf-8");
 }
 
 function generateId(): string {

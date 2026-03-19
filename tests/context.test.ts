@@ -20,6 +20,10 @@ import { buildCompressedPrompt } from "../src/context/prompt-compressor";
 import { formatCompressedContextForPrompt } from "../src/context/context-service";
 import { resolveMemoryCommitDecision } from "../src/context/memory-commit-policy";
 import { evaluateOutcome } from "../src/context/outcome-tracker";
+import { buildDebugTrace } from "../src/context/debug-trace";
+import { formatDebugTrace } from "../src/context/context-service";
+import { resolveFollowupAutomationDecision, applyFollowupAutomation } from "../src/context/followup-automation";
+import { resolveDomainPolicy } from "../src/context/domain-policy-resolver";
 import type { ContextBundle, ResolvedContext } from "../src/context/context-types";
 
 const ownerSender = { name: "רני", isOwner: true, isGroup: false };
@@ -1982,6 +1986,380 @@ describe("formatter outcome section", () => {
     const text = formatCompressedContextForPrompt(resolved);
     if (resolved.outcomeEvaluation.status === "completed") {
       assert.ok(!text.includes("מצב משימה"));
+    }
+  });
+});
+
+// ============================================================
+// PHASE 14 — Debug Trace
+// ============================================================
+
+// Helper to build a minimal resolved context (without debugTrace) for trace testing
+function makeResolvedForTrace(overrides: Partial<Omit<ResolvedContext, "debugTrace">> = {}): Omit<ResolvedContext, "debugTrace"> {
+  const bundle = makeBundle();
+  return {
+    bundle,
+    primaryFocus: { type: "message", summary: "הודעה רגילה", reason: "אין פוקוס מיוחד", confidence: 0.8 },
+    responseMode: { tone: "friendly", brevity: "short", structure: "direct_answer", shouldAcknowledgeDelay: false, shouldMentionOpenLoops: false },
+    actionPlan: { type: "reply_only", summary: "תגובה פשוטה", reason: "אין פעולה נדרשת", confidence: 0.9, needsClarification: false },
+    toolIntent: { type: "none", shouldUseTool: false, summary: "אין צורך בכלי", reason: "שיחה רגילה", confidence: 0.9 },
+    memoryWriteDecision: { type: "none", shouldWrite: false, summary: "אין מה לשמור", reason: "אין עובדה חדשה", confidence: 0.8 },
+    memoryCommitDecision: { action: "skip", summary: "דילוג", reason: "אין צורך בכתיבה", confidence: 0.9 },
+    conversationState: { type: "new_chat", summary: "שיחה חדשה", reason: "אין היסטוריה", confidence: 0.9 },
+    contradictions: [],
+    responseStrategy: { type: "direct_reply", summary: "תגובה ישירה", reason: "הודעה פשוטה", confidence: 0.9 },
+    executionDecision: { type: "reply_only", summary: "תגובה בלבד", reason: "אין צורך בכלים", confidence: 0.9, allowTools: false },
+    toolRoutingPolicy: { group: "none", summary: "ללא ניתוב", reason: "אין כלי", confidence: 0.9, allowedToolNames: [] },
+    compressedPrompt: { sections: [{ key: "person", title: "אדם", content: ["test"], priority: "high", included: true, reason: "תמיד" }], summary: "הקשר בסיסי" },
+    outcomeEvaluation: { status: "completed", summary: "הושלם", reason: "תגובה פשוטה", confidence: 0.9, requiresFollowup: false },
+    ...overrides,
+  };
+}
+
+describe("debug-trace", () => {
+  it("always includes primary_focus", () => {
+    const trace = buildDebugTrace(makeResolvedForTrace());
+    assert.ok(trace.items.some((i) => i.step === "primary_focus"));
+  });
+
+  it("always includes action_plan", () => {
+    const trace = buildDebugTrace(makeResolvedForTrace());
+    assert.ok(trace.items.some((i) => i.step === "action_plan"));
+  });
+
+  it("always includes response_strategy", () => {
+    const trace = buildDebugTrace(makeResolvedForTrace());
+    assert.ok(trace.items.some((i) => i.step === "response_strategy"));
+  });
+
+  it("always includes execution_decision", () => {
+    const trace = buildDebugTrace(makeResolvedForTrace());
+    assert.ok(trace.items.some((i) => i.step === "execution_decision"));
+  });
+
+  it("always includes tool_routing", () => {
+    const trace = buildDebugTrace(makeResolvedForTrace());
+    assert.ok(trace.items.some((i) => i.step === "tool_routing"));
+  });
+
+  it("always includes outcome", () => {
+    const trace = buildDebugTrace(makeResolvedForTrace());
+    assert.ok(trace.items.some((i) => i.step === "outcome"));
+  });
+
+  it("omits contradictions item when none", () => {
+    const trace = buildDebugTrace(makeResolvedForTrace({ contradictions: [] }));
+    assert.ok(!trace.items.some((i) => i.step === "contradictions"));
+  });
+
+  it("includes contradictions item when present", () => {
+    const trace = buildDebugTrace(makeResolvedForTrace({
+      contradictions: [{ type: "intent_vs_missing_info", summary: "סתירה", resolution: "פתרון", confidence: 0.8 }],
+    }));
+    assert.ok(trace.items.some((i) => i.step === "contradictions"));
+  });
+
+  it("omits memory_commit when skip", () => {
+    const trace = buildDebugTrace(makeResolvedForTrace({
+      memoryCommitDecision: { action: "skip", summary: "דילוג", reason: "אין צורך", confidence: 0.9 },
+    }));
+    assert.ok(!trace.items.some((i) => i.step === "memory_commit"));
+  });
+
+  it("includes memory_commit when not skip", () => {
+    const trace = buildDebugTrace(makeResolvedForTrace({
+      memoryCommitDecision: { action: "write_new", summary: "כתיבה", reason: "עובדה חדשה", confidence: 0.9 },
+    }));
+    assert.ok(trace.items.some((i) => i.step === "memory_commit"));
+  });
+
+  it("summary is non-empty", () => {
+    const trace = buildDebugTrace(makeResolvedForTrace());
+    assert.ok(trace.summary.length > 0);
+  });
+
+  it("omits tool_intent when type is none", () => {
+    const trace = buildDebugTrace(makeResolvedForTrace({
+      toolIntent: { type: "none", shouldUseTool: false, summary: "אין", reason: "אין", confidence: 0.9 },
+    }));
+    assert.ok(!trace.items.some((i) => i.step === "tool_intent"));
+  });
+
+  it("includes tool_intent when type is not none", () => {
+    const trace = buildDebugTrace(makeResolvedForTrace({
+      toolIntent: { type: "calendar", shouldUseTool: true, summary: "יומן", reason: "בקשת תיאום", confidence: 0.9 },
+    }));
+    assert.ok(trace.items.some((i) => i.step === "tool_intent"));
+  });
+});
+
+describe("debug-trace formatter", () => {
+  it("includes 🧠 Debug Trace header", () => {
+    const resolved = buildResolvedContext({ chatId: "test@c.us", message: "hi", sender: contactSender });
+    const text = formatDebugTrace(resolved);
+    assert.ok(text.includes("🧠 Debug Trace"));
+  });
+
+  it("includes 🧾 Summary header", () => {
+    const resolved = buildResolvedContext({ chatId: "test@c.us", message: "hi", sender: contactSender });
+    const text = formatDebugTrace(resolved);
+    assert.ok(text.includes("🧾 Summary"));
+  });
+});
+
+describe("debug-trace integration", () => {
+  it("buildResolvedContext includes debugTrace", () => {
+    const resolved = buildResolvedContext({ chatId: "test@c.us", message: "שלום", sender: contactSender });
+    assert.ok("debugTrace" in resolved);
+    assert.ok(Array.isArray(resolved.debugTrace.items));
+    assert.ok(resolved.debugTrace.summary.length > 0);
+  });
+
+  it("debugTrace items always include mandatory steps", () => {
+    const resolved = buildResolvedContext({ chatId: "test@c.us", message: "מה קורה?", sender: ownerSender });
+    const steps = resolved.debugTrace.items.map((i) => i.step);
+    assert.ok(steps.includes("primary_focus"));
+    assert.ok(steps.includes("action_plan"));
+    assert.ok(steps.includes("response_strategy"));
+    assert.ok(steps.includes("execution_decision"));
+    assert.ok(steps.includes("tool_routing"));
+    assert.ok(steps.includes("outcome"));
+  });
+});
+
+// ============================================================
+// PHASE 16 — Followup Automation
+// ============================================================
+
+// Helper: build a resolved context for followup automation testing (without followupAutomationDecision)
+function makeResolvedForFollowup(overrides: Partial<Omit<ResolvedContext, "followupAutomationDecision">> = {}): Omit<ResolvedContext, "followupAutomationDecision"> {
+  const bundle = makeBundle();
+  return {
+    bundle,
+    primaryFocus: { type: "message", summary: "הודעה רגילה", reason: "אין פוקוס מיוחד", confidence: 0.8 },
+    responseMode: { tone: "friendly", brevity: "short", structure: "direct_answer", shouldAcknowledgeDelay: false, shouldMentionOpenLoops: false },
+    actionPlan: { type: "reply_only", summary: "תגובה פשוטה", reason: "אין פעולה נדרשת", confidence: 0.9, needsClarification: false },
+    toolIntent: { type: "none", shouldUseTool: false, summary: "אין צורך בכלי", reason: "שיחה רגילה", confidence: 0.9 },
+    memoryWriteDecision: { type: "none", shouldWrite: false, summary: "אין מה לשמור", reason: "אין עובדה חדשה", confidence: 0.8 },
+    memoryCommitDecision: { action: "skip", summary: "דילוג", reason: "אין צורך בכתיבה", confidence: 0.9 },
+    conversationState: { type: "new_chat", summary: "שיחה חדשה", reason: "אין היסטוריה", confidence: 0.9 },
+    contradictions: [],
+    responseStrategy: { type: "direct_reply", summary: "תגובה ישירה", reason: "הודעה פשוטה", confidence: 0.9 },
+    executionDecision: { type: "reply_only", summary: "תגובה בלבד", reason: "אין צורך בכלים", confidence: 0.9, allowTools: false },
+    toolRoutingPolicy: { group: "none", summary: "ללא ניתוב", reason: "אין כלי", confidence: 0.9, allowedToolNames: [] },
+    compressedPrompt: { sections: [{ key: "person", title: "אדם", content: ["test"], priority: "high", included: true, reason: "תמיד" }], summary: "הקשר בסיסי" },
+    outcomeEvaluation: { status: "completed", summary: "הושלם", reason: "תגובה פשוטה", confidence: 0.9, requiresFollowup: false },
+    debugTrace: { items: [], summary: "test" },
+    ...overrides,
+  };
+}
+
+describe("followup-automation", () => {
+  it("no followup needed => skip_not_needed", () => {
+    const decision = resolveFollowupAutomationDecision(makeResolvedForFollowup());
+    assert.strictEqual(decision.action, "skip_not_needed");
+  });
+
+  it("clarification flow => create_followup", () => {
+    const decision = resolveFollowupAutomationDecision(makeResolvedForFollowup({
+      actionPlan: { type: "ask_for_missing_detail", summary: "חסר פרט", reason: "לא ברור למי", confidence: 0.8, needsClarification: true },
+      outcomeEvaluation: { status: "awaiting_user", summary: "ממתין", reason: "חסר פרט", confidence: 0.8, requiresFollowup: true, followupSuggestedMinutes: 30 },
+    }));
+    assert.strictEqual(decision.action, "create_followup");
+    assert.ok(decision.suggestedDueAt);
+    // Verify ~30 min in the future
+    const dueMs = new Date(decision.suggestedDueAt).getTime() - Date.now();
+    assert.ok(dueMs > 25 * 60 * 1000 && dueMs < 35 * 60 * 1000, "due time should be ~30 min from now");
+  });
+
+  it("followup mention => create_followup", () => {
+    const bundle = makeBundle({
+      openLoops: { followups: [{ reason: "לבדוק עם דני על החשבונית", dueAt: new Date().toISOString(), isOverdue: false }] },
+    });
+    const decision = resolveFollowupAutomationDecision(makeResolvedForFollowup({
+      bundle,
+      actionPlan: { type: "mention_followup", summary: "הזכרת followup", reason: "יש דבר פתוח", confidence: 0.8, needsClarification: false },
+      outcomeEvaluation: { status: "pending", summary: "ממתין", reason: "followup פתוח", confidence: 0.8, requiresFollowup: true, followupSuggestedMinutes: 60 },
+    }));
+    assert.strictEqual(decision.action, "create_followup");
+    assert.ok(decision.suggestedReason);
+  });
+
+  it("meeting mention => create_followup", () => {
+    const bundle = makeBundle({
+      openLoops: { followups: [], pendingMeeting: { requesterName: "דני", topic: "סקירת פרויקט", id: "m1" } },
+    });
+    const decision = resolveFollowupAutomationDecision(makeResolvedForFollowup({
+      bundle,
+      actionPlan: { type: "mention_meeting", summary: "הזכרת פגישה", reason: "יש בקשת תיאום", confidence: 0.8, needsClarification: false },
+      outcomeEvaluation: { status: "pending", summary: "ממתין", reason: "פגישה ממתינה", confidence: 0.8, requiresFollowup: true, followupSuggestedMinutes: 120 },
+    }));
+    assert.strictEqual(decision.action, "create_followup");
+    assert.ok(decision.suggestedReason?.includes("פגישה"));
+  });
+
+  it("allow_tool_execution => skip_not_needed", () => {
+    const decision = resolveFollowupAutomationDecision(makeResolvedForFollowup({
+      actionPlan: { type: "ask_for_missing_detail", summary: "חסר פרט", reason: "חסר", confidence: 0.8, needsClarification: true },
+      executionDecision: { type: "allow_tool_execution", summary: "הפעלת כלי", reason: "מותר", confidence: 0.9, allowTools: true },
+      outcomeEvaluation: { status: "pending", summary: "ממתין", reason: "כלי", confidence: 0.8, requiresFollowup: true, followupSuggestedMinutes: 30 },
+    }));
+    assert.strictEqual(decision.action, "skip_not_needed");
+  });
+
+  it("decision has suggestedReason when creating", () => {
+    const decision = resolveFollowupAutomationDecision(makeResolvedForFollowup({
+      actionPlan: { type: "ask_for_missing_detail", summary: "חסר פרט", reason: "חסר", confidence: 0.8, needsClarification: true },
+      outcomeEvaluation: { status: "awaiting_user", summary: "ממתין", reason: "חסר", confidence: 0.8, requiresFollowup: true, followupSuggestedMinutes: 30 },
+    }));
+    assert.strictEqual(decision.action, "create_followup");
+    assert.ok(decision.suggestedReason, "should have suggestedReason");
+    assert.ok(decision.suggestedReason.length > 0);
+  });
+
+  it("decision has suggestedDueAt when creating", () => {
+    const decision = resolveFollowupAutomationDecision(makeResolvedForFollowup({
+      actionPlan: { type: "ask_for_missing_detail", summary: "חסר פרט", reason: "חסר", confidence: 0.8, needsClarification: true },
+      outcomeEvaluation: { status: "awaiting_user", summary: "ממתין", reason: "חסר", confidence: 0.8, requiresFollowup: true, followupSuggestedMinutes: 30 },
+    }));
+    assert.ok(decision.suggestedDueAt, "should have suggestedDueAt");
+    // Validate ISO date format
+    assert.ok(!isNaN(new Date(decision.suggestedDueAt).getTime()));
+  });
+
+  it("buildResolvedContext includes followupAutomationDecision", () => {
+    const resolved = buildResolvedContext({ chatId: "test@c.us", message: "שלום", sender: contactSender });
+    assert.ok("followupAutomationDecision" in resolved);
+    assert.ok(typeof resolved.followupAutomationDecision.action === "string");
+  });
+
+  it("debug trace and formatter still work with followupAutomationDecision", () => {
+    const resolved = buildResolvedContext({ chatId: "test@c.us", message: "hi", sender: contactSender });
+    const traceText = formatDebugTrace(resolved);
+    assert.ok(traceText.includes("🧠 Debug Trace"));
+    assert.ok(traceText.includes("🧾 Summary"));
+  });
+});
+
+// ============================================================
+// PHASE 17 — Domain Policies
+// ============================================================
+
+// Helper: build a resolved context for domain policy testing (without domainPolicy)
+function makeResolvedForDomain(overrides: Partial<Omit<ResolvedContext, "domainPolicy">> = {}): Omit<ResolvedContext, "domainPolicy"> {
+  const bundle = makeBundle();
+  return {
+    bundle,
+    primaryFocus: { type: "message", summary: "הודעה רגילה", reason: "אין פוקוס מיוחד", confidence: 0.8 },
+    responseMode: { tone: "friendly", brevity: "short", structure: "direct_answer", shouldAcknowledgeDelay: false, shouldMentionOpenLoops: false },
+    actionPlan: { type: "reply_only", summary: "תגובה פשוטה", reason: "אין פעולה נדרשת", confidence: 0.9, needsClarification: false },
+    toolIntent: { type: "none", shouldUseTool: false, summary: "אין צורך בכלי", reason: "שיחה רגילה", confidence: 0.9 },
+    memoryWriteDecision: { type: "none", shouldWrite: false, summary: "אין מה לשמור", reason: "אין עובדה חדשה", confidence: 0.8 },
+    memoryCommitDecision: { action: "skip", summary: "דילוג", reason: "אין צורך בכתיבה", confidence: 0.9 },
+    conversationState: { type: "new_chat", summary: "שיחה חדשה", reason: "אין היסטוריה", confidence: 0.9 },
+    contradictions: [],
+    responseStrategy: { type: "direct_reply", summary: "תגובה ישירה", reason: "הודעה פשוטה", confidence: 0.9 },
+    executionDecision: { type: "reply_only", summary: "תגובה בלבד", reason: "אין צורך בכלים", confidence: 0.9, allowTools: false },
+    toolRoutingPolicy: { group: "none", summary: "ללא ניתוב", reason: "אין כלי", confidence: 0.9, allowedToolNames: [] },
+    compressedPrompt: { sections: [{ key: "person", title: "אדם", content: ["test"], priority: "high", included: true, reason: "תמיד" }], summary: "הקשר בסיסי" },
+    outcomeEvaluation: { status: "completed", summary: "הושלם", reason: "תגובה פשוטה", confidence: 0.9, requiresFollowup: false },
+    debugTrace: { items: [], summary: "test" },
+    followupAutomationDecision: { action: "skip_not_needed", summary: "לא ליצור followup", reason: "לא נדרש", confidence: 0.7 },
+    ...overrides,
+  };
+}
+
+describe("domain-policy-resolver", () => {
+  it("messaging intent => domain messaging", () => {
+    const policy = resolveDomainPolicy(makeResolvedForDomain({
+      toolIntent: { type: "messaging", shouldUseTool: true, summary: "שליחה", reason: "בקשת שליחה", confidence: 0.9 },
+    }));
+    assert.strictEqual(policy.domain, "messaging");
+  });
+
+  it("calendar intent => domain calendar", () => {
+    const policy = resolveDomainPolicy(makeResolvedForDomain({
+      toolIntent: { type: "calendar", shouldUseTool: true, summary: "יומן", reason: "בקשת תיאום", confidence: 0.9 },
+    }));
+    assert.strictEqual(policy.domain, "calendar");
+  });
+
+  it("crm intent => domain crm", () => {
+    const policy = resolveDomainPolicy(makeResolvedForDomain({
+      toolIntent: { type: "crm", shouldUseTool: true, summary: "CRM", reason: "בקשת CRM", confidence: 0.9 },
+    }));
+    assert.strictEqual(policy.domain, "crm");
+  });
+
+  it("booking intent => domain booking", () => {
+    const policy = resolveDomainPolicy(makeResolvedForDomain({
+      toolIntent: { type: "booking", shouldUseTool: true, summary: "הזמנה", reason: "בקשת הזמנה", confidence: 0.9 },
+    }));
+    assert.strictEqual(policy.domain, "booking");
+  });
+
+  it("travel intent => domain travel", () => {
+    const policy = resolveDomainPolicy(makeResolvedForDomain({
+      toolIntent: { type: "travel", shouldUseTool: true, summary: "נסיעה", reason: "בקשת נסיעה", confidence: 0.9 },
+    }));
+    assert.strictEqual(policy.domain, "travel");
+  });
+
+  it("no domain intent => general", () => {
+    const policy = resolveDomainPolicy(makeResolvedForDomain());
+    assert.strictEqual(policy.domain, "general");
+    assert.strictEqual(policy.confidence, 0.7);
+  });
+
+  it("messaging rules include recipient safety", () => {
+    const policy = resolveDomainPolicy(makeResolvedForDomain({
+      toolIntent: { type: "messaging", shouldUseTool: true, summary: "שליחה", reason: "בקשת שליחה", confidence: 0.9 },
+    }));
+    assert.ok(policy.rules.some((r) => r.includes("נמען")));
+  });
+
+  it("calendar rules include date/time/topic safety", () => {
+    const policy = resolveDomainPolicy(makeResolvedForDomain({
+      toolIntent: { type: "calendar", shouldUseTool: true, summary: "יומן", reason: "תיאום", confidence: 0.9 },
+    }));
+    assert.ok(policy.rules.some((r) => r.includes("תאריך") || r.includes("שעה") || r.includes("נושא")));
+  });
+
+  it("booking rules include missing reservation details", () => {
+    const policy = resolveDomainPolicy(makeResolvedForDomain({
+      toolIntent: { type: "booking", shouldUseTool: true, summary: "הזמנה", reason: "הזמנה", confidence: 0.9 },
+    }));
+    assert.ok(policy.rules.some((r) => r.includes("הזמנה") || r.includes("סועדים")));
+  });
+
+  it("domainPolicy summary and reason are non-empty", () => {
+    const policy = resolveDomainPolicy(makeResolvedForDomain());
+    assert.ok(policy.summary.length > 0);
+    assert.ok(policy.reason.length > 0);
+  });
+
+  it("buildResolvedContext includes domainPolicy", () => {
+    const resolved = buildResolvedContext({ chatId: "test@c.us", message: "שלום", sender: contactSender });
+    assert.ok("domainPolicy" in resolved);
+    assert.ok(typeof resolved.domainPolicy.domain === "string");
+    assert.ok(Array.isArray(resolved.domainPolicy.rules));
+  });
+});
+
+describe("domain-policy formatter", () => {
+  it("compressed formatter includes domain section when relevant", () => {
+    const resolved = buildResolvedContext({ chatId: "owner@c.us", message: "תקבע פגישה מחר", sender: ownerSender });
+    if (resolved.domainPolicy.domain !== "general") {
+      const text = formatCompressedContextForPrompt(resolved);
+      assert.ok(text.includes("🧩 מדיניות דומיין"));
+    }
+  });
+
+  it("compressed formatter omits domain section for general", () => {
+    const resolved = buildResolvedContext({ chatId: "test@c.us", message: "שלום", sender: contactSender });
+    if (resolved.domainPolicy.domain === "general") {
+      const text = formatCompressedContextForPrompt(resolved);
+      assert.ok(!text.includes("🧩 מדיניות דומיין"));
     }
   });
 });

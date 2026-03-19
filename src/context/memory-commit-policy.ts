@@ -7,7 +7,7 @@
 import type { ResolvedContext, MemoryCommitDecision } from "./context-types";
 import { getProfile } from "../relationship-memory/relationship-store";
 
-type CommitInput = Omit<ResolvedContext, "memoryCommitDecision" | "conversationState" | "contradictions" | "responseStrategy" | "executionDecision" | "toolRoutingPolicy" | "compressedPrompt" | "outcomeEvaluation">;
+type CommitInput = Omit<ResolvedContext, "memoryCommitDecision" | "conversationState" | "contradictions" | "responseStrategy" | "executionDecision" | "toolRoutingPolicy" | "compressedPrompt" | "outcomeEvaluation" | "debugTrace" | "followupAutomationDecision" | "domainPolicy">;
 
 // Patterns that indicate explicit owner memory instruction
 const EXPLICIT_MEMORY_PATTERNS = /תזכרי ש|תזכור ש|תשמרי ש|תשמור ש|remember that/i;

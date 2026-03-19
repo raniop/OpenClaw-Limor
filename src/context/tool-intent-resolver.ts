@@ -17,7 +17,8 @@ const BOOKING_PATTERNS = /(מסעדה|להזמין מקום|שולחן|booking|b
 const TRAVEL_PATTERNS = /(טיסה|מלון|חופשה|flight|hotel)/i;
 const CRM_PATTERNS = /(פוליסה|ביטוח|לקוח|crm|policy|insurance)/i;
 const FILE_PATTERNS = /(קובץ|מסמך|לשמור|למחוק קובץ|file|document)/i;
-const CONTACT_PATTERNS = /(איש קשר|מספר של|טלפון של|contact|אנשי קשר)/i;
+const CONTACT_PATTERNS = /(איש קשר|מספר של|טלפון של|contact|אנשי קשר|תוסיפי את|תוסיף את|vcard|vcf|BEGIN:VCARD)/i;
+const VCARD_PATTERN = /^[A-Za-zא-ת\s\-\.]+\n\+?9725\d{8}/;
 const CAPABILITY_PATTERNS = /(תלמדי|תלמד|capability|יכולת חדשה)/i;
 const WHATSAPP_MGMT_PATTERNS = /(מי בקבוצ|חברי הקבוצ|רשימת.*קבוצ|group members|תמחקי.*הודע|תערכי.*הודע|edit message|delete message|תחפשי.*הודע|search messages|סקר|poll|תצמידי|pin|נקרא|read status|תבדקי.*מספר|check.*number|בוואטסאפ|label|תייגי|תוסיפי.*לקבוצ|תסירי.*מקבוצ|מי שם\??)/i;
 
@@ -87,8 +88,8 @@ function matchToolCategory(message: string): ToolMatch | null {
   if (FILE_PATTERNS.test(message)) {
     return { type: "file", label: "קבצים", reason: "יש בקשה הקשורה לקבצים", confidence: 0.85 };
   }
-  if (CONTACT_PATTERNS.test(message)) {
-    return { type: "contact_lookup", label: "אנשי קשר", reason: "יש בקשת חיפוש איש קשר", confidence: 0.85 };
+  if (CONTACT_PATTERNS.test(message) || VCARD_PATTERN.test(message)) {
+    return { type: "contact_lookup", label: "אנשי קשר", reason: "יש בקשת חיפוש או הוספת איש קשר", confidence: 0.9 };
   }
   if (CAPABILITY_PATTERNS.test(message)) {
     return { type: "capability", label: "יכולות", reason: "יש בקשת יכולת חדשה", confidence: 0.85 };

@@ -22,7 +22,8 @@ import { handleOwnerCommand } from "./owner-commands";
 import { checkApprovalGate } from "./approval-gate";
 import { handleResponse } from "./response-handler";
 import { classifyGroupMessage } from "./group-classifier";
-import { getResolvedContext, formatCompressedContextForPrompt } from "../context";
+import { getResolvedContext, formatCompressedContextForPrompt, formatDebugTrace, applyFollowupAutomation } from "../context";
+import type { ResolvedContext } from "../context";
 import { extractFollowups } from "../followups";
 import { updateFromMessage } from "../relationship-memory";
 import { approvalStore } from "../stores";
@@ -139,7 +140,8 @@ export function createWhatsAppClient(): Client {
  * Poll for pending notifications from the dashboard (e.g., followup completed → notify requester).
  */
 function startNotificationPoller(client: Client): void {
-  const notifyPath = resolve(__dirname, "..", "..", "workspace", "state", "pending-notifications.json");
+  const { statePath } = require("../state-dir");
+  const notifyPath = statePath("pending-notifications.json");
   const { readFileSync, writeFileSync, existsSync } = require("fs");
 
   setInterval(() => {
@@ -225,6 +227,26 @@ async function handleMessage(msg: Message): Promise<void> {
     return;
   }
   let { body, imageData } = mediaResult.result;
+
+  // --- vCard (contact card) processing: auto-add contacts from owner ---
+  if (msg.type === "vcard" && (msg as any).vCards?.length > 0) {
+    const vcards: string[] = (msg as any).vCards;
+    const parsed = vcards.map(parseVCard).filter(Boolean) as Array<{ name: string; phone: string }>;
+    if (parsed.length > 0) {
+      const { addManualContact } = require("../contacts");
+      const { approvalStore: aStore } = require("../stores");
+      const results: string[] = [];
+      for (const c of parsed) {
+        const result = addManualContact(c.name, c.phone);
+        const cleanPhone = c.phone.replace(/\D/g, "");
+        if (cleanPhone) aStore.addApproved(`manual_${cleanPhone}`);
+        results.push(`${c.name} (${c.phone}): ${result}`);
+        console.log(`[vcard] Auto-added: ${c.name} ${c.phone} → ${result}`);
+      }
+      body = `[כרטיס איש קשר שנשמר אוטומטית]\n${results.join("\n")}`;
+    }
+  }
+
   if (!body) return;
   const mediaDurationMs = mediaTimer.stop();
 
@@ -351,12 +373,17 @@ async function handleMessage(msg: Message): Promise<void> {
     let extraContext = "";
     let allowTools = true;
     let allowedToolNames: string[] | undefined;
+    let resolvedCtx: ResolvedContext | undefined;
     try {
-      const resolved = getResolvedContext(chatId, body, { name: contactName, isOwner, isGroup });
-      extraContext = "\n\n" + formatCompressedContextForPrompt(resolved);
-      allowTools = resolved.executionDecision.allowTools;
-      if (resolved.toolRoutingPolicy.allowedToolNames.length > 0) {
-        allowedToolNames = resolved.toolRoutingPolicy.allowedToolNames;
+      resolvedCtx = getResolvedContext(chatId, body, { name: contactName, isOwner, isGroup });
+      extraContext = "\n\n" + formatCompressedContextForPrompt(resolvedCtx);
+      allowTools = resolvedCtx.executionDecision.allowTools;
+      if (resolvedCtx.toolRoutingPolicy.allowedToolNames.length > 0) {
+        allowedToolNames = resolvedCtx.toolRoutingPolicy.allowedToolNames;
+      }
+      console.log(`[brain] ${resolvedCtx.debugTrace.summary}`);
+      if (process.env.DEBUG_BRAIN_TRACE === "true") {
+        console.log(formatDebugTrace(resolvedCtx));
       }
     } catch (err) {
       console.error("[context] Failed to build context:", err);
@@ -385,6 +412,20 @@ async function handleMessage(msg: Message): Promise<void> {
       response.startsWith("[REACT:") ? "react" : "text";
     log.traceEnd(trace, outcome, elapsed(trace));
 
+    // --- Followup automation ---
+    if (resolvedCtx) {
+      try {
+        const fuDecision = applyFollowupAutomation(resolvedCtx);
+        if (fuDecision.action === "create_followup") {
+          console.log(`[followup:auto] created: ${fuDecision.suggestedReason}`);
+        } else if (fuDecision.action === "skip_existing") {
+          console.log("[followup:auto] duplicate avoided");
+        }
+      } catch (err) {
+        console.error("[followup:auto] Error:", err);
+      }
+    }
+
     // Background fact extraction
     extractFacts(history).then(({ name, facts }) => {
       if (name || facts.length > 0) saveExtractedFacts(chatId, facts, name || undefined);
@@ -399,9 +440,30 @@ async function handleMessage(msg: Message): Promise<void> {
       console.error("[followup] Extraction error:", err);
     }
 
+    // Background contact sync (keeps contacts.json in sync with relationships)
+    try {
+      const { syncContacts } = require("../sync-contacts");
+      syncContacts();
+    } catch (err) {
+      console.error("[sync] Contact sync error:", err);
+    }
+
   } catch (error) {
     const normalized = normalizeError(error, "handleMessage", trace.traceId);
     log.traceError(trace, normalized, elapsed(trace));
     await msg.reply("אוי, משהו השתבש 😅 נסה שוב בבקשה!");
   }
+}
+
+function parseVCard(vcard: string): { name: string; phone: string } | null {
+  try {
+    const fnMatch = vcard.match(/FN[;:](.+)/i);
+    // Try waid= first (WhatsApp ID — cleanest source), then TEL line
+    const waidMatch = vcard.match(/waid=(\d+)/i);
+    const telMatch = vcard.match(/TEL[^:]*:([^\n]+)/i);
+    const name = fnMatch?.[1]?.trim();
+    const phone = waidMatch?.[1] || telMatch?.[1]?.replace(/\D/g, "");
+    if (name && phone && phone.length >= 10) return { name, phone };
+  } catch {}
+  return null;
 }

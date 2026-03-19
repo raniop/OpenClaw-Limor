@@ -296,10 +296,16 @@ export function getContacts(): ContactWithRelationship[] {
 
   // Dedup by phone: if same phone exists on both manual_ and real chatId, keep the real one.
   // Also dedup personal vs group chatIds with the same phone — prefer personal.
+  // Dedup by phone (when phone exists), keep contacts without phone too
   const byPhone = new Map<string, ContactWithRelationship>();
+  const noPhone: ContactWithRelationship[] = [];
   for (const c of allContacts) {
     const phone = c.phone?.replace(/\D/g, "");
-    if (!phone) { continue; }
+    if (!phone) {
+      // Keep contacts without phone (groups, manual entries not yet matched)
+      noPhone.push(c);
+      continue;
+    }
     const existing = byPhone.get(phone);
     if (!existing) {
       byPhone.set(phone, c);
@@ -326,7 +332,7 @@ export function getContacts(): ContactWithRelationship[] {
     // Otherwise keep existing (first seen)
   }
 
-  return Array.from(byPhone.values())
+  return [...Array.from(byPhone.values()), ...noPhone]
     .sort((a, b) => {
       // Owner first
       const ownerChatId = process.env.OWNER_CHAT_ID || "";

@@ -3,9 +3,8 @@
  * Records tool calls, approvals, meeting decisions, messages sent, capability actions.
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
-import { resolve, dirname } from "path";
-
-const LOG_PATH = resolve(__dirname, "..", "..", "workspace", "state", "audit-log.json");
+import { dirname } from "path";
+import { statePath } from "../state-dir";
 const MAX_ENTRIES = 500;
 
 export interface AuditEntry {
@@ -18,15 +17,16 @@ export interface AuditEntry {
 }
 
 function ensureDir(): void {
-  const dir = dirname(LOG_PATH);
+  const dir = dirname(statePath("audit-log.json"));
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
 
 function readLog(): AuditEntry[] {
   ensureDir();
-  if (!existsSync(LOG_PATH)) return [];
+  const p = statePath("audit-log.json");
+  if (!existsSync(p)) return [];
   try {
-    return JSON.parse(readFileSync(LOG_PATH, "utf-8"));
+    return JSON.parse(readFileSync(p, "utf-8"));
   } catch {
     return [];
   }
@@ -34,7 +34,7 @@ function readLog(): AuditEntry[] {
 
 function writeLog(entries: AuditEntry[]): void {
   ensureDir();
-  writeFileSync(LOG_PATH, JSON.stringify(entries, null, 2), "utf-8");
+  writeFileSync(statePath("audit-log.json"), JSON.stringify(entries, null, 2), "utf-8");
 }
 
 export function logAudit(

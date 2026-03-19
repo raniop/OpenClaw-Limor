@@ -6,7 +6,7 @@
  */
 import type { ResolvedContext, ToolRoutingPolicy } from "./context-types";
 
-type RoutingInput = Omit<ResolvedContext, "toolRoutingPolicy" | "compressedPrompt" | "outcomeEvaluation">;
+type RoutingInput = Omit<ResolvedContext, "toolRoutingPolicy" | "compressedPrompt" | "outcomeEvaluation" | "debugTrace" | "followupAutomationDecision" | "domainPolicy">;
 
 /** Real tool names from src/ai/tools/ grouped by function */
 const TOOL_GROUPS: Record<string, string[]> = {

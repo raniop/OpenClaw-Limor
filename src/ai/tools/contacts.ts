@@ -4,7 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 export const contactTools: Anthropic.Tool[] = [
   {
     name: "add_contact",
-    description: "הוספת איש קשר חדש. השתמשי כשרני מלמד אותך על אנשי קשר חדשים.",
+    description: "הוספת איש קשר חדש למערכת ולדשבורד. **חובה** להשתמש בכלי הזה כשרני מבקש להוסיף איש קשר, שולח כרטיס איש קשר, או מזכיר שם + מספר טלפון של מישהו חדש. לא מספיק לזכור — חייבים לקרוא לכלי!",
     input_schema: {
       type: "object" as const,
       properties: {

@@ -1,6 +1,7 @@
 import { writeFileSync } from "fs";
 import { resolve } from "path";
 import { loadWithFallback } from "./state-migration";
+import { statePath } from "./state-dir";
 
 interface MeetingRequest {
   requesterChatId: string;
@@ -10,15 +11,14 @@ interface MeetingRequest {
   createdAt: string;
 }
 
-const REQUESTS_PATH = resolve(__dirname, "..", "workspace", "state", "active_tasks.json");
 const OLD_REQUESTS_PATH = resolve(__dirname, "..", "memory", "meeting-requests.json");
 
 function loadRequests(): Record<string, MeetingRequest> {
-  return loadWithFallback<Record<string, MeetingRequest>>(REQUESTS_PATH, OLD_REQUESTS_PATH, {});
+  return loadWithFallback<Record<string, MeetingRequest>>(statePath("active_tasks.json"), OLD_REQUESTS_PATH, {});
 }
 
 function saveRequests(data: Record<string, MeetingRequest>): void {
-  writeFileSync(REQUESTS_PATH, JSON.stringify(data, null, 2), "utf-8");
+  writeFileSync(statePath("active_tasks.json"), JSON.stringify(data, null, 2), "utf-8");
 }
 
 export function hasPendingRequest(requesterChatId: string): boolean {
