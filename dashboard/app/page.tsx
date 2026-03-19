@@ -75,20 +75,17 @@ export default function DashboardHome() {
 
         <div>
           <div className="section-header">Contacts ({contacts.length})</div>
-          {contacts.slice(0, 5).map((c) => (
-            <div key={c.chatId} className="card">
-              <div className="card-row">
-                <strong>{c.name}</strong>
-                {c.relationship && c.relationship.relationshipType !== "unknown" && (
-                  <span className="badge badge-approved">{c.relationship.relationshipType}</span>
-                )}
-              </div>
-              <div className="text-xs text-muted mt-1">
-                {c.phone} &middot; {new Date(c.lastSeen).toLocaleDateString("he-IL")}
-                {c.relationship ? ` · ${c.relationship.importanceScore}/100` : ""}
-              </div>
+          <div className="card" style={{ padding: "8px 16px", overflow: "hidden" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 24px" }}>
+              {contacts.map((c) => (
+                <div key={c.chatId} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 0", fontSize: 13 }}>
+                  {c.isApproved && <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--success)", flexShrink: 0 }} />}
+                  <strong style={{ fontSize: 13 }}>{c.name}</strong>
+                  <span className="text-xs text-muted" style={{ marginInlineStart: "auto" }}>{c.phone}</span>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
           <Link href="/contacts" className="text-sm">View all &rarr;</Link>
         </div>
       </div>
