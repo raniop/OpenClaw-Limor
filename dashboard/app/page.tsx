@@ -3,6 +3,19 @@ import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
+function ContactIcon({ chatId, isApproved, ownerChatId }: { chatId: string; isApproved: boolean; ownerChatId: string }) {
+  if (chatId === ownerChatId) {
+    return <span style={{ fontSize: 11, flexShrink: 0 }} title="Owner">👑</span>;
+  }
+  if (chatId.endsWith("@g.us")) {
+    return <span style={{ fontSize: 11, flexShrink: 0 }} title="Group">👥</span>;
+  }
+  if (isApproved) {
+    return <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--success)", flexShrink: 0, display: "inline-block" }} title="Approved" />;
+  }
+  return <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--text-tertiary)", flexShrink: 0, display: "inline-block" }} title="Unknown" />;
+}
+
 export default function DashboardHome() {
   const pending = getPendingApprovals();
   const followups = getFollowups().filter((f) => f.status === "pending");
@@ -12,11 +25,15 @@ export default function DashboardHome() {
   const contacts = getContacts();
   const running = isLimorRunning();
   const recentLogs = getLogs(5);
+  const ownerChatId = process.env.OWNER_CHAT_ID || "";
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <h1>Dashboard</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
+        <div>
+          <h1>Dashboard</h1>
+          <h2>System overview</h2>
+        </div>
         <div className="card" style={{ padding: "10px 18px", marginBottom: 0, display: "inline-flex", alignItems: "center", gap: 10 }}>
           <span style={{
             width: 10, height: 10, borderRadius: "50%",
@@ -32,7 +49,6 @@ export default function DashboardHome() {
           </span>
         </div>
       </div>
-      <h2>System overview</h2>
 
       <div className="grid grid-3">
         <Link href="/approvals" className="stat-card">
@@ -79,7 +95,7 @@ export default function DashboardHome() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 24px" }}>
               {contacts.map((c) => (
                 <div key={c.chatId} style={{ display: "flex", alignItems: "center", gap: 6, padding: "4px 0", fontSize: 13 }}>
-                  {c.isApproved && <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--success)", flexShrink: 0 }} />}
+                  <ContactIcon chatId={c.chatId} isApproved={c.isApproved} ownerChatId={ownerChatId} />
                   <strong style={{ fontSize: 13 }}>{c.name}</strong>
                   <span className="text-xs text-muted" style={{ marginInlineStart: "auto" }}>{c.phone}</span>
                 </div>
