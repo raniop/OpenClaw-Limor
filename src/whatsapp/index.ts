@@ -22,7 +22,7 @@ import { handleOwnerCommand } from "./owner-commands";
 import { checkApprovalGate } from "./approval-gate";
 import { handleResponse } from "./response-handler";
 import { classifyGroupMessage } from "./group-classifier";
-import { getContextBundle, formatContextForPrompt } from "../context";
+import { getResolvedContext, formatCompressedContextForPrompt } from "../context";
 import { extractFollowups } from "../followups";
 import { updateFromMessage } from "../relationship-memory";
 import { approvalStore } from "../stores";
@@ -338,9 +338,15 @@ async function handleMessage(msg: Message): Promise<void> {
 
     // --- Build context engine ---
     let extraContext = "";
+    let allowTools = true;
+    let allowedToolNames: string[] | undefined;
     try {
-      const contextBundle = getContextBundle(chatId, body, { name: contactName, isOwner, isGroup });
-      extraContext = "\n\n" + formatContextForPrompt(contextBundle);
+      const resolved = getResolvedContext(chatId, body, { name: contactName, isOwner, isGroup });
+      extraContext = "\n\n" + formatCompressedContextForPrompt(resolved);
+      allowTools = resolved.executionDecision.allowTools;
+      if (resolved.toolRoutingPolicy.allowedToolNames.length > 0) {
+        allowedToolNames = resolved.toolRoutingPolicy.allowedToolNames;
+      }
     } catch (err) {
       console.error("[context] Failed to build context:", err);
     }
@@ -351,7 +357,7 @@ async function handleMessage(msg: Message): Promise<void> {
 
     log.aiRequestStart(trace);
     const aiTimer = startTimer();
-    const response = await sendMessage(history, (memoryContext || "") + extraContext, sender);
+    const response = await sendMessage(history, (memoryContext || "") + extraContext, sender, { allowTools, allowedToolNames });
     const aiDurationMs = aiTimer.stop();
     log.aiRequestEnd(aiDurationMs, 0, trace); // tool count is tracked inside send-message
 

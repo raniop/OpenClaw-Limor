@@ -18,10 +18,18 @@ import { handleToolCall } from "./handle-tool-call";
 import { log } from "../logger";
 import { startTimer } from "../observability";
 
+export interface SendMessageOptions {
+  /** When false, tools are stripped from the API call to prevent execution. Default: true. */
+  allowTools?: boolean;
+  /** When provided and non-empty, filter tools to only these names. Empty array = no tools. */
+  allowedToolNames?: string[];
+}
+
 export async function sendMessage(
   history: Message[],
   memoryContext?: string,
-  sender?: SenderContext
+  sender?: SenderContext,
+  options?: SendMessageOptions
 ): Promise<string> {
   let systemPrompt = config.systemPrompt;
   if (memoryContext) {
@@ -117,17 +125,29 @@ export async function sendMessage(
   });
 
   // Include CRM + instruction + file tools only for owner, travel + booking tools for everyone
-  const tools = sender?.isOwner
-    ? [...calendarTools, ...travelTools, ...bookingTools, ...crmTools, ...instructionTools, ...fileTools, ...contactTools, ...smartHomeTools, ...capabilityTools, ...modelTools, ...codingTools, ...gettTools]
-    : [...calendarTools, ...travelTools, ...bookingTools];
+  // If allowTools is explicitly false, pass empty tools array to prevent tool execution
+  const toolsEnabled = options?.allowTools !== false;
+  let tools = !toolsEnabled
+    ? []
+    : sender?.isOwner
+      ? [...calendarTools, ...travelTools, ...bookingTools, ...crmTools, ...instructionTools, ...fileTools, ...contactTools, ...smartHomeTools, ...capabilityTools, ...modelTools, ...codingTools, ...gettTools]
+      : [...calendarTools, ...travelTools, ...bookingTools];
 
-  let response = await withRetry(() => client.messages.create({
+  // Apply tool routing filter — narrow to only allowed tool names
+  if (toolsEnabled && options?.allowedToolNames && options.allowedToolNames.length > 0) {
+    const allowed = new Set(options.allowedToolNames);
+    tools = tools.filter((t) => allowed.has(t.name));
+  }
+
+  const apiParams: any = {
     model: config.model,
     max_tokens: config.maxTokens,
     system: systemPrompt,
     messages,
-    tools,
-  }));
+  };
+  if (tools.length > 0) apiParams.tools = tools;
+
+  let response = await withRetry(() => client.messages.create(apiParams));
 
   // Handle tool use loop (supports multiple parallel tool calls)
   while (response.stop_reason === "tool_use") {
@@ -159,13 +179,15 @@ export async function sendMessage(
       })),
     });
 
-    response = await withRetry(() => client.messages.create({
+    const loopParams: any = {
       model: config.model,
       max_tokens: config.maxTokens,
       system: systemPrompt,
       messages,
-      tools,
-    }));
+    };
+    if (tools.length > 0) loopParams.tools = tools;
+
+    response = await withRetry(() => client.messages.create(loopParams));
   }
 
   const textBlock = response.content.find((block) => block.type === "text");

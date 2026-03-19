@@ -1,12 +1,31 @@
 /**
- * Context builder — assembles a ContextBundle from existing stores.
+ * Context builder v2 — assembles a ContextBundle from existing stores.
+ * Now includes open loop resolution, turn intent, and response guidance.
  * Deterministic, no AI calls, fast.
  */
-import type { ContextBundle, PersonContext, ConversationContext, UrgencyContext, SystemContext } from "./context-types";
+import type { ContextBundle, PersonContext, ConversationContext, UrgencyContext, SystemContext, OpenLoopContext, ResolvedContext } from "./context-types";
 import { getProfile } from "../relationship-memory/relationship-store";
 import { conversationStore, approvalStore, meetingStore } from "../stores";
 import { getPendingFollowups, getDueFollowups } from "../followups";
 import { listPending as listPendingCapabilities } from "../capabilities/spec-store";
+import { resolveOpenLoops } from "./open-loop-resolver";
+import { classifyTurnIntent } from "./turn-intent";
+import { generateResponseGuidance } from "./response-guidance";
+import { resolvePrimaryFocus } from "./primary-focus";
+import { resolveResponseMode } from "./response-mode";
+import { resolveActionPlan } from "./action-plan";
+import { resolveReferences } from "./reference-resolver";
+import { resolveMissingInfo } from "./missing-info-resolver";
+import { resolveToolIntent } from "./tool-intent-resolver";
+import { resolveMemoryWriteDecision } from "./memory-write-decider";
+import { resolveConversationState } from "./conversation-state-resolver";
+import { resolveContradictions } from "./contradiction-resolver";
+import { resolveResponseStrategy } from "./response-strategy-resolver";
+import { resolveExecutionDecision } from "./execution-guardrails";
+import { resolveToolRoutingPolicy } from "./tool-routing-policy";
+import { buildCompressedPrompt } from "./prompt-compressor";
+import { resolveMemoryCommitDecision } from "./memory-commit-policy";
+import { evaluateOutcome } from "./outcome-tracker";
 
 interface BuildParams {
   chatId: string;
@@ -22,11 +41,44 @@ export function buildContext(params: BuildParams): ContextBundle {
   const person = buildPersonContext(params);
   const conversation = buildConversationContext(params);
   const urgency = buildUrgencyContext(params.chatId, person.importanceScore, conversation);
+  const openLoops = resolveOpenLoops(params.chatId);
+  const turnIntent = classifyTurnIntent(params.message);
+  const references = resolveReferences(params.message, {
+    mentionedEntities: turnIntent.mentionedEntities,
+    openLoops,
+    conversation,
+    person,
+  });
+  const missingInfo = resolveMissingInfo(params.message, turnIntent, references);
   const system = buildSystemContext();
   const signals = buildSignals(person, conversation, urgency, system);
-  const historySummary = buildHistorySummary(person, conversation, urgency);
+  const historySummary = buildHistorySummary(person, conversation, urgency, openLoops);
 
-  return { person, conversation, urgency, historySummary, system, signals };
+  // Build partial bundle for guidance (needs all other fields)
+  const partialBundle: ContextBundle = { person, conversation, urgency, openLoops, turnIntent, references, missingInfo, responseGuidance: [], historySummary, system, signals };
+  const responseGuidance = generateResponseGuidance(partialBundle);
+
+  return { person, conversation, urgency, openLoops, turnIntent, references, missingInfo, responseGuidance, historySummary, system, signals };
+}
+
+export function buildResolvedContext(params: BuildParams): ResolvedContext {
+  const bundle = buildContext(params);
+  const primaryFocus = resolvePrimaryFocus(bundle);
+  const responseMode = resolveResponseMode(bundle, primaryFocus);
+  const actionPlan = resolveActionPlan({ bundle, primaryFocus, responseMode });
+  const partial = { bundle, primaryFocus, responseMode, actionPlan };
+  const toolIntent = resolveToolIntent(partial);
+  const memoryWriteDecision = resolveMemoryWriteDecision(partial);
+  const memoryCommitDecision = resolveMemoryCommitDecision({ ...partial, toolIntent, memoryWriteDecision });
+  const fullPartial = { ...partial, toolIntent, memoryWriteDecision, memoryCommitDecision };
+  const conversationState = resolveConversationState(fullPartial);
+  const contradictions = resolveContradictions(fullPartial);
+  const responseStrategy = resolveResponseStrategy({ ...fullPartial, conversationState, contradictions });
+  const executionDecision = resolveExecutionDecision({ ...fullPartial, conversationState, contradictions, responseStrategy });
+  const toolRoutingPolicy = resolveToolRoutingPolicy({ ...fullPartial, conversationState, contradictions, responseStrategy, executionDecision });
+  const compressedPrompt = buildCompressedPrompt({ bundle, primaryFocus, responseMode, actionPlan, toolIntent, memoryWriteDecision, memoryCommitDecision, conversationState, contradictions, responseStrategy, executionDecision, toolRoutingPolicy });
+  const outcomeEvaluation = evaluateOutcome({ bundle, primaryFocus, responseMode, actionPlan, toolIntent, memoryWriteDecision, memoryCommitDecision, conversationState, contradictions, responseStrategy, executionDecision, toolRoutingPolicy, compressedPrompt });
+  return { bundle, primaryFocus, responseMode, actionPlan, toolIntent, memoryWriteDecision, memoryCommitDecision, conversationState, contradictions, responseStrategy, executionDecision, toolRoutingPolicy, compressedPrompt, outcomeEvaluation };
 }
 
 function buildPersonContext(params: BuildParams): PersonContext {
@@ -169,7 +221,8 @@ function buildSignals(
 function buildHistorySummary(
   person: PersonContext,
   conversation: ConversationContext,
-  urgency: UrgencyContext
+  urgency: UrgencyContext,
+  openLoops: OpenLoopContext
 ): string {
   const parts: string[] = [];
 
@@ -183,8 +236,17 @@ function buildHistorySummary(
     parts.push(`מדובר ב${typeName}`);
   }
 
-  // Urgency
-  if (urgency.isOverdue) {
+  // Open loop content (v2 — actual task descriptions)
+  if (openLoops.followups.length > 0) {
+    const overdueItems = openLoops.followups.filter((f) => f.isOverdue);
+    if (overdueItems.length > 0) {
+      const desc = overdueItems[0].reason.substring(0, 60);
+      parts.push(`יש משימה דחופה שעבר הזמן שלה: "${desc}"`);
+    } else {
+      const desc = openLoops.followups[0].reason.substring(0, 60);
+      parts.push(`יש דבר פתוח: "${desc}"`);
+    }
+  } else if (urgency.isOverdue) {
     parts.push("יש followup שעבר הזמן שלו — דחוף לטפל");
   } else if (urgency.hasFollowup) {
     parts.push("יש followup פתוח");
