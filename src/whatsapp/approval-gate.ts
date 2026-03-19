@@ -5,6 +5,7 @@ import { approvalStore } from "../stores";
 import { config } from "../config";
 import { log } from "../logger";
 import type { TraceContext } from "../observability";
+import { findContactByPhone } from "../contacts";
 
 interface ApprovalContext {
   chatId: string;
@@ -24,6 +25,15 @@ interface ApprovalContext {
 export async function checkApprovalGate(ctx: ApprovalContext): Promise<boolean> {
   if (approvalStore.isApproved(ctx.chatId)) {
     log.approvalGateResult("approved", ctx.trace);
+    return false;
+  }
+
+  // Auto-approve: if this phone number belongs to a known contact (added by owner via add_contact)
+  const knownContact = findContactByPhone(ctx.phone);
+  if (knownContact) {
+    approvalStore.addApproved(ctx.chatId);
+    log.approvalGateResult("approved", ctx.trace);
+    console.log(`[approval] Auto-approved ${ctx.contactName} (${ctx.phone}) — matched known contact ${knownContact.name}`);
     return false;
   }
 

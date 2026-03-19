@@ -230,7 +230,17 @@ export async function handleToolCall(
 
     // Contact tools
     if (name === "add_contact") {
-      return addManualContact(input.name, input.phone);
+      const result = addManualContact(input.name, input.phone);
+      // Auto-approve contacts added by owner — they should be able to talk to Limor immediately
+      const phone = input.phone.replace(/\D/g, "");
+      if (phone) {
+        // Find if this phone already has a pending approval and approve it
+        // Also add the manual chatId to approved list
+        const manualChatId = `manual_${phone}`;
+        approvalStore.addApproved(manualChatId);
+      }
+      logAudit(actor, "contact_added_and_approved", input.name, "success");
+      return result;
     }
     if (name === "list_contacts") {
       return listAllContacts();
