@@ -118,6 +118,18 @@ export function createWhatsAppClient(): Client {
 
     // Poll for pending notifications from dashboard (e.g., followup completion)
     startNotificationPoller(client);
+
+    // Poll for delivery SMS alerts
+    try {
+      const { startDeliveryPoller } = require("../sms");
+      startDeliveryPoller(async (text: string) => {
+        if (config.ownerChatId && whatsappClient) {
+          await whatsappClient.sendMessage(config.ownerChatId, text);
+        }
+      });
+    } catch (err) {
+      console.error("[sms] Failed to start delivery poller:", err);
+    }
   });
 
   client.on("authenticated", () => { console.log("WhatsApp authenticated successfully."); });

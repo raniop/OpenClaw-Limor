@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: "/capabilities", label: "Capabilities", icon: "⚡" },
   { href: "/digests", label: "Digests", icon: "📋" },
   { href: "/contacts", label: "Contacts", icon: "👥" },
+  { href: "/sms", label: "SMS & Deliveries", icon: "📦" },
   { href: "/logs", label: "Logs", icon: "📟" },
 ];
 

@@ -12,7 +12,7 @@ import { client, withRetry } from "./client";
 import type { Message, SenderContext } from "./types";
 import {
   calendarTools, travelTools, bookingTools,
-  crmTools, instructionTools, fileTools, contactTools, smartHomeTools, capabilityTools, modelTools, codingTools, gettTools, whatsappExtraTools,
+  crmTools, instructionTools, fileTools, contactTools, smartHomeTools, capabilityTools, modelTools, codingTools, gettTools, whatsappExtraTools, smsTools,
 } from "./tools";
 import { handleToolCall } from "./handle-tool-call";
 import { log } from "../logger";
@@ -130,7 +130,7 @@ export async function sendMessage(
   let tools = !toolsEnabled
     ? []
     : sender?.isOwner
-      ? [...calendarTools, ...travelTools, ...bookingTools, ...crmTools, ...instructionTools, ...fileTools, ...contactTools, ...smartHomeTools, ...capabilityTools, ...modelTools, ...codingTools, ...gettTools, ...whatsappExtraTools]
+      ? [...calendarTools, ...travelTools, ...bookingTools, ...crmTools, ...instructionTools, ...fileTools, ...contactTools, ...smartHomeTools, ...capabilityTools, ...modelTools, ...codingTools, ...gettTools, ...whatsappExtraTools, ...smsTools]
       : [...calendarTools, ...travelTools, ...bookingTools];
 
   // Apply tool routing filter — narrow to only allowed tool names
@@ -138,6 +138,9 @@ export async function sendMessage(
     const allowed = new Set(options.allowedToolNames);
     tools = tools.filter((t) => allowed.has(t.name));
   }
+
+  // Debug: log tool count and names
+  console.log(`[send-message] Tools: ${tools.length} | allowTools=${options?.allowTools} | allowedNames=${options?.allowedToolNames?.length ?? 'none'} | names=${tools.map(t=>t.name).join(',')}`);
 
   const apiParams: any = {
     model: config.model,

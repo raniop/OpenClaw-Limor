@@ -8,7 +8,8 @@ import { sendCalendarInviteEmail } from "../email";
 import { approvalStore, meetingStore } from "../stores";
 import { searchAvailability, bookOntopo } from "../ontopo";
 import { searchTabit, bookTabit } from "../tabit";
-import { findContactByName, getRecentContacts, addManualContact, listAllContacts } from "../contacts";
+import { findContactByName, findContactByPhone, getRecentContacts, addManualContact, listAllContacts } from "../contacts";
+import { config as appConfig } from "../config";
 import { getHistory } from "../conversation";
 import { controlDevice, getDeviceStatus, listRooms, listDevices, findDevice } from "../control4";
 import { createSpec, listPending, listApproved } from "../capabilities";
@@ -455,21 +456,34 @@ export async function handleToolCall(
       const chat = await waClient.getChatById(groupChatId) as any;
       if (!chat.isGroup) return `❌ "${input.group_name}" הוא לא קבוצה.`;
       const participants = chat.participants || [];
+      const botNumber = waClient.info?.wid?.user || "";
+      const ownerPhone = appConfig.ownerPhone?.replace(/\D/g, "") || "";
       const members = await Promise.all(
         participants.map(async (p: any) => {
+          const pNumber = p.id.user || "";
           try {
             const contact = await waClient.getContactById(p.id._serialized);
-            return {
-              name: contact.pushname || contact.name || "לא ידוע",
-              phone: contact.number || p.id.user,
-              isAdmin: p.isAdmin || p.isSuperAdmin,
-            };
+            const rawName = contact.pushname || contact.name || "לא ידוע";
+            const phone = contact.number || pNumber;
+            // Identify bot itself
+            if (pNumber === botNumber) {
+              return { name: "לימור (אני 🤖)", phone };
+            }
+            // Identify owner
+            if (phone.replace(/\D/g, "") === ownerPhone || pNumber === ownerPhone) {
+              return { name: `${rawName} (הבעלים)`, phone };
+            }
+            // Match with known contacts by phone for accurate name
+            const knownContact = findContactByPhone(phone);
+            const finalName = knownContact ? knownContact.name : rawName;
+            return { name: finalName, phone };
           } catch {
-            return { name: "לא ידוע", phone: p.id.user, isAdmin: p.isAdmin || false };
+            if (pNumber === botNumber) return { name: "לימור (אני 🤖)", phone: pNumber };
+            return { name: "לא ידוע", phone: pNumber };
           }
         })
       );
-      const lines = members.map((m: any) => `${m.isAdmin ? "👑 " : "👤 "}${m.name} (${m.phone})`);
+      const lines = members.map((m: any) => `👤 ${m.name} (${m.phone})`);
       return `📋 חברי הקבוצה "${input.group_name}" (${members.length}):\n${lines.join("\n")}`;
     }
 
@@ -706,6 +720,69 @@ export async function handleToolCall(
         return `✅ המספר ${formatted} רשום בוואטסאפ!`;
       }
       return `❌ המספר ${phone} לא רשום בוואטסאפ.`;
+    }
+
+    // --- SMS tools ---
+    if (name === "read_sms") {
+      const { isAvailable, getRecentMessages } = require("../sms");
+      if (!isAvailable()) return "❌ אין גישה ל-Messages DB. צריך Full Disk Access.";
+      const messages = getRecentMessages(input.limit || 15, input.hours || 24, input.sms_only || false);
+      if (messages.length === 0) return "אין הודעות חדשות בטווח הזמן המבוקש.";
+      return messages.map((m: any) =>
+        `${m.isFromMe ? "←" : "→"} ${m.sender} (${m.timestamp}): ${m.text.substring(0, 200)}`
+      ).join("\n");
+    }
+
+    if (name === "search_sms") {
+      const { isAvailable, searchMessages } = require("../sms");
+      if (!isAvailable()) return "❌ אין גישה ל-Messages DB.";
+      const messages = searchMessages(input.keyword, input.limit || 10);
+      if (messages.length === 0) return `לא נמצאו הודעות עם "${input.keyword}"`;
+      return messages.map((m: any) =>
+        `${m.isFromMe ? "←" : "→"} ${m.sender} (${m.timestamp}): ${m.text.substring(0, 200)}`
+      ).join("\n");
+    }
+
+    if (name === "check_deliveries") {
+      const { isAvailable, getRecentMessages, findDeliveryAlerts, addDelivery, getDeliveries } = require("../sms");
+      if (!isAvailable()) return "❌ אין גישה ל-Messages DB.";
+      const messages = getRecentMessages(300, input.hours || 168, false);
+      const alerts = findDeliveryAlerts(messages);
+      // Save any new alerts to the delivery store
+      for (const a of alerts) {
+        addDelivery(a.message.id, a.carrier, a.summary, a.message.text, a.message.sender, a.message.timestamp, a.trackingNumber);
+      }
+      const pending = getDeliveries("pending");
+      if (alerts.length === 0 && pending.length === 0) return "אין הודעות על חבילות או משלוחים.";
+      const parts: string[] = [];
+      if (pending.length > 0) {
+        parts.push(`📦 ${pending.length} משלוחים ממתינים:`);
+        for (const d of pending) {
+          parts.push(`  - ${d.summary} (${d.smsTimestamp})`);
+        }
+      }
+      if (alerts.length > 0 && pending.length === 0) {
+        for (const a of alerts) {
+          parts.push(`📦 ${a.summary}\n   ${a.message.sender} (${a.message.timestamp}): ${a.message.text.substring(0, 150)}`);
+        }
+      }
+      return parts.join("\n");
+    }
+
+    if (name === "mark_delivery_received") {
+      const { markReceivedByMatch, getDeliveries } = require("../sms");
+      const entry = markReceivedByMatch(input.keyword);
+      if (entry) return `✅ סומן כנמסר: ${entry.summary}`;
+      const pending = getDeliveries("pending");
+      if (pending.length === 0) return "אין משלוחים ממתינים לסימון.";
+      return `לא מצאתי משלוח מתאים ל-"${input.keyword}". משלוחים ממתינים:\n${pending.map((d: any) => `  - ${d.summary}`).join("\n")}`;
+    }
+
+    if (name === "list_pending_deliveries") {
+      const { getDeliveries } = require("../sms");
+      const pending = getDeliveries("pending");
+      if (pending.length === 0) return "אין משלוחים ממתינים! 🎉";
+      return pending.map((d: any) => `📦 ${d.summary} (${d.smsTimestamp})`).join("\n");
     }
 
     return "פעולה לא מוכרת";

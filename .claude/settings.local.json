@@ -209,7 +209,14 @@
       "Bash(curl -s http://localhost:3848)",
       "Bash(curl -s http://localhost:3848/api/status)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3848)",
-      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); [print\\(f''''{k}: {v[\"\"name\"\"]} \\({v[\"\"phone\"\"]}\\)''''\\) for k,v in d.items\\(\\)]\")"
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); [print\\(f''''{k}: {v[\"\"name\"\"]} \\({v[\"\"phone\"\"]}\\)''''\\) for k,v in d.items\\(\\)]\")",
+      "Bash(kill -TERM 41331)",
+      "Bash(kill -9 57673)",
+      "Bash(pkill -9 -f chrome.*wwebjs)",
+      "Bash(sqlite3 ~/Library/Messages/chat.db \"SELECT COUNT\\(*\\) FROM message WHERE date > strftime\\(''%s'',''2026-03-18''\\) * 1000000000;\")",
+      "Bash(sqlite3 ~/Library/Messages/chat.db \"SELECT COUNT\\(*\\) FROM message;\")",
+      "Bash(sqlite3 ~/Library/Messages/chat.db \":*)",
+      "Bash(python3:*)"
     ]
   }
 }

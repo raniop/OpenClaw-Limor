@@ -16,10 +16,10 @@ const TOOL_GROUPS: Record<string, string[]> = {
   travel: ["flight_search", "hotel_search"],
   crm: ["crm_search_policy", "crm_policy_details", "crm_policy_customers", "crm_dashboard", "crm_top_policies", "crm_agents_report", "crm_send_sms"],
   file: ["list_files", "read_file", "save_file"],
-  contact_lookup: ["add_contact", "list_contacts", "get_contact_history", "get_group_history", "summarize_group_activity", "create_reminder"],
+  contact_lookup: ["add_contact", "list_contacts", "get_contact_history", "get_group_history", "summarize_group_activity", "create_reminder", "read_sms", "search_sms", "check_deliveries", "mark_delivery_received", "list_pending_deliveries"],
   capability: ["create_capability_request", "list_capability_requests", "run_capability"],
   whatsapp_management: ["list_group_members", "search_messages", "edit_message", "delete_message", "check_read_status", "get_contact_info", "list_labels", "add_label", "pin_message", "create_poll", "forward_message", "group_add_member", "group_remove_member", "check_whatsapp_number"],
-  owner_safe_readonly: ["list_events", "list_contacts", "get_contact_history", "get_group_history", "list_instructions", "list_capability_requests", "list_files", "get_current_model", "crm_dashboard", "list_labels", "list_group_members", "check_read_status", "check_whatsapp_number", "get_contact_info", "search_messages"],
+  owner_safe_readonly: ["list_events", "list_contacts", "get_contact_history", "get_group_history", "list_instructions", "list_capability_requests", "list_files", "get_current_model", "crm_dashboard", "list_labels", "list_group_members", "check_read_status", "check_whatsapp_number", "get_contact_info", "search_messages", "read_sms", "search_sms", "check_deliveries", "mark_delivery_received", "list_pending_deliveries"],
 };
 
 /**
