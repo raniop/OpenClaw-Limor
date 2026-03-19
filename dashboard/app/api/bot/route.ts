@@ -22,8 +22,15 @@ function killOrphanChrome(): void {
   const lockPath = resolve(BOT_DIR, ".wwebjs_auth", "session", "SingletonLock");
   try {
     if (existsSync(lockPath)) {
-      require("fs").unlinkSync(lockPath);
+      const { unlinkSync } = require("fs");
+      unlinkSync(lockPath);
+      appendFileSync(LOG_PATH, `[${new Date().toISOString()}] [INFO] [system] Removed stale SingletonLock\n`);
     }
+  } catch {}
+
+  // Also kill any orphan chromium processes from old bot sessions
+  try {
+    execSync("pkill -f 'chromium.*wwebjs' 2>/dev/null || true", { encoding: "utf-8", timeout: 5000 });
   } catch {}
 }
 
