@@ -5,9 +5,10 @@ import { useState, useEffect } from "react";
 export function BotControl({ initialRunning }: { initialRunning: boolean }) {
   const [running, setRunning] = useState(initialRunning);
   const [loading, setLoading] = useState(false);
+  const [statusText, setStatusText] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  // Poll status every 10 seconds
+  // Poll status every 5 seconds
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
@@ -15,13 +16,14 @@ export function BotControl({ initialRunning }: { initialRunning: boolean }) {
         const data = await res.json();
         setRunning(data.running);
       } catch {}
-    }, 10000);
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
 
   async function handleAction(action: "start" | "stop" | "restart") {
     setLoading(true);
     setError(null);
+    setStatusText(action === "start" ? "Building & starting..." : action === "stop" ? "Stopping..." : "Restarting...");
     try {
       const res = await fetch("/api/bot", {
         method: "POST",
@@ -30,16 +32,17 @@ export function BotControl({ initialRunning }: { initialRunning: boolean }) {
       });
       const data = await res.json();
       if (data.success) {
-        // Wait a moment then check status
-        await new Promise((r) => setTimeout(r, 3000));
-        const check = await fetch("/api/bot");
-        const status = await check.json();
-        setRunning(status.running);
+        setRunning(action !== "stop");
+        setStatusText(data.message || "");
+        // Clear message after 3s
+        setTimeout(() => setStatusText(""), 3000);
       } else {
-        setError(data.error);
+        setError(data.error || "Failed");
+        setStatusText("");
       }
     } catch (e: any) {
       setError(e.message);
+      setStatusText("");
     }
     setLoading(false);
   }
@@ -48,16 +51,18 @@ export function BotControl({ initialRunning }: { initialRunning: boolean }) {
     <div className="card" style={{ padding: "10px 18px", marginBottom: 0, display: "inline-flex", alignItems: "center", gap: 12 }}>
       <span style={{
         width: 10, height: 10, borderRadius: "50%",
-        background: running ? "var(--success)" : "var(--danger)",
-        boxShadow: running
-          ? "0 0 10px var(--success-glow), 0 0 20px var(--success-glow)"
-          : "0 0 10px var(--danger-glow)",
-        animation: running ? "pulseGlow 2s ease-in-out infinite" : "none",
+        background: loading ? "var(--warning)" : running ? "var(--success)" : "var(--danger)",
+        boxShadow: loading
+          ? "0 0 10px var(--warning-glow)"
+          : running
+            ? "0 0 10px var(--success-glow), 0 0 20px var(--success-glow)"
+            : "0 0 10px var(--danger-glow)",
+        animation: "pulseGlow 2s ease-in-out infinite",
         display: "inline-block",
         flexShrink: 0,
       }} />
-      <span style={{ fontWeight: 600, fontSize: 13, color: running ? "var(--success)" : "var(--danger)" }}>
-        {loading ? "..." : running ? "Online" : "Offline"}
+      <span style={{ fontWeight: 600, fontSize: 13, color: loading ? "var(--warning)" : running ? "var(--success)" : "var(--danger)" }}>
+        {loading ? statusText : running ? "Online" : "Offline"}
       </span>
 
       {!running && !loading && (
@@ -75,11 +80,8 @@ export function BotControl({ initialRunning }: { initialRunning: boolean }) {
           </button>
         </>
       )}
-      {loading && (
-        <span className="text-xs text-muted">Processing...</span>
-      )}
       {error && (
-        <span className="text-xs text-danger">{error}</span>
+        <span className="text-xs text-danger" style={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis" }}>{error}</span>
       )}
     </div>
   );

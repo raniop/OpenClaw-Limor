@@ -1,24 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
 import { execSync, spawn } from "child_process";
 import { resolve } from "path";
+import { existsSync, appendFileSync } from "fs";
 import { isLimorRunning } from "@/lib/data";
 
 const BOT_DIR = resolve(process.cwd(), "..");
+const LOG_PATH = resolve(BOT_DIR, "workspace", "state", "limor.log");
 
 function findBotPid(): number | null {
   try {
     const result = execSync("pgrep -f 'node dist/index.js'", { encoding: "utf-8" }).trim();
-    const pids = result.split("\n").filter(Boolean);
-    return pids.length > 0 ? parseInt(pids[0]) : null;
+    const pids = result.split("\n").filter(Boolean).map(Number).filter(n => !isNaN(n));
+    return pids.length > 0 ? pids[0] : null;
   } catch {
     return null;
   }
 }
 
+function killOrphanChrome(): void {
+  // Kill any SingletonLock that blocks puppeteer
+  const lockPath = resolve(BOT_DIR, ".wwebjs_auth", "session", "SingletonLock");
+  try {
+    if (existsSync(lockPath)) {
+      require("fs").unlinkSync(lockPath);
+    }
+  } catch {}
+}
+
+function waitForBot(maxWaitMs: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const check = () => {
+      if (findBotPid() !== null) {
+        resolve(true);
+        return;
+      }
+      if (Date.now() - start > maxWaitMs) {
+        resolve(false);
+        return;
+      }
+      setTimeout(check, 500);
+    };
+    setTimeout(check, 1000);
+  });
+}
+
 export async function GET() {
   const pid = findBotPid();
   return NextResponse.json({
-    running: pid !== null || isLimorRunning(),
+    running: pid !== null,
     pid,
   });
 }
@@ -29,24 +59,43 @@ export async function POST(request: NextRequest) {
   if (action === "start") {
     const existingPid = findBotPid();
     if (existingPid) {
-      return NextResponse.json({ success: false, error: "Limor is already running", pid: existingPid });
+      return NextResponse.json({ success: true, pid: existingPid, message: "Already running" });
     }
 
     try {
-      // Build first, then start
-      execSync("npm run build", { cwd: BOT_DIR, encoding: "utf-8", timeout: 30000 });
+      // Clean up stale browser locks
+      killOrphanChrome();
 
-      // Start bot detached
+      // Build
+      execSync("npm run build", { cwd: BOT_DIR, encoding: "utf-8", timeout: 60000 });
+
+      // Start bot with output going to log file
       const child = spawn("node", ["dist/index.js"], {
         cwd: BOT_DIR,
         detached: true,
-        stdio: "ignore",
+        stdio: ["ignore", "pipe", "pipe"],
       });
+
+      // Pipe stdout/stderr to log file for visibility
+      if (child.stdout) {
+        child.stdout.on("data", (data: Buffer) => {
+          try { appendFileSync(LOG_PATH, data.toString()); } catch {}
+        });
+      }
+      if (child.stderr) {
+        child.stderr.on("data", (data: Buffer) => {
+          try { appendFileSync(LOG_PATH, data.toString()); } catch {}
+        });
+      }
+
       child.unref();
 
-      return NextResponse.json({ success: true, pid: child.pid });
+      // Wait up to 5 seconds to confirm it's running
+      const started = await waitForBot(5000);
+
+      return NextResponse.json({ success: started, pid: child.pid, message: started ? "Limor started" : "Started but may have crashed — check logs" });
     } catch (error: any) {
-      return NextResponse.json({ success: false, error: error.message?.substring(0, 200) });
+      return NextResponse.json({ success: false, error: error.message?.substring(0, 300) });
     }
   }
 
@@ -57,6 +106,13 @@ export async function POST(request: NextRequest) {
     }
     try {
       process.kill(pid, "SIGTERM");
+      // Wait for it to die
+      await new Promise((r) => setTimeout(r, 2000));
+      const stillRunning = findBotPid() !== null;
+      if (stillRunning) {
+        // Force kill
+        try { process.kill(pid, "SIGKILL"); } catch {}
+      }
       return NextResponse.json({ success: true });
     } catch (error: any) {
       return NextResponse.json({ success: false, error: error.message });
@@ -64,24 +120,44 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === "restart") {
+    // Stop
     const pid = findBotPid();
     if (pid) {
       try { process.kill(pid, "SIGTERM"); } catch {}
-      // Wait a moment for cleanup
-      await new Promise((r) => setTimeout(r, 2000));
+      await new Promise((r) => setTimeout(r, 3000));
+      if (findBotPid() !== null) {
+        try { process.kill(pid, "SIGKILL"); } catch {}
+        await new Promise((r) => setTimeout(r, 1000));
+      }
     }
 
+    killOrphanChrome();
+
     try {
-      execSync("npm run build", { cwd: BOT_DIR, encoding: "utf-8", timeout: 30000 });
+      execSync("npm run build", { cwd: BOT_DIR, encoding: "utf-8", timeout: 60000 });
       const child = spawn("node", ["dist/index.js"], {
         cwd: BOT_DIR,
         detached: true,
-        stdio: "ignore",
+        stdio: ["ignore", "pipe", "pipe"],
       });
+
+      if (child.stdout) {
+        child.stdout.on("data", (data: Buffer) => {
+          try { appendFileSync(LOG_PATH, data.toString()); } catch {}
+        });
+      }
+      if (child.stderr) {
+        child.stderr.on("data", (data: Buffer) => {
+          try { appendFileSync(LOG_PATH, data.toString()); } catch {}
+        });
+      }
+
       child.unref();
-      return NextResponse.json({ success: true, pid: child.pid });
+      const started = await waitForBot(5000);
+
+      return NextResponse.json({ success: started, pid: child.pid });
     } catch (error: any) {
-      return NextResponse.json({ success: false, error: error.message?.substring(0, 200) });
+      return NextResponse.json({ success: false, error: error.message?.substring(0, 300) });
     }
   }
 
