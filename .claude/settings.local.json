@@ -174,7 +174,13 @@
       "Bash(ln -sf ../workspace dist-test/workspace)",
       "Bash(ln -sf ../.env dist-test/.env)",
       "Bash(mkdir -p workspace/state workspace/memory/users files)",
-      "Bash(touch workspace/state/.gitkeep workspace/memory/users/.gitkeep files/.gitkeep)"
+      "Bash(touch workspace/state/.gitkeep workspace/memory/users/.gitkeep files/.gitkeep)",
+      "WebFetch(domain:developer.gett.com)",
+      "Bash(curl -s \"https://business-api.gett.com/oauth/token\" -X POST -H \"Content-Type: application/x-www-form-urlencoded\" -d \"grant_type=client_credentials&client_id=eli@ophirins.co.il&client_secret=4580Eliop!\")",
+      "Bash(claude --version)",
+      "Read(//usr/local/bin/**)",
+      "Bash(find / -name claude -type f -perm +111)",
+      "Bash(\"/Users/raniophir/Library/Application Support/Claude/claude-code/2.1.74/claude\" --version)"
     ]
   }
 }

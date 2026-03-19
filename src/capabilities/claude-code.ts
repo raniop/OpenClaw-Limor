@@ -1,0 +1,139 @@
+/**
+ * Claude Code integration — uses the Claude CLI to implement capability specs.
+ * Runs Claude Code in a git worktree with the spec as the prompt.
+ */
+import { spawn } from "child_process";
+import { existsSync, readFileSync } from "fs";
+import { resolve, join } from "path";
+import { createWorktree, getDiff, applyWorktree, cleanupWorktree } from "./sandbox";
+import { getSpec } from "./spec-store";
+
+const CLAUDE_CLI = "/Users/raniophir/Library/Application Support/Claude/claude-code/2.1.74/claude";
+const PROJECT_ROOT = resolve(__dirname, "..", "..");
+const WORKTREES_DIR = join(PROJECT_ROOT, ".worktrees");
+
+/**
+ * Run Claude Code to implement a capability spec.
+ * Returns a promise that resolves with the implementation result.
+ */
+export async function implementCapability(capId: string, onProgress?: (msg: string) => void): Promise<string> {
+  // Get the spec
+  const spec = getSpec(capId);
+  if (!spec) return `❌ לא מצאתי capability spec: ${capId}`;
+  if (spec.status !== "approved") return `❌ הספציפיקציה ${capId} לא אושרה. סטטוס: ${spec.status}`;
+
+  // Create worktree
+  const wtResult = createWorktree(capId);
+  if (onProgress) onProgress(`📂 Worktree created: ${capId}`);
+
+  const worktreePath = join(WORKTREES_DIR, capId);
+  if (!existsSync(worktreePath)) return `❌ Failed to create worktree: ${wtResult}`;
+
+  // Build the prompt for Claude Code
+  const prompt = buildPrompt(spec);
+  if (onProgress) onProgress(`🤖 Starting Claude Code...`);
+
+  try {
+    // Run Claude Code in the worktree
+    const output = await runClaudeCode(worktreePath, prompt);
+    if (onProgress) onProgress(`✅ Claude Code finished`);
+
+    // Get the diff
+    const diff = getDiff(capId);
+    const diffSummary = diff.split("\n").slice(0, 30).join("\n");
+
+    return `✅ Claude Code סיים לעבוד על: **${spec.title}**\n\n` +
+      `📝 שינויים:\n\`\`\`\n${diffSummary}\n\`\`\`\n\n` +
+      `להחיל את השינויים? ענה: *החלי ${capId}*\n` +
+      `לבטל: *בטלי ${capId}*`;
+  } catch (err: any) {
+    return `❌ Claude Code נכשל: ${err.message}`;
+  }
+}
+
+function buildPrompt(spec: any): string {
+  return `You are implementing a capability for the Limor WhatsApp AI assistant bot.
+
+## Capability: ${spec.title}
+
+## Problem
+${spec.problem}
+
+## Why Current System Can't Do It
+${spec.whyCurrentSystemCantDoIt}
+
+## Proposed Solution
+${spec.proposedSolution}
+
+## Affected Modules
+${spec.affectedModules?.join(", ") || "TBD"}
+
+## Level
+${spec.level}
+
+## Instructions
+1. Read the relevant source files to understand the current architecture
+2. Implement the minimum viable solution
+3. Follow existing patterns (look at how other tools/integrations are built)
+4. Add the new tool definitions, handlers, and any service modules needed
+5. Make sure TypeScript compiles cleanly (run: npx tsc)
+6. Do NOT break existing behavior
+7. Keep it simple and production-minded
+
+## Important project structure
+- src/ai/tools/ — tool definition arrays (one file per category)
+- src/ai/handle-tool-call.ts — tool execution dispatcher
+- src/ai/send-message.ts — imports tool arrays, assembles for Claude API
+- src/ai/tools/index.ts — barrel re-export of all tool arrays
+- src/config.ts — env vars and configuration
+- workspace/policies/ — behavioral policies loaded into prompt
+- .env — API keys and secrets (add new vars here)
+
+After implementing, run: npx tsc
+Fix any compilation errors before finishing.`;
+}
+
+/**
+ * Run Claude Code CLI in headless mode.
+ */
+function runClaudeCode(cwd: string, prompt: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const args = [
+      "--print", prompt,
+      "--output-format", "text",
+      "--max-turns", "20",
+    ];
+
+    console.log(`[claude-code] Starting in ${cwd}`);
+
+    const proc = spawn(CLAUDE_CLI, args, {
+      cwd,
+      timeout: 300_000, // 5 minutes
+      env: { ...process.env, CLAUDE_CODE_ENTRYPOINT: "limor-bot" },
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    proc.stdout?.on("data", (data: Buffer) => {
+      stdout += data.toString();
+    });
+
+    proc.stderr?.on("data", (data: Buffer) => {
+      stderr += data.toString();
+    });
+
+    proc.on("close", (code: number | null) => {
+      console.log(`[claude-code] Finished with code ${code}`);
+      if (code === 0) {
+        resolve(stdout);
+      } else {
+        reject(new Error(`Claude Code exited with ${code}: ${stderr.substring(0, 500)}`));
+      }
+    });
+
+    proc.on("error", (err: Error) => {
+      reject(err);
+    });
+  });
+}

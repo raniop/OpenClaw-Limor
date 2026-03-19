@@ -12,7 +12,7 @@ import { client, withRetry } from "./client";
 import type { Message, SenderContext } from "./types";
 import {
   calendarTools, travelTools, bookingTools,
-  crmTools, instructionTools, fileTools, contactTools, smartHomeTools,
+  crmTools, instructionTools, fileTools, contactTools, smartHomeTools, capabilityTools, modelTools, codingTools, gettTools,
 } from "./tools";
 import { handleToolCall } from "./handle-tool-call";
 import { log } from "../logger";
@@ -118,7 +118,7 @@ export async function sendMessage(
 
   // Include CRM + instruction + file tools only for owner, travel + booking tools for everyone
   const tools = sender?.isOwner
-    ? [...calendarTools, ...travelTools, ...bookingTools, ...crmTools, ...instructionTools, ...fileTools, ...contactTools, ...smartHomeTools]
+    ? [...calendarTools, ...travelTools, ...bookingTools, ...crmTools, ...instructionTools, ...fileTools, ...contactTools, ...smartHomeTools, ...capabilityTools, ...modelTools, ...codingTools, ...gettTools]
     : [...calendarTools, ...travelTools, ...bookingTools];
 
   let response = await withRetry(() => client.messages.create({

@@ -7,6 +7,7 @@ import { getMemoryContext } from "../memory";
 import { approvalStore, meetingStore, conversationStore } from "../stores";
 import { log } from "../logger";
 import type { TraceContext } from "../observability";
+import { approveSpec, rejectSpec, getSpec } from "../capabilities";
 
 interface OwnerCommandContext {
   chatId: string;
@@ -91,6 +92,29 @@ export async function handleOwnerCommand(ctx: OwnerCommandContext): Promise<bool
       await ctx.reply(`🚫 דחיתי את בקשת הפגישה מ-${req.requesterName} (${cmd.id}).`);
     } else {
       await ctx.reply(`❌ לא מצאתי בקשת פגישה עם קוד ${cmd.id}.`);
+    }
+    return true;
+  }
+
+  // --- Capability approval/rejection ---
+  if (cmd?.type === "approve_capability") {
+    const spec = approveSpec(cmd.id);
+    if (spec) {
+      console.log(`[capability] Approved: ${spec.id} — ${spec.title}`);
+      await ctx.reply(`✅ יכולת אושרה: **${spec.title}** (${spec.id})\n\nהשלב הבא: לממש את השינוי. אני אזדקק לעזרה מהמפתח כדי ליישם את הפתרון המוצע.`);
+    } else {
+      await ctx.reply(`❌ לא מצאתי בקשת יכולת עם מזהה ${cmd.id}`);
+    }
+    return true;
+  }
+
+  if (cmd?.type === "reject_capability") {
+    const spec = rejectSpec(cmd.id);
+    if (spec) {
+      console.log(`[capability] Rejected: ${spec.id} — ${spec.title}`);
+      await ctx.reply(`🚫 בקשת יכולת נדחתה: **${spec.title}** (${spec.id})`);
+    } else {
+      await ctx.reply(`❌ לא מצאתי בקשת יכולת עם מזהה ${cmd.id}`);
     }
     return true;
   }

@@ -9,6 +9,13 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
 log.systemStarting();
 
+// Check if this is a restart after self-update
+import { checkRestartFlag } from "./capabilities/sandbox";
+const restartInfo = checkRestartFlag();
+if (restartInfo) {
+  console.log(`[self-update] Restarted after applying capability: ${restartInfo.capId} at ${restartInfo.appliedAt}`);
+}
+
 // Workspace verification
 const wsDir = resolve(__dirname, "..", "workspace");
 const stateDir = resolve(wsDir, "state");

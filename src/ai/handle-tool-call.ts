@@ -8,7 +8,12 @@ import { approvalStore, meetingStore } from "../stores";
 import { searchAvailability, bookOntopo } from "../ontopo";
 import { searchTabit, bookTabit } from "../tabit";
 import { findContactByName, getRecentContacts, addManualContact, listAllContacts } from "../contacts";
+import { getHistory } from "../conversation";
 import { controlDevice, getDeviceStatus, listRooms, listDevices, findDevice } from "../control4";
+import { createSpec, listPending, listApproved } from "../capabilities";
+import { createWorktree, runInWorktree, readProjectFile, writeProjectFile, buildAndTest, getDiff, applyWorktree, cleanupWorktree } from "../capabilities/sandbox";
+import { bookRide, getRideStatus, cancelRide } from "../gett";
+import { implementCapability } from "../capabilities/claude-code";
 // removeApproved now via approvalStore (imported above)
 import {
   searchPolicyByPersonId,
@@ -243,6 +248,29 @@ export async function handleToolCall(
       return `${contact.name} לא היה מאושר.`;
     }
 
+    if (name === "get_contact_history") {
+      if (!sender?.isOwner) return "רק רני יכול לראות היסטוריית שיחות.";
+      const contact = findContactByName(input.contact_name);
+      if (!contact) return `❌ לא מצאתי איש קשר בשם "${input.contact_name}"`;
+      const history = getHistory(contact.chatId);
+      if (history.length === 0) return `אין היסטוריית שיחה עם ${contact.name}.`;
+      const lastN = input.last_n || 10;
+      const recent = history.slice(-lastN);
+      return recent.map((m: any) => `${m.role === "user" ? contact.name : "לימור"}: ${m.content}`).join("\n");
+    }
+
+    if (name === "get_group_history") {
+      if (!sender?.isOwner) return "רק רני יכול לראות היסטוריית קבוצות.";
+      // Find group chatId by name
+      const groupChatId = findGroupChatId(input.group_name);
+      if (!groupChatId) return `❌ לא מצאתי קבוצה בשם "${input.group_name}". אני צריכה לראות הודעה בקבוצה קודם כדי לזהות אותה.`;
+      const history = getHistory(groupChatId);
+      if (history.length === 0) return `אין היסטוריית שיחה בקבוצה "${input.group_name}".`;
+      const lastN = input.last_n || 20;
+      const recent = history.slice(-lastN);
+      return recent.map((m: any) => m.content).join("\n");
+    }
+
     // File tools (owner only)
     if (name === "list_files") {
       if (!sender?.isOwner) return "רק רני יכול לגשת לקבצים.";
@@ -287,6 +315,114 @@ export async function handleToolCall(
       if (!sender?.isOwner) return "רק רני יכול לראות מכשירי בית חכם.";
       if (input.type === "rooms") return listRooms();
       return listDevices();
+    }
+
+    // Model switching (owner only)
+    if (name === "switch_model") {
+      if (!sender?.isOwner) return "רק רני יכול להחליף מודל.";
+      const MODEL_MAP: Record<string, string> = {
+        sonnet: "claude-sonnet-4-6",
+        opus: "claude-opus-4-6",
+      };
+      const target = input.model?.toLowerCase();
+      const modelId = MODEL_MAP[target];
+      if (!modelId) return `❌ מודל לא מוכר: "${input.model}". אפשרויות: sonnet, opus`;
+      const { config } = require("../config");
+      const previous = config.model;
+      config.model = modelId;
+      console.log(`[model] Switched from ${previous} to ${modelId}`);
+      return `✅ עברתי ל-${target.charAt(0).toUpperCase() + target.slice(1)}! (${modelId})\nשים לב: זה חוזר ל-Sonnet אחרי restart.`;
+    }
+    if (name === "get_current_model") {
+      const { config } = require("../config");
+      const name_ = config.model.includes("opus") ? "Opus" : "Sonnet";
+      return `המודל הנוכחי: **${name_}** (${config.model})`;
+    }
+
+    // Capability learning tools (owner only)
+    if (name === "create_capability_request") {
+      if (!sender?.isOwner) return "רק רני יכול לבקש יכולות חדשות.";
+      const spec = createSpec({
+        title: input.title,
+        requestedBy: sender.name,
+        problem: input.problem,
+        whyCurrentSystemCantDoIt: input.why_cant_do_it,
+        proposedSolution: input.proposed_solution,
+        affectedModules: input.affected_modules ? input.affected_modules.split(",").map((s: string) => s.trim()) : [],
+        requiredTools: [],
+        risks: input.risks ? input.risks.split(",").map((s: string) => s.trim()) : [],
+        validationPlan: input.validation_plan || "",
+        level: input.level || "code_change",
+      });
+      console.log(`[capability] New capability request: ${spec.id} — ${spec.title}`);
+      return `✅ בקשת יכולת נוצרה!\n\n📋 **${spec.title}** (${spec.id})\nסטטוס: ממתין לאישור\nרמה: ${spec.level}\n\nהבעיה: ${spec.problem}\nפתרון מוצע: ${spec.proposedSolution}\n\nכדי לאשר: *אשר יכולת ${spec.id}*`;
+    }
+    if (name === "list_capability_requests") {
+      if (!sender?.isOwner) return "רק רני יכול לראות בקשות יכולת.";
+      const status = input.status || "pending";
+      const specs = status === "approved" ? listApproved() :
+        status === "all" ? [...listPending(), ...listApproved()] : listPending();
+      if (specs.length === 0) return `אין בקשות יכולת ${status === "pending" ? "ממתינות" : ""}.`;
+      return specs.map(s => `- **${s.title}** (${s.id}) [${s.status}] — ${s.level}`).join("\n");
+    }
+
+    // Coding / self-programming tools (owner only)
+    if (name === "code_start_session") {
+      if (!sender?.isOwner) return "רק רני יכול להתחיל session תכנות.";
+      return createWorktree(input.capability_id);
+    }
+    if (name === "code_read") {
+      if (!sender?.isOwner) return "רק רני יכול לקרוא קוד.";
+      return readProjectFile(input.path, input.capability_id);
+    }
+    if (name === "code_write") {
+      if (!sender?.isOwner) return "רק רני יכול לכתוב קוד.";
+      return writeProjectFile(input.capability_id, input.path, input.content);
+    }
+    if (name === "code_execute") {
+      if (!sender?.isOwner) return "רק רני יכול להריץ פקודות.";
+      return runInWorktree(input.capability_id, input.command);
+    }
+    if (name === "code_build_test") {
+      if (!sender?.isOwner) return "רק רני יכול לבנות ולבדוק.";
+      return buildAndTest(input.capability_id);
+    }
+    if (name === "code_show_diff") {
+      if (!sender?.isOwner) return "רק רני יכול לראות שינויים.";
+      return getDiff(input.capability_id);
+    }
+    if (name === "code_apply") {
+      if (!sender?.isOwner) return "רק רני יכול להחיל שינויים.";
+      return applyWorktree(input.capability_id);
+    }
+    if (name === "code_cleanup") {
+      if (!sender?.isOwner) return "רק רני יכול לנקות worktree.";
+      return cleanupWorktree(input.capability_id);
+    }
+
+    if (name === "code_implement") {
+      if (!sender?.isOwner) return "רק רני יכול להפעיל Claude Code.";
+      console.log(`[claude-code] Implementation requested for: ${input.capability_id}`);
+      return implementCapability(input.capability_id);
+    }
+
+    // Gett taxi tools (owner only)
+    if (name === "gett_book_ride") {
+      if (!sender?.isOwner) return "רק רני יכול להזמין מונית.";
+      return bookRide({
+        pickupAddress: input.pickup_address,
+        dropoffAddress: input.dropoff_address,
+        scheduledAt: input.scheduled_at,
+        note: input.note,
+      });
+    }
+    if (name === "gett_ride_status") {
+      if (!sender?.isOwner) return "רק רני יכול לבדוק סטטוס מונית.";
+      return getRideStatus(input.order_id);
+    }
+    if (name === "gett_cancel_ride") {
+      if (!sender?.isOwner) return "רק רני יכול לבטל מונית.";
+      return cancelRide(input.order_id);
     }
 
     return "פעולה לא מוכרת";

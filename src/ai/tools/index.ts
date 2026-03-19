@@ -7,3 +7,7 @@ export { instructionTools } from "./instructions";
 export { fileTools } from "./files";
 export { contactTools } from "./contacts";
 export { smartHomeTools } from "./smarthome";
+export { capabilityTools } from "./capabilities";
+export { modelTools } from "./model";
+export { codingTools } from "./coding";
+export { gettTools } from "./gett";

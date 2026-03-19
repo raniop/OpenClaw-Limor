@@ -11,3 +11,6 @@ workspace/memory/users/
 memory/
 data/
 files/
+.worktrees/
+.restart-after-update
+workspace/capability_requests/

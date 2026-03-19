@@ -34,6 +34,9 @@ export const config = {
   control4Username: process.env.CONTROL4_USERNAME || "",
   control4Password: process.env.CONTROL4_PASSWORD || "",
   control4CommonName: "control4_ea3_000FFF1AE6F2",
+  gettClientId: process.env.GETT_CLIENT_ID || "",
+  gettClientSecret: process.env.GETT_CLIENT_SECRET || "",
+  gettBusinessId: process.env.GETT_BUSINESS_ID || "",
 };
 
 export function validateConfig(): void {

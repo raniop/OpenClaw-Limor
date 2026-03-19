@@ -85,13 +85,13 @@ describe("memory", () => {
   });
 
   describe("max facts trimming", () => {
-    it("trims to MAX_FACTS_PER_USER (15)", () => {
-      // Add 20 unique facts in a single call
-      const facts = Array.from({ length: 20 }, (_, i) => `xfact${i.toString().padStart(3, "0")}`);
+    it("trims to MAX_FACTS_PER_USER (50)", () => {
+      // Add 60 unique facts in a single call
+      const facts = Array.from({ length: 60 }, (_, i) => `xfact${i.toString().padStart(3, "0")}`);
       saveExtractedFacts("test1@lid", facts);
       const ctx = getMemoryContext("test1@lid");
       const factLines = ctx.split("\n").filter(l => l.startsWith("- ") && l.includes("xfact"));
-      assert.ok(factLines.length <= 15, `Expected <=15 facts, got ${factLines.length}`);
+      assert.ok(factLines.length <= 50, `Expected <=50 facts, got ${factLines.length}`);
     });
   });
 

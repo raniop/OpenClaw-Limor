@@ -1,7 +1,6 @@
 /**
  * Owner command parsing.
  * Pure functions — no side effects, no I/O.
- * Extracted from whatsapp.ts for testability.
  */
 
 export type OwnerCommand =
@@ -9,6 +8,8 @@ export type OwnerCommand =
   | { type: "reject_contact"; code: string }
   | { type: "approve_meeting"; id: string }
   | { type: "reject_meeting"; id: string }
+  | { type: "approve_capability"; id: string }
+  | { type: "reject_capability"; id: string }
   | { type: "bare_approve" }
   | null;
 
@@ -42,7 +43,19 @@ export function parseOwnerCommand(body: string): OwnerCommand {
     return { type: "reject_meeting", id: meetingReject[1].toUpperCase() };
   }
 
-  // Bare approval words: "כן", "אשר", "yes", "approve", "אישור"
+  // "אשר יכולת cap-XXXX" / "approve capability cap-XXXX"
+  const capApprove = lower.match(/^(?:אשר(?:\s+יכולת)?|approve\s+capability)\s+(cap-[a-z0-9-]+)$/i);
+  if (capApprove) {
+    return { type: "approve_capability", id: capApprove[1] };
+  }
+
+  // "דחה יכולת cap-XXXX"
+  const capReject = lower.match(/^(?:דחה(?:\s+יכולת)?|reject\s+capability)\s+(cap-[a-z0-9-]+)$/i);
+  if (capReject) {
+    return { type: "reject_capability", id: capReject[1] };
+  }
+
+  // Bare approval words
   const bareApproveWords = ["כן", "אשר", "yes", "approve", "אישור"];
   if (bareApproveWords.includes(lower)) {
     return { type: "bare_approve" };

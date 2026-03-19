@@ -37,4 +37,40 @@ export const contactTools: Anthropic.Tool[] = [
       required: ["contact_name"],
     },
   },
+  {
+    name: "get_contact_history",
+    description: "צפייה בהיסטוריית השיחה עם איש קשר. השתמשי כשרני שואל 'מה X כתב/רצה/אמר לך?' או 'מה דיברת עם X?'",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        contact_name: {
+          type: "string",
+          description: "שם איש הקשר",
+        },
+        last_n: {
+          type: "number",
+          description: "כמה הודעות אחרונות להחזיר (ברירת מחדל: 10)",
+        },
+      },
+      required: ["contact_name"],
+    },
+  },
+  {
+    name: "get_group_history",
+    description: "צפייה בהיסטוריית שיחה של קבוצת וואטסאפ. השתמשי כשרני שואל 'מה היה בקבוצה X?' או 'תסכמי לי את הקבוצה'.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        group_name: {
+          type: "string",
+          description: "שם הקבוצה (או חלק ממנו)",
+        },
+        last_n: {
+          type: "number",
+          description: "כמה הודעות אחרונות להחזיר (ברירת מחדל: 20)",
+        },
+      },
+      required: ["group_name"],
+    },
+  },
 ];

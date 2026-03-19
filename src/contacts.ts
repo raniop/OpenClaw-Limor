@@ -37,6 +37,8 @@ const NAME_MAP: Record<string, string[]> = {
   "רני": ["rani"],
   "eli": ["אלי"],
   "אלי": ["eli"],
+  "eyal": ["אייל"],
+  "אייל": ["eyal"],
   "dvora": ["דבורה"],
   "דבורה": ["dvora"],
   "guy": ["גיא"],
@@ -141,29 +143,43 @@ export function findContactByName(name: string): ContactEntry | null {
     return aIsPersonal - bIsPersonal;
   });
 
-  // Try exact match first (name or alias, including translated variants)
+  // 1. Try exact full name match first
   for (const c of sorted) {
     const cNames = allNames(c);
     for (const variant of searchVariants) {
       if (cNames.some(n => n === variant)) return c;
     }
   }
-  // Try partial match with translated variants
+
+  // 2. Try exact first-name match (split full name, match first word exactly)
   for (const c of sorted) {
-    const cNames = allNames(c);
+    const firstName = c.name.toLowerCase().split(/\s+/)[0];
+    const firstNameAliases = (c.aliases || []).map(a => a.toLowerCase().split(/\s+/)[0]);
+    const allFirstNames = [firstName, ...firstNameAliases];
     for (const variant of searchVariants) {
-      if (cNames.some(n => n.includes(variant) || variant.includes(n))) return c;
+      if (allFirstNames.some(fn => fn === variant)) return c;
     }
   }
-  // Phonetic fallback: compare Hebrew input to English names (or vice versa)
-  const searchPhonetic = phoneticKey(searchLower);
-  for (const c of sorted) {
-    const nameParts = c.name.toLowerCase().split(/\s+/);
-    // Check if phonetic key of search matches first name
-    if (nameParts.some(part => phoneticKey(part) === searchPhonetic)) return c;
-    // Check if phonetic key of first name matches search
-    if (nameParts.some(part => searchPhonetic === phoneticKey(part))) return c;
+
+  // 3. Partial match — but require minimum 3 chars to avoid "אלי" matching "אייל"
+  if (searchLower.length >= 3) {
+    for (const c of sorted) {
+      const cNames = allNames(c);
+      for (const variant of searchVariants) {
+        if (variant.length >= 3 && cNames.some(n => n.includes(variant) || variant.includes(n))) return c;
+      }
+    }
   }
+
+  // 4. Phonetic fallback — only for searches >= 3 chars
+  if (searchLower.length >= 3) {
+    const searchPhonetic = phoneticKey(searchLower);
+    for (const c of sorted) {
+      const nameParts = c.name.toLowerCase().split(/\s+/);
+      if (nameParts.some(part => phoneticKey(part) === searchPhonetic)) return c;
+    }
+  }
+
   return null;
 }
 
