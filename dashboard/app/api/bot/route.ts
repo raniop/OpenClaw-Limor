@@ -113,12 +113,10 @@ export async function POST(request: NextRequest) {
     }
     try {
       process.kill(pid, "SIGTERM");
-      // Wait for it to die
-      await new Promise((r) => setTimeout(r, 2000));
-      const stillRunning = findBotPid() !== null;
-      if (stillRunning) {
-        // Force kill
-        try { process.kill(pid, "SIGKILL"); } catch {}
+      // Wait up to 12 seconds for graceful shutdown (Chrome needs time)
+      for (let i = 0; i < 12; i++) {
+        await new Promise((r) => setTimeout(r, 1000));
+        if (findBotPid() === null) break;
       }
       return NextResponse.json({ success: true });
     } catch (error: any) {
@@ -127,14 +125,13 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === "restart") {
-    // Stop
+    // Graceful stop — wait for Chrome to close properly
     const pid = findBotPid();
     if (pid) {
       try { process.kill(pid, "SIGTERM"); } catch {}
-      await new Promise((r) => setTimeout(r, 3000));
-      if (findBotPid() !== null) {
-        try { process.kill(pid, "SIGKILL"); } catch {}
+      for (let i = 0; i < 12; i++) {
         await new Promise((r) => setTimeout(r, 1000));
+        if (findBotPid() === null) break;
       }
     }
 

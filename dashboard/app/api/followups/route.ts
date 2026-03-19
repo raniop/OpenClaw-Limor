@@ -17,8 +17,9 @@ export async function POST(request: NextRequest) {
 
   const success = completeFollowup(id);
 
-  // If followup has a requester, notify them via WhatsApp
-  if (success && followup?.requesterChatId) {
+  // If followup has a requester (and it's not the owner), notify them via WhatsApp
+  const ownerChatId = process.env.OWNER_CHAT_ID || "";
+  if (success && followup?.requesterChatId && followup.requesterChatId !== ownerChatId) {
     try {
       // Extract the task from reason (remove "[מ-name] " prefix)
       const task = followup.reason.replace(/^\[מ-[^\]]+\]\s*/, "");

@@ -31,20 +31,67 @@ validateConfig();
 
 const client = createWhatsAppClient();
 
-client.initialize();
+// Initialize with auto-retry on session corruption
+async function initWithRetry(maxRetries = 2) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await client.initialize();
+      return; // Success
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      console.error(`[init] Attempt ${attempt}/${maxRetries} failed: ${msg}`);
+
+      // If session is corrupted, clean it and retry
+      if (msg.includes("already running") || msg.includes("Execution context") || msg.includes("Protocol error")) {
+        console.log("[init] Cleaning corrupted session...");
+        const sessionDir = resolve(__dirname, "..", ".wwebjs_auth", "session");
+        const lockFile = resolve(sessionDir, "SingletonLock");
+        try { require("fs").unlinkSync(lockFile); } catch {}
+
+        if (attempt < maxRetries) {
+          console.log("[init] Retrying in 3 seconds...");
+          await new Promise(r => setTimeout(r, 3000));
+          continue;
+        }
+
+        // Last resort: delete session entirely
+        console.log("[init] Deleting session for fresh QR scan...");
+        try { require("fs").rmSync(sessionDir, { recursive: true, force: true }); } catch {}
+        await new Promise(r => setTimeout(r, 2000));
+        try {
+          await client.initialize();
+          return;
+        } catch (e: any) {
+          console.error("[init] Final attempt failed:", e.message);
+        }
+      }
+
+      if (attempt === maxRetries) {
+        console.error("[init] All attempts failed. Bot will not start.");
+        process.exit(1);
+      }
+    }
+  }
+}
+
+initWithRetry();
 
 // Start daily digest scheduler
 startDigestScheduler();
 
-// Graceful shutdown
-process.on("SIGINT", async () => {
+// Graceful shutdown — give Chrome time to close properly
+async function gracefulShutdown() {
   log.systemShutdown();
-  await client.destroy();
+  try {
+    await Promise.race([
+      client.destroy(),
+      new Promise(r => setTimeout(r, 10000)), // Max 10s wait
+    ]);
+  } catch (err) {
+    console.error("[shutdown] Error during destroy:", err);
+  }
   process.exit(0);
-});
+}
 
-process.on("SIGTERM", async () => {
-  log.systemShutdown();
-  await client.destroy();
-  process.exit(0);
-});
+process.on("SIGINT", gracefulShutdown);
+process.on("SIGTERM", gracefulShutdown);
