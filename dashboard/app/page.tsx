@@ -2,6 +2,7 @@ import { getPendingApprovals, getFollowups, getActivityLog, getCapabilities, get
 import Link from "next/link";
 import { BotControl } from "./components/bot-control";
 import { LiveLogs } from "./components/live-logs";
+import { SystemStatus } from "./components/system-status";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,9 @@ export default function DashboardHome() {
         <BotControl initialRunning={running} />
       </div>
 
-      <div className="grid grid-3">
+      <SystemStatus />
+
+      <div className="grid grid-3 mt-3">
         <Link href="/approvals" className="stat-card">
           <div className="stat-label">Pending Approvals</div>
           <div className="stat-value">{pending.length}</div>
