@@ -255,3 +255,56 @@ export function getContactById(chatId: string): ContactWithRelationship | null {
   const all = getContacts();
   return all.find((c) => c.chatId === chatId) || null;
 }
+
+// --- Logs ---
+export interface LogLine {
+  raw: string;
+  timestamp?: string;
+  level?: string;
+  domain?: string;
+  message?: string;
+}
+
+const LOG_PATH = resolve(STATE_DIR, "limor.log");
+
+export function getLogs(limit: number = 200, level?: string, domain?: string): LogLine[] {
+  if (!existsSync(LOG_PATH)) return [];
+  try {
+    const content = readFileSync(LOG_PATH, "utf-8");
+    let lines = content.split("\n").filter((l) => l.trim().length > 0);
+
+    // Parse each line
+    let parsed: LogLine[] = lines.map((raw) => {
+      const match = raw.match(/^\[([^\]]+)\] \[([^\]]+)\] \[([^\]]+)\] (.*)$/);
+      if (match) {
+        return { raw, timestamp: match[1], level: match[2], domain: match[3], message: match[4] };
+      }
+      return { raw };
+    });
+
+    // Filter
+    if (level) {
+      parsed = parsed.filter((l) => l.level?.toUpperCase() === level.toUpperCase());
+    }
+    if (domain) {
+      parsed = parsed.filter((l) => l.domain === domain);
+    }
+
+    // Return last N, reversed (newest first)
+    return parsed.slice(-limit).reverse();
+  } catch {
+    return [];
+  }
+}
+
+export function isLimorRunning(): boolean {
+  if (!existsSync(LOG_PATH)) return false;
+  try {
+    const stats = require("fs").statSync(LOG_PATH);
+    const lastModified = stats.mtimeMs;
+    // Consider running if log was written in last 5 minutes
+    return Date.now() - lastModified < 5 * 60 * 1000;
+  } catch {
+    return false;
+  }
+}

@@ -1,8 +1,10 @@
 /**
  * Structured logger for Limor.
- * Outputs structured lines to stdout/stderr.
- * Supports optional trace context for correlation.
+ * Outputs structured lines to stdout/stderr AND to a rotating log file
+ * at workspace/state/limor.log (read by the dashboard).
  */
+import { appendFileSync, existsSync, statSync, renameSync, mkdirSync } from "fs";
+import { resolve, dirname } from "path";
 import type { TraceContext, NormalizedError } from "./observability/types";
 
 type LogLevel = "info" | "warn" | "error" | "debug";
@@ -10,6 +12,14 @@ type LogDomain = "msg" | "tool" | "approval" | "api" | "system" | "media" | "mem
 
 interface LogContext {
   [key: string]: string | number | boolean | undefined;
+}
+
+const LOG_PATH = resolve(__dirname, "..", "workspace", "state", "limor.log");
+const MAX_LOG_SIZE = 2 * 1024 * 1024; // 2MB — rotate when exceeded
+
+function ensureLogDir(): void {
+  const dir = dirname(LOG_PATH);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
 
 function formatLine(level: LogLevel, domain: LogDomain, message: string, ctx?: LogContext): string {
@@ -25,6 +35,23 @@ function formatLine(level: LogLevel, domain: LogDomain, message: string, ctx?: L
   return `${prefix} ${message} | ${pairs}`;
 }
 
+function writeToFile(line: string): void {
+  try {
+    ensureLogDir();
+    // Rotate if too large
+    if (existsSync(LOG_PATH)) {
+      const stats = statSync(LOG_PATH);
+      if (stats.size > MAX_LOG_SIZE) {
+        const backupPath = LOG_PATH + ".1";
+        try { renameSync(LOG_PATH, backupPath); } catch {}
+      }
+    }
+    appendFileSync(LOG_PATH, line + "\n", "utf-8");
+  } catch {
+    // Silently fail — don't break the bot for log I/O errors
+  }
+}
+
 function write(level: LogLevel, domain: LogDomain, message: string, ctx?: LogContext): void {
   const line = formatLine(level, domain, message, ctx);
   if (level === "error") {
@@ -32,6 +59,7 @@ function write(level: LogLevel, domain: LogDomain, message: string, ctx?: LogCon
   } else {
     console.log(line);
   }
+  writeToFile(line);
 }
 
 /** Build context with trace info merged in. */

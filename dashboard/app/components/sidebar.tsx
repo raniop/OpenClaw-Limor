@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: "/capabilities", label: "Capabilities", icon: "⚡" },
   { href: "/digests", label: "Digests", icon: "📋" },
   { href: "/contacts", label: "Contacts", icon: "👥" },
+  { href: "/logs", label: "Logs", icon: "📟" },
 ];
 
 export function Sidebar() {
