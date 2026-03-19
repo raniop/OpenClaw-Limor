@@ -18,7 +18,7 @@ export function LiveLogs() {
       try {
         const res = await fetch("/api/logs?limit=5");
         const data = await res.json();
-        setLogs(data.logs || []);
+        setLogs((data.logs || []).reverse());
       } catch {}
     }
 
