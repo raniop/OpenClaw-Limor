@@ -12,8 +12,29 @@ type GuardrailInput = Omit<ResolvedContext, "executionDecision" | "toolRoutingPo
  * Resolve the execution decision based on all resolved context layers.
  * Priority-ordered rules — first match wins.
  */
+// Tool intent types that should always allow tool access even when strategy says clarify.
+// Calendar = includes request_meeting which only forwards to owner, not a dangerous action.
+// Messaging = includes notify_owner.
+const FORWARDING_INTENT_TYPES = new Set(["calendar", "messaging"]);
+
 export function resolveExecutionDecision(resolved: GuardrailInput): ExecutionDecision {
-  const { responseStrategy, contradictions, toolIntent, actionPlan } = resolved;
+  const { responseStrategy, contradictions, toolIntent, actionPlan, bundle } = resolved;
+
+  // Rule 0: For non-owner users requesting meetings/messaging — always allow tools
+  // because request_meeting and notify_owner only forward to the owner, they don't execute.
+  if (
+    toolIntent.shouldUseTool &&
+    FORWARDING_INTENT_TYPES.has(toolIntent.type) &&
+    !bundle.person.isOwner
+  ) {
+    return {
+      type: "allow_tool_execution",
+      summary: "כלי העברת בקשה — תמיד מותר לאנשי קשר",
+      reason: `${toolIntent.type} — כלי בקשה/העברה, לא פעולה מסוכנת`,
+      confidence: 0.95,
+      allowTools: true,
+    };
+  }
 
   // 1. Clarify-first strategy — block everything
   if (responseStrategy.type === "clarify_first") {
