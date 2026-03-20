@@ -234,11 +234,16 @@ export function applyWorktree(capId: string): string {
     // Write restart flag
     writeFileSync(RESTART_FLAG, JSON.stringify({ capId, appliedAt: new Date().toISOString() }));
 
-    console.log(`[sandbox] Applied ${capId} — restarting...`);
+    console.log(`[sandbox] Applied ${capId} — restarting via pm2...`);
 
-    // Schedule restart (give time for the response to send)
+    // Restart via pm2 (graceful) — if pm2 is not available, fallback to process.exit
     setTimeout(() => {
-      process.exit(0); // Process manager will restart
+      try {
+        const { execSync } = require("child_process");
+        execSync("npx pm2 restart limor", { cwd: PROJECT_ROOT, timeout: 10_000 });
+      } catch {
+        process.exit(0); // Fallback: pm2 will auto-restart
+      }
     }, 2000);
 
     return `✅ Changes applied! Building and restarting...\nCapability: ${capId}`;

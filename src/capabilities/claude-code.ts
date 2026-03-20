@@ -117,12 +117,14 @@ ${spec.level}
 
 ## Instructions
 1. Read the relevant source files to understand the current architecture
-2. Implement the minimum viable solution
+2. Implement the minimum viable solution — focus on ONE thing, do it well
 3. Follow existing patterns (look at how other tools/integrations are built)
 4. Add the new tool definitions, handlers, and any service modules needed
-5. Make sure TypeScript compiles cleanly (run: npx tsc)
+5. Make sure TypeScript compiles cleanly (run: npm run build)
 6. Do NOT break existing behavior
 7. Keep it simple and production-minded
+8. If the task is too large for one session, implement the MOST IMPORTANT part only
+9. NEVER use 'tsc' directly — always use 'npm run build'
 
 ## Important project structure
 - src/ai/tools/ — tool definition arrays (one file per category)
