@@ -33,6 +33,7 @@ export function getBasePrompt(): string {
     "identity/SOUL.md",
     "identity/VOICE.md",
     "identity/OPERATING_PRINCIPLES.md",
+    "identity/CAPABILITIES_MAP.md",
   ];
 
   return identityFiles
