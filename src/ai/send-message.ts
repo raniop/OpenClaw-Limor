@@ -202,7 +202,9 @@ export async function sendMessage(
   if (!hadToolCalls && tools.length > 0) {
     const claimsAction = /שולחת בקשה|שלחתי בקשה|שולחת לרני|העברתי לרני|קבעתי|שלחתי זימון|שולחת זימון|שלחתי הודעה|שלחתי ל|העברתי ל|בדקתי את|מצאתי (מסעדה|טיסה|מלון)|הזמנתי|ביטלתי|יצרתי|נוצרה|הוספתי|מחקתי/.test(finalText);
     if (claimsAction) {
-      console.warn(`[hallucination-guard] ⚠️ AI claimed action but no tool was called! Text: ${finalText.substring(0, 100)}`);
+      console.error(`[hallucination-guard] 🚨 BLOCKED: AI claimed action but no tool was called! Text: ${finalText.substring(0, 200)}`);
+      // Replace the lying response with an honest one
+      return "אוי, רגע — רציתי לבצע את הפעולה אבל משהו השתבש ולא באמת ביצעתי. תגיד לי שוב מה לעשות ואני אטפל בזה 🙏";
     }
   }
 
