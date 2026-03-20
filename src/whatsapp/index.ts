@@ -337,14 +337,9 @@ async function handleMessage(msg: Message): Promise<void> {
       return;
     }
 
-    // --- Group classifier pre-filter ---
-    if (isGroup) {
-      const classification = classifyGroupMessage(body, contactName, chatId);
-      if (!classification.shouldRespond) {
-        log.traceEnd(trace, "group_filtered", elapsed(trace));
-        return;
-      }
-    }
+    // --- Group messages: always let AI decide (no pre-filtering) ---
+    // The AI has [SKIP] logic and full context — it's smarter than regex.
+    // Muted groups are already handled above (save to history, don't process).
 
     // --- Owner commands ---
     if (!isGroup && config.ownerChatId && chatId === config.ownerChatId) {
