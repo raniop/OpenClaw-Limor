@@ -255,6 +255,24 @@ export function addManualContact(name: string, phone: string, notes?: string): s
   return `✅ נשמר: ${name} (${phone})`;
 }
 
+/**
+ * Remove a contact by name. Returns a status message.
+ */
+export function removeContact(name: string): string {
+  const contacts = loadContacts();
+  const contact = findContactByName(name);
+  if (!contact) return `❌ לא מצאתי איש קשר בשם "${name}"`;
+
+  // Find the key in contacts store
+  const key = Object.keys(contacts).find(k => contacts[k].name === contact.name || k === contact.chatId);
+  if (!key) return `❌ לא מצאתי איש קשר בשם "${name}" במאגר`;
+
+  const removed = contacts[key];
+  delete contacts[key];
+  saveContacts(contacts);
+  return `✅ מחקתי את ${removed.name}${removed.phone ? ` (${removed.phone})` : ""} מאנשי הקשר.`;
+}
+
 export function listAllContacts(): string {
   const contacts = loadContacts();
   const entries = Object.values(contacts)

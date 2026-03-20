@@ -70,7 +70,18 @@ export function resolveActionPlan(resolved: ActionPlanInput): ActionPlan {
     };
   }
 
-  // 5. New request — use missingInfo for precise clarification
+  // 5. Multi-step request — complex tasks that need planning
+  if (bundle.turnIntent.category === "multi_step_request") {
+    return {
+      type: "handle_multi_step",
+      summary: "לתכנן ולבצע משימה מורכבת בכמה שלבים",
+      reason: "המשתמש ביקש משהו שדורש כמה פעולות",
+      confidence: 0.85,
+      needsClarification: false,
+    };
+  }
+
+  // 6. New request — use missingInfo for precise clarification
   if (primaryFocus.type === "new_request") {
     const hasMissing = !bundle.missingInfo.missing.includes("none");
     if (hasMissing) {

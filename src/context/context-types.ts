@@ -62,6 +62,7 @@ export type TurnIntentCategory =
   | "followup_query"
   | "reminder_request"
   | "action_request"
+  | "multi_step_request"
   | "status_query"
   | "correction"
   | "continuation"
@@ -100,6 +101,23 @@ export interface MissingInfo {
   confidence: number;
 }
 
+// --- Mood detection ---
+
+export type UserMood =
+  | "neutral"
+  | "stressed"
+  | "frustrated"
+  | "happy"
+  | "sad"
+  | "rushed"
+  | "excited";
+
+export interface MoodContext {
+  mood: UserMood;
+  confidence: number;
+  signals: string[];
+}
+
 export interface ContextBundle {
   person: PersonContext;
   conversation: ConversationContext;
@@ -112,6 +130,7 @@ export interface ContextBundle {
   historySummary: string;
   system: SystemContext;
   signals: string[];
+  mood: MoodContext;
 }
 
 // --- v3 decision layer ---
@@ -127,6 +146,7 @@ export interface ResponseMode {
   tone: "friendly" | "direct" | "professional" | "warm";
   brevity: "short" | "medium";
   structure: "direct_answer" | "status_list" | "action_confirmation" | "clarify_and_act";
+  register: "casual" | "professional" | "relaxed";
   shouldAcknowledgeDelay: boolean;
   shouldMentionOpenLoops: boolean;
 }
@@ -140,6 +160,7 @@ export type PlannedActionType =
   | "give_status"
   | "confirm_correction"
   | "handle_new_request"
+  | "handle_multi_step"
   | "ask_for_missing_detail";
 
 export interface ActionPlan {
@@ -314,7 +335,8 @@ export interface PromptSection {
     | "contradictions"
     | "response_strategy"
     | "execution_decision"
-    | "tool_routing";
+    | "tool_routing"
+    | "mood";
   title: string;
   content: string[];
   priority: PromptPriorityLevel;

@@ -82,6 +82,10 @@ const TOPIC_RULES: TopicRule[] = [
     keywords: ["אור", "אורות", "light", "וילון", "blind", "מזגן", "מאוורר", "fan", "דוד", "boiler", "בית חכם", "smart home", "הדלק", "כבה", "פתח", "סגור", "control4", "סלון", "מטבח", "חדר שינה", "גינה", "פרגולה"],
     files: ["policies/smarthome.md"],
   },
+  {
+    keywords: ["תתכנני", "תארגני", "תסדרי לי", "סדרי לי", "ערב", "plan", "organize", "arrange", "טיול", "אירוע", "מסיבה"],
+    files: ["policies/multi_step.md"],
+  },
 ];
 
 /**

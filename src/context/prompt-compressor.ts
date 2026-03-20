@@ -12,9 +12,11 @@ const PRIORITY_ORDER: PromptPriorityLevel[] = ["critical", "high", "medium", "lo
 const MAX_SECTIONS = 8;
 const MIN_SECTIONS = 4;
 
+const MOOD_LABELS: Record<string, string> = { neutral: "ניטרלי", stressed: "לחוץ", frustrated: "מתוסכל", happy: "שמח", sad: "עצוב", rushed: "ממהר", excited: "נרגש" };
 const PRIORITY_LABELS: Record<string, string> = { low: "נמוכה", medium: "בינונית", high: "גבוהה" };
 const TYPE_LABELS: Record<string, string> = { unknown: "לא מוגדר", client: "לקוח", lead: "ליד", friend: "חבר/ה", family: "משפחה", work: "עבודה", service: "שירות" };
 const TONE_LABELS: Record<string, string> = { friendly: "חברותי", direct: "ישיר", professional: "מקצועי", warm: "חם" };
+const REGISTER_LABELS: Record<string, string> = { casual: "יומיומי", professional: "מקצועי", relaxed: "רגוע" };
 const STRUCTURE_LABELS: Record<string, string> = { direct_answer: "תשובה ישירה", status_list: "רשימת סטטוס", action_confirmation: "אישור פעולה", clarify_and_act: "הבהרה ופעולה" };
 
 /**
@@ -208,11 +210,12 @@ function buildAllSections(r: CompressorInput): PromptSection[] {
     reason: personImportant ? "אדם חשוב או מוכר" : "אדם רגיל",
   });
 
-  const modeRelevant = responseMode.tone !== "professional" || responseMode.brevity !== "medium" || responseMode.structure !== "direct_answer";
+  const modeRelevant = responseMode.tone !== "professional" || responseMode.brevity !== "medium" || responseMode.structure !== "direct_answer" || responseMode.register !== "professional";
+  const registerLabel = REGISTER_LABELS[responseMode.register] || responseMode.register;
   sections.push({
     key: "response_mode",
     title: "🗣️ אופן תגובה",
-    content: modeRelevant ? [`טון: ${TONE_LABELS[responseMode.tone] || responseMode.tone}, מבנה: ${STRUCTURE_LABELS[responseMode.structure] || responseMode.structure}`] : [],
+    content: modeRelevant ? [`טון: ${TONE_LABELS[responseMode.tone] || responseMode.tone}, מבנה: ${STRUCTURE_LABELS[responseMode.structure] || responseMode.structure}, רגיסטר: ${registerLabel}`] : [],
     priority: modeRelevant ? "medium" : "low",
     included: modeRelevant,
     reason: modeRelevant ? "אופן תגובה שונה מברירת מחדל" : "אופן תגובה רגיל",
@@ -247,6 +250,17 @@ function buildAllSections(r: CompressorInput): PromptSection[] {
     priority: hasGuidance ? "medium" : "low",
     included: hasGuidance,
     reason: hasGuidance ? "יש הנחיות ספציפיות" : "אין הנחיות",
+  });
+
+  // --- Mood section ---
+  const moodRelevant = bundle.mood.mood !== "neutral" && bundle.mood.confidence >= 0.6;
+  sections.push({
+    key: "mood",
+    title: "😊 מצב רוח",
+    content: moodRelevant ? [`המשתמש נשמע ${MOOD_LABELS[bundle.mood.mood] || bundle.mood.mood}`] : [],
+    priority: moodRelevant ? "medium" : "low",
+    included: moodRelevant,
+    reason: moodRelevant ? "זוהה מצב רוח שמשפיע על אופן התגובה" : "מצב רוח ניטרלי",
   });
 
   return sections;

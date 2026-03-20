@@ -9,7 +9,7 @@ import * as QRCode from "qrcode";
 import * as http from "http";
 import { sendMessage, extractFacts, setNotifyOwnerCallback, setSendMessageCallback, setSendFileCallback } from "../ai";
 import { updateContact } from "../contacts";
-import { getMemoryContext, saveExtractedFacts } from "../memory";
+import { getMemoryContext, saveExtractedFacts, saveEmotionalState, savePreference } from "../memory";
 import { config } from "../config";
 import { log } from "../logger";
 import { conversationStore } from "../stores";
@@ -27,6 +27,8 @@ import type { ResolvedContext } from "../context";
 import { extractFollowups } from "../followups";
 import { updateFromMessage } from "../relationship-memory";
 import { approvalStore } from "../stores";
+import { learnFromCorrection } from "../context/correction-learner";
+import { startProactiveScheduler, recordOwnerResponse } from "../proactive";
 
 let latestQR: string | null = null;
 let qrServer: http.Server | null = null;
@@ -141,6 +143,13 @@ export function createWhatsAppClient(): Client {
       });
     } catch (err) {
       console.error("[telegram] Failed to start alert poller:", err);
+    }
+
+    // Start proactive messaging scheduler
+    try {
+      startProactiveScheduler();
+    } catch (err) {
+      console.error("[proactive] Failed to start scheduler:", err);
     }
   });
 
@@ -379,6 +388,11 @@ async function handleMessage(msg: Message): Promise<void> {
       return;
     }
 
+    // Track owner messages for proactive rate limiting
+    if (isOwner) {
+      recordOwnerResponse();
+    }
+
     // --- AI conversation ---
     const messageForHistory = isGroup ? `[${contactName}]: ${body}` : body;
     conversationStore.addMessage(chatId, "user", messageForHistory);
@@ -450,9 +464,16 @@ async function handleMessage(msg: Message): Promise<void> {
       }
     }
 
-    // Background fact extraction
-    extractFacts(history).then(({ name, facts }) => {
+    // Background fact + preference extraction
+    extractFacts(history).then(({ name, facts, preferences }) => {
       if (name || facts.length > 0) saveExtractedFacts(chatId, facts, name || undefined);
+      if (preferences && Object.keys(preferences).length > 0) {
+        for (const [category, values] of Object.entries(preferences)) {
+          if (Array.isArray(values) && values.length > 0) {
+            savePreference(chatId, category, values);
+          }
+        }
+      }
     }).catch((err) => log.memorySaveError(String(err)));
 
     // Background followup extraction (skip if create_reminder tool was already used)
@@ -462,6 +483,29 @@ async function handleMessage(msg: Message): Promise<void> {
       }
     } catch (err) {
       console.error("[followup] Extraction error:", err);
+    }
+
+    // Background emotional state logging — save mood to memory when detected
+    if (resolvedCtx && !isGroup) {
+      const { mood } = resolvedCtx.bundle.mood;
+      if (mood !== "neutral" && resolvedCtx.bundle.mood.confidence >= 0.7) {
+        try {
+          const contextHint = body.substring(0, 50);
+          saveEmotionalState(chatId, mood, contextHint);
+        } catch (err) {
+          console.error("[emotional-log] Save error:", err);
+        }
+      }
+    }
+
+    // Background correction learning — when user corrects Limor, extract and save the lesson
+    if (resolvedCtx?.bundle.turnIntent.category === "correction" && isOwner) {
+      const lastAssistant = resolvedCtx.bundle.conversation.lastAssistantMessage;
+      if (lastAssistant) {
+        learnFromCorrection(body, lastAssistant).catch((err) =>
+          console.error("[correction-learner] Error:", err)
+        );
+      }
     }
 
     // Background contact sync (keeps contacts.json in sync with relationships)

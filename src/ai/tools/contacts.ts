@@ -24,6 +24,20 @@ export const contactTools: Anthropic.Tool[] = [
     },
   },
   {
+    name: "delete_contact",
+    description: "מחיקת איש קשר מהמערכת לחלוטין. השתמשי כשרני מבקש למחוק/להסיר איש קשר.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        contact_name: {
+          type: "string",
+          description: "שם איש הקשר למחיקה",
+        },
+      },
+      required: ["contact_name"],
+    },
+  },
+  {
     name: "block_contact",
     description: "חסימת איש קשר - הוא לא יוכל לדבר עם לימור יותר (עד שרני יאשר מחדש)",
     input_schema: {

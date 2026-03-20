@@ -8,7 +8,7 @@ import { sendCalendarInviteEmail } from "../email";
 import { approvalStore, meetingStore } from "../stores";
 import { searchAvailability, bookOntopo } from "../ontopo";
 import { searchTabit, bookTabit } from "../tabit";
-import { findContactByName, findContactByPhone, getRecentContacts, addManualContact, listAllContacts } from "../contacts";
+import { findContactByName, findContactByPhone, getRecentContacts, addManualContact, listAllContacts, removeContact } from "../contacts";
 import { config as appConfig } from "../config";
 import { getHistory } from "../conversation";
 import { controlDevice, getDeviceStatus, listRooms, listDevices, findDevice } from "../control4";
@@ -246,6 +246,11 @@ export async function handleToolCall(
     }
     if (name === "list_contacts") {
       return listAllContacts();
+    }
+    if (name === "delete_contact") {
+      const result = removeContact(input.contact_name);
+      logAudit(actor, "contact_deleted", input.contact_name, result.startsWith("✅") ? "success" : "failed");
+      return result;
     }
     if (name === "block_contact") {
       const contact = findContactByName(input.contact_name);

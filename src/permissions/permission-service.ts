@@ -31,6 +31,7 @@ const TOOL_PERMISSIONS: Record<string, Role[]> = {
   // Contact management
   add_contact: ["owner"],
   list_contacts: ["owner"],
+  delete_contact: ["owner"],
   block_contact: ["owner"],
   get_contact_history: ["owner"],
   get_group_history: ["owner"],

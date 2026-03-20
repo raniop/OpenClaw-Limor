@@ -23,6 +23,10 @@ const FOLLOWUP_PATTERN = /(מה עם|מה לגבי|עדכון על|נושא של
 // Reminder request
 const REMINDER_PATTERN = /(תזכירי|תזכרי|אל תשכחי|remind|תזכורת|לזכור|תרשמי|רשמי לי)/i;
 
+// Multi-step request — complex tasks that require planning multiple actions
+const MULTI_STEP_PATTERN = /(תתכנני|תארגני|תסדרי לי|סדרי לי|ארגני לי|plan|organize|arrange)/i;
+const MULTI_STEP_KEYWORDS = /(ערב|יום|אירוע|טיול|חופשה|מסיבה|פגישות|לו"ז|evening|trip|event|party)/i;
+
 // Action request — asking Limor to do something
 const ACTION_PATTERN = /(תשלחי|תקבעי|תבדקי|תחפשי|תעשי|תמצאי|תזמיני|send|book|check|search|do|find)/i;
 
@@ -53,6 +57,11 @@ export function classifyTurnIntent(message: string): TurnIntent {
   // Status query
   if (STATUS_PATTERN.test(trimmed)) {
     return { category: "status_query", confidence: 0.9, mentionedEntities, isMinimal: false };
+  }
+
+  // Multi-step request — before action request since it's more specific
+  if (MULTI_STEP_PATTERN.test(trimmed) || (ACTION_PATTERN.test(trimmed) && MULTI_STEP_KEYWORDS.test(trimmed) && trimmed.length > 30)) {
+    return { category: "multi_step_request", confidence: 0.85, mentionedEntities, isMinimal: false };
   }
 
   // Reminder request

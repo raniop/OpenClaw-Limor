@@ -3,7 +3,7 @@
  * Now includes open loop resolution, turn intent, and response guidance.
  * Deterministic, no AI calls, fast.
  */
-import type { ContextBundle, PersonContext, ConversationContext, UrgencyContext, SystemContext, OpenLoopContext, ResolvedContext } from "./context-types";
+import type { ContextBundle, PersonContext, ConversationContext, UrgencyContext, SystemContext, OpenLoopContext, ResolvedContext, MoodContext } from "./context-types";
 import { getProfile } from "../relationship-memory/relationship-store";
 import { conversationStore, approvalStore, meetingStore } from "../stores";
 import { getPendingFollowups, getDueFollowups } from "../followups";
@@ -29,6 +29,7 @@ import { evaluateOutcome } from "./outcome-tracker";
 import { buildDebugTrace } from "./debug-trace";
 import { resolveFollowupAutomationDecision } from "./followup-automation";
 import { resolveDomainPolicy } from "./domain-policy-resolver";
+import { detectMood } from "./mood-detector";
 
 interface BuildParams {
   chatId: string;
@@ -53,15 +54,16 @@ export function buildContext(params: BuildParams): ContextBundle {
     person,
   });
   const missingInfo = resolveMissingInfo(params.message, turnIntent, references);
+  const mood = detectMood(params.message);
   const system = buildSystemContext();
   const signals = buildSignals(person, conversation, urgency, system);
   const historySummary = buildHistorySummary(person, conversation, urgency, openLoops);
 
   // Build partial bundle for guidance (needs all other fields)
-  const partialBundle: ContextBundle = { person, conversation, urgency, openLoops, turnIntent, references, missingInfo, responseGuidance: [], historySummary, system, signals };
+  const partialBundle: ContextBundle = { person, conversation, urgency, openLoops, turnIntent, references, missingInfo, responseGuidance: [], historySummary, system, signals, mood };
   const responseGuidance = generateResponseGuidance(partialBundle);
 
-  return { person, conversation, urgency, openLoops, turnIntent, references, missingInfo, responseGuidance, historySummary, system, signals };
+  return { person, conversation, urgency, openLoops, turnIntent, references, missingInfo, responseGuidance, historySummary, system, signals, mood };
 }
 
 export function buildResolvedContext(params: BuildParams): ResolvedContext {

@@ -8,9 +8,42 @@ import { resolve, join } from "path";
 import { createWorktree, getDiff, applyWorktree, cleanupWorktree } from "./sandbox";
 import { getSpec } from "./spec-store";
 
-const CLAUDE_CLI = "/Users/raniophir/Library/Application Support/Claude/claude-code/2.1.74/claude";
 const PROJECT_ROOT = resolve(__dirname, "..", "..");
 const WORKTREES_DIR = join(PROJECT_ROOT, ".worktrees");
+
+/**
+ * Find the latest Claude CLI binary dynamically.
+ * Claude Code updates change the version directory, so we find the latest.
+ */
+function findClaudeCli(): string {
+  const baseDir = join(
+    process.env.HOME || "/Users/raniophir",
+    "Library/Application Support/Claude/claude-code"
+  );
+  try {
+    const { readdirSync } = require("fs");
+    const versions = readdirSync(baseDir)
+      .filter((d: string) => /^\d+\.\d+\.\d+$/.test(d))
+      .sort((a: string, b: string) => {
+        const pa = a.split(".").map(Number);
+        const pb = b.split(".").map(Number);
+        for (let i = 0; i < 3; i++) {
+          if (pa[i] !== pb[i]) return pb[i] - pa[i];
+        }
+        return 0;
+      });
+    if (versions.length > 0) {
+      const cliPath = join(baseDir, versions[0], "claude");
+      if (existsSync(cliPath)) return cliPath;
+    }
+  } catch {}
+  // Fallback: try PATH
+  try {
+    const { execSync } = require("child_process");
+    return execSync("which claude", { encoding: "utf-8" }).trim();
+  } catch {}
+  return join(baseDir, "2.1.76", "claude"); // last known good
+}
 
 /**
  * Run Claude Code to implement a capability spec.
@@ -104,9 +137,10 @@ function runClaudeCode(cwd: string, prompt: string): Promise<string> {
       "--max-turns", "20",
     ];
 
-    console.log(`[claude-code] Starting in ${cwd}`);
+    const claudeCli = findClaudeCli();
+    console.log(`[claude-code] Starting in ${cwd} (CLI: ${claudeCli})`);
 
-    const proc = spawn(CLAUDE_CLI, args, {
+    const proc = spawn(claudeCli, args, {
       cwd,
       timeout: 300_000, // 5 minutes
       env: { ...process.env, CLAUDE_CODE_ENTRYPOINT: "limor-bot" },

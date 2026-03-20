@@ -10,26 +10,38 @@ import { log } from "../logger";
 const EXTRACT_PROMPT = `אתה מנתח שיחות. תפקידך לחלץ מידע חשוב ו**קבוע** מהשיחה שצריך לזכור לטווח ארוך.
 
 החזר JSON בלבד בפורמט הזה (בלי markdown, בלי backticks):
-{"name": "שם המשתמש אם נאמר, או null", "facts": ["עובדה 1", "עובדה 2"]}
+{"name": "שם המשתמש אם נאמר, או null", "facts": ["עובדה 1", "עובדה 2"], "preferences": {"קטגוריה": ["ערך"]}}
 
-מה כן לשמור:
-- עובדות אישיות קבועות (שם, עבודה, תחביבים, העדפות, משפחה, מיקום)
+מה כן לשמור ב-facts:
+- עובדות אישיות קבועות (שם, עבודה, תחביבים, משפחה, מיקום)
 - תזכורות עתידיות שהמשתמש ביקש
 
+מה כן לשמור ב-preferences (העדפות):
+- אוכל: סוגי מסעדות, מאכלים אהובים ("אוהב סושי", "צמחוני")
+- זמנים: שעות מועדפות, ימים ("מעדיף ערבים", "פנוי בימי שישי")
+- תקשורת: סגנון תקשורת ("מעדיף הודעות קצרות")
+- מקומות: מסעדות/מקומות אהובים
+- כללי: כל העדפה אחרת שנלמדה
+
 מה לא לשמור:
-- פעולות זמניות ("לימור מחכה לתשובה", "לימור שלחה הודעה") - אלה לא עובדות לזכור
-- בקשות חד-פעמיות שכבר טופלו ("ביקש לחפש מסעדה", "שאל על פוליסה")
+- פעולות זמניות ("לימור מחכה לתשובה", "לימור שלחה הודעה")
+- בקשות חד-פעמיות שכבר טופלו
 - מידע על מה שלימור עשתה או לא עשתה
-- מידע שהמשתמש רק שאל עליו (שאלות זה לא עובדות)
 - דברים כלליים וברורים מאליהם
 
-כלל חשוב: שמור רק 0-2 עובדות מכל שיחה. רוב השיחות לא מכילות מידע חדש לזכור.
-אם אין מידע חדש, החזר: {"name": null, "facts": []}
+כלל חשוב: שמור רק 0-2 עובדות ו-0-2 העדפות מכל שיחה.
+אם אין מידע חדש, החזר: {"name": null, "facts": [], "preferences": {}}
 כתוב בצורה קצרה וברורה בעברית`;
+
+export interface ExtractedData {
+  name: string | null;
+  facts: string[];
+  preferences: Record<string, string[]>;
+}
 
 export async function extractFacts(
   history: Message[]
-): Promise<{ name: string | null; facts: string[] }> {
+): Promise<ExtractedData> {
   try {
     const lastMessages = history.slice(-4);
     const conversation = lastMessages
@@ -48,9 +60,10 @@ export async function extractFacts(
     return {
       name: parsed.name || null,
       facts: Array.isArray(parsed.facts) ? parsed.facts : [],
+      preferences: (typeof parsed.preferences === "object" && parsed.preferences !== null) ? parsed.preferences : {},
     };
   } catch (error) {
     log.memoryExtractFailed(String(error));
-    return { name: null, facts: [] };
+    return { name: null, facts: [], preferences: {} };
   }
 }

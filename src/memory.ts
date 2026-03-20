@@ -13,9 +13,18 @@ interface Fact {
   savedAt: string;
 }
 
+interface EmotionalLogEntry {
+  date: string;
+  mood: string;
+  context: string;
+}
+
 interface UserMemory {
   name?: string;
   facts: Fact[];
+  preferences: Record<string, string[]>;
+  patterns: string[];
+  emotionalLog: EmotionalLogEntry[];
 }
 
 // Sanitize chatId for filename (replace special chars)
@@ -34,7 +43,7 @@ function loadUserMemory(chatId: string): UserMemory {
       const content = readFileSync(filePath, "utf-8");
       return parseUserMarkdown(content);
     } catch {
-      return { facts: [] };
+      return { facts: [], preferences: {}, patterns: [], emotionalLog: [] };
     }
   }
 
@@ -48,33 +57,83 @@ function loadUserMemory(chatId: string): UserMemory {
 }
 
 function loadFromOldStore(chatId: string): UserMemory {
-  if (!existsSync(OLD_MEMORY_PATH)) return { facts: [] };
+  if (!existsSync(OLD_MEMORY_PATH)) return { facts: [], preferences: {}, patterns: [], emotionalLog: [] };
   try {
     const store = JSON.parse(readFileSync(OLD_MEMORY_PATH, "utf-8"));
     const entry = store[chatId];
-    if (!entry) return { facts: [] };
+    if (!entry) return { facts: [], preferences: {}, patterns: [], emotionalLog: [] };
     return {
       name: entry.name,
       facts: Array.isArray(entry.facts) ? entry.facts : [],
+      preferences: {},
+      patterns: [],
+      emotionalLog: [],
     };
   } catch {
-    return { facts: [] };
+    return { facts: [], preferences: {}, patterns: [], emotionalLog: [] };
   }
 }
 
 function parseUserMarkdown(content: string): UserMemory {
-  const mem: UserMemory = { facts: [] };
+  const mem: UserMemory = { facts: [], preferences: {}, patterns: [], emotionalLog: [] };
   const lines = content.split("\n");
 
+  let currentSection = "";
+  let currentPrefCategory = "";
+
   for (const line of lines) {
+    // Detect sections
+    if (line.startsWith("## Known Facts")) { currentSection = "facts"; continue; }
+    if (line.startsWith("## Preferences") || line.startsWith("## העדפות")) { currentSection = "preferences"; continue; }
+    if (line.startsWith("## Patterns") || line.startsWith("## דפוסים")) { currentSection = "patterns"; continue; }
+    if (line.startsWith("## Emotional Log") || line.startsWith("## יומן רגשי")) { currentSection = "emotional"; continue; }
+    if (line.startsWith("## ")) { currentSection = ""; continue; }
+
     const nameMatch = line.match(/^Name:\s*(.+)$/);
     if (nameMatch) {
       mem.name = nameMatch[1].trim();
       continue;
     }
-    const factMatch = line.match(/^- (.+)$/);
-    if (factMatch && !line.includes("Name:")) {
-      mem.facts.push({ text: factMatch[1].trim(), savedAt: "" });
+
+    if (currentSection === "facts") {
+      const factMatch = line.match(/^- (.+)$/);
+      if (factMatch) {
+        mem.facts.push({ text: factMatch[1].trim(), savedAt: "" });
+      }
+    } else if (currentSection === "preferences") {
+      // Sub-category header: "- מסעדות: ..."
+      const catMatch = line.match(/^- ([^:]+):\s*(.+)$/);
+      if (catMatch) {
+        currentPrefCategory = catMatch[1].trim();
+        mem.preferences[currentPrefCategory] = catMatch[2].split(",").map(s => s.trim()).filter(Boolean);
+      } else {
+        const subMatch = line.match(/^\s+- (.+)$/);
+        if (subMatch && currentPrefCategory) {
+          if (!mem.preferences[currentPrefCategory]) mem.preferences[currentPrefCategory] = [];
+          mem.preferences[currentPrefCategory].push(subMatch[1].trim());
+        }
+      }
+    } else if (currentSection === "patterns") {
+      const patMatch = line.match(/^- (.+)$/);
+      if (patMatch) {
+        mem.patterns.push(patMatch[1].trim());
+      }
+    } else if (currentSection === "emotional") {
+      // Format: "- 2026-03-19: לחוץ (דדליין בעבודה)"
+      const emoMatch = line.match(/^- (\d{4}-\d{2}-\d{2}):\s*(\S+)\s*(?:\((.+)\))?$/);
+      if (emoMatch) {
+        mem.emotionalLog.push({
+          date: emoMatch[1],
+          mood: emoMatch[2],
+          context: emoMatch[3] || "",
+        });
+      }
+    } else if (!currentSection) {
+      // Legacy: facts without section header
+      const factMatch = line.match(/^- (.+)$/);
+      if (factMatch && !line.includes("Name:")) {
+        mem.facts.push({ text: factMatch[1].trim(), savedAt: "" });
+      }
     }
   }
   return mem;
@@ -92,13 +151,37 @@ function saveUserMemory(chatId: string, mem: UserMemory): void {
     for (const fact of mem.facts) {
       lines.push(`- ${fact.text}`);
     }
+    lines.push("");
+  }
+  if (Object.keys(mem.preferences).length > 0) {
+    lines.push("## העדפות");
+    for (const [category, prefs] of Object.entries(mem.preferences)) {
+      lines.push(`- ${category}: ${prefs.join(", ")}`);
+    }
+    lines.push("");
+  }
+  if (mem.patterns.length > 0) {
+    lines.push("## דפוסים");
+    for (const pattern of mem.patterns) {
+      lines.push(`- ${pattern}`);
+    }
+    lines.push("");
+  }
+  if (mem.emotionalLog.length > 0) {
+    lines.push("## יומן רגשי");
+    for (const entry of mem.emotionalLog.slice(-10)) { // Keep max 10
+      const ctx = entry.context ? ` (${entry.context})` : "";
+      lines.push(`- ${entry.date}: ${entry.mood}${ctx}`);
+    }
+    lines.push("");
   }
   writeFileSync(getUserFilePath(chatId), lines.join("\n"), "utf-8");
 }
 
 export function getMemoryContext(chatId: string): string {
   const mem = loadUserMemory(chatId);
-  if (!mem || mem.facts.length === 0) return "";
+  const hasContent = mem.facts.length > 0 || Object.keys(mem.preferences).length > 0 || mem.patterns.length > 0 || mem.emotionalLog.length > 0;
+  if (!mem || !hasContent) return "";
 
   const lines: string[] = [];
   lines.push("## מה שאת זוכרת על המשתמש הזה");
@@ -108,7 +191,93 @@ export function getMemoryContext(chatId: string): string {
   for (const fact of mem.facts) {
     lines.push(`- ${fact.text}`);
   }
+
+  if (Object.keys(mem.preferences).length > 0) {
+    lines.push("");
+    lines.push("### העדפות");
+    for (const [category, prefs] of Object.entries(mem.preferences)) {
+      lines.push(`- ${category}: ${prefs.join(", ")}`);
+    }
+  }
+
+  if (mem.patterns.length > 0) {
+    lines.push("");
+    lines.push("### דפוסים שזיהית");
+    for (const pattern of mem.patterns) {
+      lines.push(`- ${pattern}`);
+    }
+  }
+
+  if (mem.emotionalLog.length > 0) {
+    // Only show last 3 emotional entries for context
+    const recent = mem.emotionalLog.slice(-3);
+    lines.push("");
+    lines.push("### מצב רוח אחרון");
+    for (const entry of recent) {
+      const ctx = entry.context ? ` (${entry.context})` : "";
+      lines.push(`- ${entry.date}: ${entry.mood}${ctx}`);
+    }
+  }
+
   return lines.join("\n");
+}
+
+/**
+ * Save an emotional log entry for a user.
+ * Keeps max 10 entries, rolling window.
+ */
+export function saveEmotionalState(chatId: string, mood: string, context: string): void {
+  const mem = loadUserMemory(chatId);
+  const today = new Date().toISOString().split("T")[0];
+
+  // Don't add duplicate for same day and mood
+  const existing = mem.emotionalLog.find(e => e.date === today && e.mood === mood);
+  if (existing) return;
+
+  mem.emotionalLog.push({ date: today, mood, context });
+
+  // Keep max 10
+  if (mem.emotionalLog.length > 10) {
+    mem.emotionalLog = mem.emotionalLog.slice(-10);
+  }
+
+  saveUserMemory(chatId, mem);
+}
+
+/**
+ * Save user preferences in a category.
+ */
+export function savePreference(chatId: string, category: string, values: string[]): void {
+  const mem = loadUserMemory(chatId);
+  const existing = mem.preferences[category] || [];
+
+  for (const val of values) {
+    if (!existing.some(e => isSimilar(e, val))) {
+      existing.push(val);
+    }
+  }
+
+  // Max 20 per category
+  mem.preferences[category] = existing.slice(-20);
+  saveUserMemory(chatId, mem);
+}
+
+/**
+ * Save a detected behavioral pattern.
+ */
+export function savePattern(chatId: string, pattern: string): void {
+  const mem = loadUserMemory(chatId);
+
+  if (mem.patterns.some(p => isSimilar(p, pattern))) return;
+
+  mem.patterns.push(pattern);
+
+  // Max 10 patterns
+  if (mem.patterns.length > 10) {
+    mem.patterns = mem.patterns.slice(-10);
+  }
+
+  saveUserMemory(chatId, mem);
 }
 
 // Common Hebrew↔English transliterations for better dedup
