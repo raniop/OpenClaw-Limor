@@ -2,12 +2,22 @@
  * Group message classifier.
  * Pre-filters group messages to avoid calling AI for irrelevant chatter.
  * The AI still has its own [SKIP] logic as a secondary filter.
+ * Tracks recent responses to detect conversation continuations.
  */
 
 export interface GroupClassification {
   shouldRespond: boolean;
   isDirect: boolean;
   confidence: number;
+}
+
+// Track when Limor last responded in each group (for conversation continuation)
+const lastResponseTime = new Map<string, number>();
+const CONVERSATION_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+
+/** Call this after Limor responds in a group */
+export function recordGroupResponse(chatId: string): void {
+  lastResponseTime.set(chatId, Date.now());
 }
 
 // Bot name patterns (case-insensitive)
@@ -41,7 +51,8 @@ const QUESTION_PATTERNS = [
  */
 export function classifyGroupMessage(
   body: string,
-  contactName: string
+  contactName: string,
+  chatId?: string
 ): GroupClassification {
   const trimmed = body.trim();
 
@@ -57,11 +68,18 @@ export function classifyGroupMessage(
     }
   }
 
+  // Conversation continuation: if Limor responded in this group recently,
+  // treat the next messages as part of the conversation (let AI decide SKIP)
+  if (chatId) {
+    const lastResponse = lastResponseTime.get(chatId);
+    if (lastResponse && Date.now() - lastResponse < CONVERSATION_WINDOW_MS) {
+      return { shouldRespond: true, isDirect: false, confidence: 0.7 };
+    }
+  }
+
   // Check for command intent directed at bot
   for (const pattern of COMMAND_PATTERNS) {
     if (pattern.test(trimmed)) {
-      // Command patterns alone aren't enough — could be directed at someone else
-      // Only respond if the message is short (likely a command, not a conversation)
       if (trimmed.length < 50) {
         return { shouldRespond: true, isDirect: false, confidence: 0.6 };
       }

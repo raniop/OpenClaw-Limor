@@ -21,7 +21,7 @@ import { processMedia } from "./media-handler";
 import { handleOwnerCommand } from "./owner-commands";
 import { checkApprovalGate } from "./approval-gate";
 import { handleResponse } from "./response-handler";
-import { classifyGroupMessage } from "./group-classifier";
+import { classifyGroupMessage, recordGroupResponse } from "./group-classifier";
 import { getResolvedContext, formatCompressedContextForPrompt, formatDebugTrace, applyFollowupAutomation } from "../context";
 import type { ResolvedContext } from "../context";
 import { extractFollowups } from "../followups";
@@ -339,7 +339,7 @@ async function handleMessage(msg: Message): Promise<void> {
 
     // --- Group classifier pre-filter ---
     if (isGroup) {
-      const classification = classifyGroupMessage(body, contactName);
+      const classification = classifyGroupMessage(body, contactName, chatId);
       if (!classification.shouldRespond) {
         log.traceEnd(trace, "group_filtered", elapsed(trace));
         return;
@@ -454,6 +454,11 @@ async function handleMessage(msg: Message): Promise<void> {
     const outcome = response.trim() === "[SKIP]" ? "skip" :
       response.startsWith("[REACT:") ? "react" : "text";
     log.traceEnd(trace, outcome, elapsed(trace));
+
+    // Track group response for conversation continuation
+    if (isGroup && outcome !== "skip") {
+      recordGroupResponse(chatId);
+    }
 
     // --- Operational trace + self-check ---
     if (resolvedCtx) {
