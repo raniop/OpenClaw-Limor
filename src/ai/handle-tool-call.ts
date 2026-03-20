@@ -818,6 +818,17 @@ export async function handleToolCall(
       return pending.map((d: any) => `📦 ${d.summary} (${d.smsTimestamp})`).join("\n");
     }
 
+    // --- Web Search ---
+    if (name === "web_search") {
+      const { webSearch } = require("../web-search");
+      const results = await webSearch(input.query, input.language || "he");
+      if (results.length === 0) return `לא נמצאו תוצאות עבור "${input.query}".`;
+      const lines = results.map(
+        (r: any, i: number) => `${i + 1}. **${r.title}**\n   ${r.snippet}\n   🔗 ${r.url}`
+      );
+      return `🔍 תוצאות חיפוש "${input.query}":\n\n${lines.join("\n\n")}`;
+    }
+
     return "פעולה לא מוכרת";
   } catch (error: any) {
     return `שגיאה: ${error.message}`;

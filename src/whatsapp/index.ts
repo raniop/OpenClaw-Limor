@@ -254,6 +254,7 @@ async function handleMessage(msg: Message): Promise<void> {
   if (msg.fromMe) return;
 
   // --- Media processing ---
+  const isVoiceMessage = msg.hasMedia && (msg.type === "ptt" || msg.type === "audio");
   const mediaTimer = startTimer();
   const mediaResult = await processMedia(msg);
   if ("error" in mediaResult) {
@@ -476,7 +477,14 @@ async function handleMessage(msg: Message): Promise<void> {
     await handleResponse(chatId, contactName, response,
       (text) => msg.reply(text).then(() => {}),
       (emoji) => msg.react(emoji),
-      trace
+      trace,
+      {
+        isVoice: isVoiceMessage,
+        sendVoice: isVoiceMessage && whatsappClient ? async (base64: string, mimetype: string) => {
+          const voiceMedia = new MessageMedia(mimetype, base64, "voice.mp3");
+          await whatsappClient!.sendMessage(chatId, voiceMedia, { sendAudioAsVoice: true });
+        } : undefined,
+      }
     );
     const responseDurationMs = responseTimer.stop();
 

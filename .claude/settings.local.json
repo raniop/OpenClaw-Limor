@@ -218,7 +218,8 @@
       "Bash(sqlite3 ~/Library/Messages/chat.db \":*)",
       "Bash(python3:*)",
       "Bash(kill 45187)",
-      "Bash(kill 47007)"
+      "Bash(kill 47007)",
+      "Bash(pip3 install:*)"
     ]
   }
 }

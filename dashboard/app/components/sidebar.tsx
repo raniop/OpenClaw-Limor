@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: "/activity", label: "Activity", icon: "◈" },
   { href: "/capabilities", label: "Capabilities", icon: "⚡" },
   { href: "/digests", label: "Digests", icon: "📋" },
+  { href: "/summaries", label: "Summaries", icon: "💬" },
   { href: "/contacts", label: "Contacts", icon: "👥" },
   { href: "/sms", label: "SMS & Deliveries", icon: "📦" },
   { href: "/telegram", label: "Telegram", icon: "📡" },

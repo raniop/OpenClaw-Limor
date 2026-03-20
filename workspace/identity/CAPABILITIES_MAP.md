@@ -31,6 +31,9 @@
 - Morning summary (07:30)
 - Rate limiter (max 3/day, quiet hours)
 
+### חיפוש באינטרנט (src/web-search.ts)
+- **web_search** — חיפוש באינטרנט עם Brave Search API (או DuckDuckGo כ-fallback). מחזיר 5 תוצאות עם כותרת, תקציר וקישור. תומך בשפות שונות (ברירת מחדל: עברית).
+
 ### כלל: לפני שבונים capability חדשה
 1. תבדקי אם היכולת כבר קיימת ב-src/
 2. אם כן — **אל תבני מחדש!** תשתמשי במה שיש

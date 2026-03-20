@@ -37,6 +37,7 @@ export const config = {
   gettClientId: process.env.GETT_CLIENT_ID || "",
   gettClientSecret: process.env.GETT_CLIENT_SECRET || "",
   gettBusinessId: process.env.GETT_BUSINESS_ID || "",
+  braveSearchApiKey: process.env.BRAVE_SEARCH_API_KEY || "",
 };
 
 export function validateConfig(): void {

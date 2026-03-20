@@ -356,6 +356,37 @@ export function getContactById(chatId: string): ContactWithRelationship | null {
   return all.find((c) => c.chatId === chatId) || null;
 }
 
+// --- Daily Summaries ---
+export interface ChatSummary {
+  chatId: string;
+  contactName: string;
+  isGroup: boolean;
+  messageCount: number;
+  summary: string;
+  topics: string[];
+  openItems: string[];
+  mood: string;
+}
+
+export interface DailySummaryFile {
+  date: string;
+  summaries: ChatSummary[];
+}
+
+export function getDailySummaries(date?: string): DailySummaryFile | null {
+  const allEntries = readJSONStrict<DailySummaryFile[]>("daily-summaries.json", []);
+  if (!date) {
+    // Return most recent
+    return allEntries.length > 0 ? allEntries[allEntries.length - 1] : null;
+  }
+  return allEntries.find((e) => e.date === date) || null;
+}
+
+export function getAvailableSummaryDates(): string[] {
+  const allEntries = readJSONStrict<DailySummaryFile[]>("daily-summaries.json", []);
+  return allEntries.map((e) => e.date).reverse();
+}
+
 // --- Deliveries ---
 export interface DeliveryStoreEntry {
   id: string;
