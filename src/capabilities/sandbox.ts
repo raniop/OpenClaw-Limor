@@ -194,6 +194,14 @@ export function applyWorktree(capId: string): string {
   }
 
   try {
+    // First: build in worktree to verify changes compile
+    console.log(`[sandbox] Building in worktree ${capId} before applying...`);
+    const testBuild = execInDir(worktreePath, "npm run build 2>&1", 120_000);
+    if (testBuild.includes("error TS") || testBuild.includes("command not found")) {
+      console.error(`[sandbox] Build failed in worktree — NOT applying: ${testBuild.substring(0, 200)}`);
+      return `❌ Build failed in worktree — changes NOT applied:\n${testBuild.substring(0, 300)}`;
+    }
+
     // Commit changes in worktree
     execInDir(worktreePath, "git add -A");
     execInDir(worktreePath, `git commit -m "feat: ${capId} — self-implemented capability" --allow-empty`);
@@ -202,12 +210,26 @@ export function applyWorktree(capId: string): string {
     const branchName = `limor/${capId}`;
     execInDir(PROJECT_ROOT, `git merge "${branchName}" --no-edit`);
 
-    // Cleanup worktree
-    execInDir(PROJECT_ROOT, `git worktree remove "${worktreePath}" --force`);
-    execInDir(PROJECT_ROOT, `git branch -d "${branchName}"`);
+    // Cleanup worktree (force, ignore errors)
+    try {
+      execInDir(PROJECT_ROOT, `git worktree remove "${worktreePath}" --force`);
+    } catch {}
+    try {
+      execInDir(PROJECT_ROOT, `git branch -D "${branchName}"`);
+    } catch {}
+
+    // Ensure node_modules exist (worktree cleanup can break symlinks)
+    if (!existsSync(resolve(PROJECT_ROOT, "node_modules", ".bin", "tsc"))) {
+      console.log("[sandbox] node_modules damaged, reinstalling...");
+      execInDir(PROJECT_ROOT, "npm install", 120_000);
+    }
 
     // Rebuild production
-    execInDir(PROJECT_ROOT, "npm run build", 120_000);
+    const buildResult = execInDir(PROJECT_ROOT, "npm run build 2>&1", 120_000);
+    if (buildResult.includes("error TS")) {
+      console.error(`[sandbox] Production build failed after merge: ${buildResult.substring(0, 200)}`);
+      return `❌ Production build failed after merge:\n${buildResult.substring(0, 300)}`;
+    }
 
     // Write restart flag
     writeFileSync(RESTART_FLAG, JSON.stringify({ capId, appliedAt: new Date().toISOString() }));
