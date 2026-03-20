@@ -88,6 +88,68 @@ export function removeMeetingRequest(id: string): MeetingRequest | null {
   return req;
 }
 
+// --- Approved meetings tracking ---
+
+interface ApprovedMeeting {
+  requesterChatId: string;
+  requesterName: string;
+  topic: string;
+  approvedTime?: string;
+  approvedAt: string;
+}
+
+function loadApproved(): Record<string, ApprovedMeeting> {
+  try {
+    const raw = require("fs").readFileSync(statePath("approved-meetings.json"), "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+function saveApproved(data: Record<string, ApprovedMeeting>): void {
+  writeFileSync(statePath("approved-meetings.json"), JSON.stringify(data, null, 2), "utf-8");
+}
+
+/** Mark a meeting as approved by Rani. */
+export function approveMeeting(id: string, approvedTime?: string): void {
+  const req = getMeetingRequestById(id);
+  if (!req) return;
+  const approved = loadApproved();
+  approved[id] = {
+    requesterChatId: req.requesterChatId,
+    requesterName: req.requesterName,
+    topic: req.topic,
+    approvedTime,
+    approvedAt: new Date().toISOString(),
+  };
+  saveApproved(approved);
+  removeMeetingRequest(id);
+}
+
+/** Check if a chat has an approved (not yet completed) meeting. */
+export function isApprovedMeeting(chatId: string): boolean {
+  const approved = loadApproved();
+  return Object.values(approved).some((m) => m.requesterChatId === chatId);
+}
+
+/** Get approved meeting for a chat. */
+export function getApprovedMeeting(chatId: string): ApprovedMeeting | null {
+  const approved = loadApproved();
+  return Object.values(approved).find((m) => m.requesterChatId === chatId) || null;
+}
+
+/** Remove approved meeting after invite is sent. */
+export function completeApprovedMeeting(chatId: string): void {
+  const approved = loadApproved();
+  for (const [id, m] of Object.entries(approved)) {
+    if (m.requesterChatId === chatId) {
+      delete approved[id];
+    }
+  }
+  saveApproved(approved);
+}
+
 function generateMeetingCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "M"; // prefix to distinguish from contact codes

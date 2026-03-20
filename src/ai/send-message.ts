@@ -61,30 +61,27 @@ export async function sendMessage(
     systemPrompt += `\n\nאנשי קשר מוכרים (השתמשי בשמות האלה בדיוק כשמשתמשת ב-send_message): ${contactsList}`;
   }
 
-  // Scan conversation history for state indicators
-  const assistantMessages = history.filter((m) => m.role === "assistant").map((m) => m.content);
-  const raniApproved = assistantMessages.some((msg) =>
-    /רני (פנוי|זמין|אישר|מאשר|מסכים)/.test(msg) ||
-    /קבעתי (ביומן|את הפגישה|אירוע)/.test(msg) ||
-    /הפגישה נקבעה/.test(msg)
-  );
+  // Check if Rani ACTUALLY approved a meeting via the meeting store (not AI hallucination)
+  const { meetingStore } = require("../stores");
+  const chatId = sender?.chatId || "";
+  const raniApproved = !sender?.isOwner && meetingStore.isApproved(chatId);
 
-  // Extract time mentioned in conversation for calendar invites
+  // Extract approved time from meeting store (not from AI messages)
   let mentionedTime = "";
   if (raniApproved) {
-    for (const msg of assistantMessages) {
-      // Match times like "14:30", "ב-14:00", "בשעה 15:00"
-      const timeMatch = msg.match(/(\d{1,2}:\d{2})/);
-      if (timeMatch) {
-        mentionedTime = timeMatch[1];
-      }
-      // Match "בעוד שעה" type patterns - calculate from now
-      if (/בעוד שעה/.test(msg) && !timeMatch) {
-        const inOneHour = new Date(now.getTime() + 60 * 60 * 1000);
-        mentionedTime = inOneHour.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
-      }
+    const approvedMeeting = meetingStore.getApprovedMeeting(chatId);
+    if (approvedMeeting?.approvedTime) {
+      mentionedTime = approvedMeeting.approvedTime;
     }
   }
+
+  // Anti-hallucination rules for calendar
+  systemPrompt += `\n\n⚠️ כללים חמורים לגבי יומן ופגישות:
+- אסור בשום מצב לטעון שיש פגישה ביומן בלי להפעיל קודם את list_events!
+- אסור להמציא זמנים או אירועים שלא חזרו מהכלי!
+- אם מישהו שואל "יש לי פגישה?" — חובה להפעיל list_events קודם!
+- אם מישהו (שהוא לא רני) מבקש פגישה — חובה להשתמש ב-request_meeting. אסור לקבוע ישירות!
+- אסור לשלוח send_calendar_invite אלא אם רני אישר דרך request_meeting!`;
 
   // Add sender context so bot knows who's talking
   if (sender) {
@@ -95,10 +92,10 @@ export async function sendMessage(
       }
     } else {
       if (raniApproved) {
-        const timeInfo = mentionedTime ? ` השעה שסוכמה: ${mentionedTime} היום (${now.toISOString().split("T")[0]}T${mentionedTime}:00).` : "";
-        systemPrompt += `\n\nהמשתמש הנוכחי: ${sender.name} (לא הבעלים). ⚠️ רני כבר אישר!${timeInfo} אם ${sender.name} מבקש זימון – בקשי ממנו את כתובת המייל שלו ואז שלחי עם send_calendar_invite! נושא: "שיחה עם רני". לא צריך request_meeting ולא notify_owner.`;
+        const timeInfo = mentionedTime ? ` השעה שאושרה: ${mentionedTime}.` : "";
+        systemPrompt += `\n\nהמשתמש הנוכחי: ${sender.name} (לא הבעלים). ⚠️ רני אישר את הפגישה דרך המערכת!${timeInfo} בקשי מ-${sender.name} את כתובת המייל שלו ושלחי זימון עם send_calendar_invite. נושא: "שיחה עם רני".`;
       } else {
-        systemPrompt += `\n\nהמשתמש הנוכחי: ${sender.name} (לא הבעלים). אם הוא רוצה לקבוע פגישה עם רני – השתמשי ב-request_meeting ואמרי שאת בודקת עם רני.`;
+        systemPrompt += `\n\nהמשתמש הנוכחי: ${sender.name} (לא הבעלים). אם הוא רוצה לקבוע פגישה עם רני – חובה להשתמש ב-request_meeting! אסור לקבוע ישירות או לשלוח זימון בלי אישור רני!`;
       }
     }
   }

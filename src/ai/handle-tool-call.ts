@@ -134,8 +134,13 @@ export async function handleToolCall(
       return `✅ ביטלתי השתקה של "${match.name}". אחזור להגיב שם.`;
     }
 
-    // Send calendar invite (ICS) via email
+    // Send calendar invite (ICS) via email — requires real approval from meeting store
     if (name === "send_calendar_invite") {
+      const senderChatId = sender?.chatId || "";
+      // If sender is not the owner, verify meeting was actually approved by Rani
+      if (sender && !sender.isOwner && !meetingStore.isApproved(senderChatId)) {
+        return `❌ לא ניתן לשלוח זימון — רני עדיין לא אישר את הפגישה. השתמשי ב-request_meeting קודם.`;
+      }
       const startDate = new Date(input.start_date);
       const duration = input.duration_minutes || 60;
       await sendCalendarInviteEmail({
@@ -145,6 +150,10 @@ export async function handleToolCall(
         durationMinutes: duration,
         description: "פגישה עם רני - נקבעה דרך לימור",
       });
+      // Mark meeting as completed
+      if (sender && !sender.isOwner) {
+        meetingStore.completeApprovedMeeting(senderChatId);
+      }
       return `✅ זימון נשלח למייל ${input.email}! (הזמנת יומן)`;
     }
 

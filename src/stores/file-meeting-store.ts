@@ -10,6 +10,10 @@ import {
   getLastMeetingRequest,
   getMeetingRequestCount,
   removeMeetingRequest,
+  isApprovedMeeting,
+  getApprovedMeeting,
+  approveMeeting,
+  completeApprovedMeeting,
 } from "../meeting-requests";
 
 export class FileMeetingRequestStore implements IMeetingRequestStore {
@@ -40,5 +44,21 @@ export class FileMeetingRequestStore implements IMeetingRequestStore {
 
   removeMeetingRequest(id: string): MeetingRequest | null {
     return removeMeetingRequest(id);
+  }
+
+  isApproved(chatId: string): boolean {
+    return isApprovedMeeting(chatId);
+  }
+
+  getApprovedMeeting(chatId: string): { approvedTime?: string } | null {
+    return getApprovedMeeting(chatId);
+  }
+
+  approveMeeting(id: string, approvedTime?: string): void {
+    approveMeeting(id, approvedTime);
+  }
+
+  completeApprovedMeeting(chatId: string): void {
+    completeApprovedMeeting(chatId);
   }
 }

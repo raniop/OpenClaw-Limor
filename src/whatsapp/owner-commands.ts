@@ -81,8 +81,11 @@ export async function handleOwnerCommand(ctx: OwnerCommandContext): Promise<bool
       await ctx.reply(`❌ לא מצאתי בקשת פגישה עם קוד ${cmd.id}.`);
       return true;
     }
+    // Extract time from Rani's message if present (e.g. "14:00", "ב-15:30")
+    const timeMatch = ctx.body.match(/(\d{1,2}:\d{2})/);
+    const approvedTime = timeMatch ? timeMatch[1] : undefined;
+    meetingStore.approveMeeting(meetingReq.id, approvedTime);
     await handleMeetingResponse(ctx.chatId, ctx.body, meetingReq, ctx.reply);
-    meetingStore.removeMeetingRequest(meetingReq.id);
     return true;
   }
 
@@ -132,8 +135,10 @@ export async function handleOwnerCommand(ctx: OwnerCommandContext): Promise<bool
   if (meetingCount === 1) {
     const meetingReq = meetingStore.getLastMeetingRequest();
     if (meetingReq) {
+      const timeMatch = ctx.body.match(/(\d{1,2}:\d{2})/);
+      const approvedTime = timeMatch ? timeMatch[1] : undefined;
+      meetingStore.approveMeeting(meetingReq.id, approvedTime);
       await handleMeetingResponse(ctx.chatId, ctx.body, meetingReq, ctx.reply);
-      meetingStore.removeMeetingRequest(meetingReq.id);
       return true;
     }
   }
