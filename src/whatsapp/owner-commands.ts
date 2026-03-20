@@ -105,7 +105,17 @@ export async function handleOwnerCommand(ctx: OwnerCommandContext): Promise<bool
     const spec = approveSpec(cmd.id);
     if (spec) {
       console.log(`[capability] Approved: ${spec.id} — ${spec.title}`);
-      await ctx.reply(`✅ יכולת אושרה: **${spec.title}** (${spec.id})\n\nהשלב הבא: לממש את השינוי. אני אזדקק לעזרה מהמפתח כדי ליישם את הפתרון המוצע.`);
+      await ctx.reply(`✅ יכולת אושרה: **${spec.title}** (${spec.id})\n\n🤖 מתחילה לממש...`);
+
+      // Auto-run implementation after approval
+      try {
+        const { runCapabilityImplementation } = require("../capabilities/capability-runner");
+        const result = await runCapabilityImplementation(spec.id);
+        await ctx.reply(result);
+      } catch (err: any) {
+        console.error(`[capability] Implementation failed:`, err);
+        await ctx.reply(`❌ המימוש נכשל: ${err.message}`);
+      }
     } else {
       await ctx.reply(`❌ לא מצאתי בקשת יכולת עם מזהה ${cmd.id}`);
     }
