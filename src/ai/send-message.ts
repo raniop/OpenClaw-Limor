@@ -200,7 +200,7 @@ export async function sendMessage(
     messages.some((m) => m.role === "user" && Array.isArray(m.content) && m.content.some((c: any) => c.type === "tool_result"));
 
   if (!hadToolCalls && tools.length > 0) {
-    const claimsAction = /שולחת בקשה|שלחתי בקשה|שולחת לרני|העברתי לרני|קבעתי|שלחתי זימון|שולחת זימון/.test(finalText);
+    const claimsAction = /שולחת בקשה|שלחתי בקשה|שולחת לרני|העברתי לרני|קבעתי|שלחתי זימון|שולחת זימון|שלחתי הודעה|שלחתי ל|העברתי ל|בדקתי את|מצאתי (מסעדה|טיסה|מלון)|הזמנתי|ביטלתי|יצרתי|נוצרה|הוספתי|מחקתי/.test(finalText);
     if (claimsAction) {
       console.warn(`[hallucination-guard] ⚠️ AI claimed action but no tool was called! Text: ${finalText.substring(0, 100)}`);
     }

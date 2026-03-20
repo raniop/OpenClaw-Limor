@@ -130,18 +130,8 @@ export async function handleOwnerCommand(ctx: OwnerCommandContext): Promise<bool
     return true;
   }
 
-  // --- Legacy: if exactly 1 meeting request, treat any owner message as response ---
-  const meetingCount = meetingStore.getMeetingRequestCount();
-  if (meetingCount === 1) {
-    const meetingReq = meetingStore.getLastMeetingRequest();
-    if (meetingReq) {
-      const timeMatch = ctx.body.match(/(\d{1,2}:\d{2})/);
-      const approvedTime = timeMatch ? timeMatch[1] : undefined;
-      meetingStore.approveMeeting(meetingReq.id, approvedTime);
-      await handleMeetingResponse(ctx.chatId, ctx.body, meetingReq, ctx.reply);
-      return true;
-    }
-  }
+  // Legacy meeting fallback removed — was intercepting unrelated owner messages.
+  // Meeting responses now handled through the normal AI flow with tools.
 
   return false;
 }

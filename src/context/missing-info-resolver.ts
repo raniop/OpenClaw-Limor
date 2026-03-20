@@ -23,7 +23,8 @@ export function resolveMissingInfo(
   turnIntent: TurnIntent,
   references: ResolvedReference[]
 ): MissingInfo {
-  // Only evaluate for action/reminder requests
+  // Only evaluate for action/reminder requests — and even then, be conservative.
+  // Multi-step requests handle their own clarification.
   if (turnIntent.category !== "action_request" && turnIntent.category !== "reminder_request") {
     return { missing: ["none"], summary: "לא חסר מידע מהותי", confidence: 0.7 };
   }
@@ -103,17 +104,22 @@ function hasExplicitTarget(message: string): boolean {
 /**
  * Check if scheduling request is generic (no topic/subject after verb).
  * e.g., "תקבעי לי" vs "תקבעי לי פגישה עם עמית"
+ * Only returns true if VERY short AND has no date/time/name markers at all.
  */
 function isGenericSchedule(message: string): boolean {
   const words = message.trim().split(/\s+/);
-  // If message is very short after the verb, it's likely generic
-  return words.length <= 3;
+  // If message has any date/time/name markers, it's not generic
+  if (DATE_MARKERS.test(message) || TIME_MARKERS.test(message)) return false;
+  if (EXPLICIT_TARGET.test(message)) return false;
+  // Only flag as generic if it's literally just the verb + "לי"
+  return words.length <= 2;
 }
 
 /**
  * Check if action message is too short to have a meaningful target.
+ * Only true for single-word commands with no context.
  */
 function isShortAction(message: string): boolean {
   const words = message.trim().split(/\s+/);
-  return words.length <= 3;
+  return words.length <= 1;
 }

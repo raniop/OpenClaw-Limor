@@ -50,16 +50,9 @@ export function resolveToolIntent(resolved: ToolIntentInput): ToolIntent {
     };
   }
 
-  // Blocking rule: if clarification is needed, don't use tool yet
-  if (needsClarification) {
-    return {
-      type: match.type,
-      shouldUseTool: false,
-      summary: `כלי ${match.label} עשוי להיות נדרש, אבל קודם צריך הבהרה`,
-      reason: "חסרים פרטים לפני שאפשר להפעיל כלי",
-      confidence: 0.85,
-    };
-  }
+  // Even if clarification might be needed, still allow tools —
+  // let the AI decide whether to clarify or proceed.
+  // Previously this blocked tools, causing Limor to ask unnecessary questions.
 
   return {
     type: match.type,

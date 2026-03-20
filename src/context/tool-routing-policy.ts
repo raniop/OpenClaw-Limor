@@ -54,12 +54,17 @@ export function resolveToolRoutingPolicy(resolved: RoutingInput): ToolRoutingPol
   // 3-10. Route by tool intent type
   const intentType = toolIntent.type;
   if (intentType !== "none" && intentType in TOOL_GROUPS) {
+    // Always include notify_owner — Limor must always be able to reach the owner
+    const tools = [...TOOL_GROUPS[intentType]];
+    if (!tools.includes("notify_owner")) {
+      tools.push("notify_owner");
+    }
     return {
       group: intentType as any,
       summary: `לחשוף כלי ${intentType}`,
       reason: toolIntent.reason,
       confidence: 0.92,
-      allowedToolNames: TOOL_GROUPS[intentType],
+      allowedToolNames: tools,
     };
   }
 

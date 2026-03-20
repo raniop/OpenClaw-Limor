@@ -23,8 +23,8 @@ interface StrategyInput {
 export function resolveResponseStrategy(resolved: StrategyInput): ResponseStrategy {
   const { bundle, primaryFocus, responseMode, actionPlan, toolIntent, conversationState, contradictions } = resolved;
 
-  // 1. Clarification needed — always ask first
-  if (actionPlan.needsClarification) {
+  // 1. Clarification might be needed — but if there's a tool intent, let the AI decide
+  if (actionPlan.needsClarification && !toolIntent.shouldUseTool) {
     return {
       type: "clarify_first",
       summary: "לבקש הבהרה לפני כל פעולה",

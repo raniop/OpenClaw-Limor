@@ -216,7 +216,9 @@
       "Bash(sqlite3 ~/Library/Messages/chat.db \"SELECT COUNT\\(*\\) FROM message WHERE date > strftime\\(''%s'',''2026-03-18''\\) * 1000000000;\")",
       "Bash(sqlite3 ~/Library/Messages/chat.db \"SELECT COUNT\\(*\\) FROM message;\")",
       "Bash(sqlite3 ~/Library/Messages/chat.db \":*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(kill 45187)",
+      "Bash(kill 47007)"
     ]
   }
 }
