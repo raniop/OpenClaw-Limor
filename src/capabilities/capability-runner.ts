@@ -6,6 +6,7 @@ import { getSpec } from "./spec-store";
 import { createWorktree, buildAndTest, getDiff, applyWorktree, cleanupWorktree } from "./sandbox";
 import { implementCapability } from "./claude-code";
 import { logAudit } from "../audit/audit-log";
+import { getNotifyOwnerCallback } from "../ai/callbacks";
 
 export async function runCapabilityImplementation(capabilityId: string): Promise<string> {
   const spec = getSpec(capabilityId);
@@ -26,9 +27,13 @@ export async function runCapabilityImplementation(capabilityId: string): Promise
     steps.push(`✅ סשן נוצר: ${worktreeResult}`);
     logAudit("system", "capability_start_session", capabilityId, "success");
 
-    // Step 2: Implement with Claude Code
+    // Step 2: Implement with Claude Code (with progress updates to owner)
     currentStep = "implement";
-    const implResult = await implementCapability(capabilityId);
+    const notify = getNotifyOwnerCallback();
+    const onProgress = notify
+      ? (msg: string) => { notify(msg).catch(() => {}); }
+      : undefined;
+    const implResult = await implementCapability(capabilityId, onProgress);
     steps.push(`✅ מימוש: ${implResult.substring(0, 200)}...`);
     logAudit("system", "capability_implement", capabilityId, "success");
 

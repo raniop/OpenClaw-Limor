@@ -67,8 +67,26 @@ export async function implementCapability(capId: string, onProgress?: (msg: stri
   if (onProgress) onProgress(`🤖 Starting Claude Code...`);
 
   try {
+    // Send progress updates every 2 minutes while Claude Code is working
+    let progressCount = 0;
+    const progressMessages = [
+      "🔍 קוראת קבצים ומבינה את הארכיטקטורה...",
+      "✏️ כותבת קוד...",
+      "🔧 מתקנת ומשפרת...",
+      "🧪 בודקת שהכל מתקמפל...",
+      "📦 מסיימת...",
+    ];
+    const progressInterval = setInterval(() => {
+      if (onProgress) {
+        const msg = progressMessages[Math.min(progressCount, progressMessages.length - 1)];
+        onProgress(`⏳ עובדת על "${spec.title}"... ${msg}`);
+        progressCount++;
+      }
+    }, 120_000); // Every 2 minutes
+
     // Run Claude Code in the worktree
     const output = await runClaudeCode(worktreePath, prompt);
+    clearInterval(progressInterval);
     if (onProgress) onProgress(`✅ Claude Code finished`);
 
     // Get the diff
