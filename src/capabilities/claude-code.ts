@@ -73,13 +73,24 @@ export async function implementCapability(capId: string, onProgress?: (msg: stri
 
     // Get the diff
     const diff = getDiff(capId);
-    const diffSummary = diff.split("\n").slice(0, 30).join("\n");
+    const diffLines = diff.split("\n");
+    const diffSummary = diffLines.slice(0, 30).join("\n");
+    const lineCount = diffLines.length;
+
+    // Auto-apply if requested by owner
+    if (spec.autoApply) {
+      if (onProgress) onProgress(`🔨 מחיל שינויים אוטומטית...`);
+      const applyResult = applyWorktree(capId);
+      return `🎉 **${spec.title}** — מומש והוחל!\n\n📝 ${lineCount} שורות שונו\n${applyResult}`;
+    }
 
     return `✅ Claude Code סיים לעבוד על: **${spec.title}**\n\n` +
-      `📝 שינויים:\n\`\`\`\n${diffSummary}\n\`\`\`\n\n` +
+      `📝 שינויים (${lineCount} שורות):\n\`\`\`\n${diffSummary}\n\`\`\`\n\n` +
       `להחיל את השינויים? ענה: *החלי ${capId}*\n` +
       `לבטל: *בטלי ${capId}*`;
   } catch (err: any) {
+    // Cleanup on failure
+    try { cleanupWorktree(capId); } catch {}
     return `❌ Claude Code נכשל: ${err.message}`;
   }
 }
@@ -134,7 +145,7 @@ function runClaudeCode(cwd: string, prompt: string): Promise<string> {
     const args = [
       "--print", prompt,
       "--output-format", "text",
-      "--max-turns", "20",
+      "--max-turns", "50",
     ];
 
     const claudeCli = findClaudeCli();
@@ -142,7 +153,7 @@ function runClaudeCode(cwd: string, prompt: string): Promise<string> {
 
     const proc = spawn(claudeCli, args, {
       cwd,
-      timeout: 300_000, // 5 minutes
+      timeout: 900_000, // 15 minutes (large changes need time)
       env: { ...process.env, CLAUDE_CODE_ENTRYPOINT: "limor-bot" },
     });
 

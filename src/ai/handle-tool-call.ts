@@ -386,11 +386,12 @@ export async function handleToolCall(
       console.log(`[capability] New capability request: ${spec.id} — ${spec.title}`);
       logAudit(actor, "capability_created", spec.id, "success");
 
-      // Owner requests → auto-approve and auto-implement immediately
+      // Owner requests → auto-approve, auto-implement, and auto-apply
       if (sender?.isOwner) {
         console.log(`[capability] Owner request — auto-approving and implementing: ${spec.id}`);
         const { approveSpec } = require("../capabilities");
         approveSpec(spec.id);
+        spec.autoApply = true; // Auto-apply after implementation (no manual "החלי" needed)
         logAudit(actor, "capability_auto_approved", spec.id, "success");
 
         // Run implementation in background

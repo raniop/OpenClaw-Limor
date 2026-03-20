@@ -18,6 +18,7 @@ export interface CapabilitySpec {
   risks: string[];
   validationPlan: string;
   level: "prompt_only" | "retrieval" | "tool_addition" | "code_change" | "integration";
+  autoApply?: boolean;
 }
 
 export interface ClassificationResult {
