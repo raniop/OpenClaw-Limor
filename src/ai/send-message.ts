@@ -75,13 +75,15 @@ export async function sendMessage(
     }
   }
 
-  // Anti-hallucination rules for calendar
-  systemPrompt += `\n\n⚠️ כללים חמורים לגבי יומן ופגישות:
-- אסור בשום מצב לטעון שיש פגישה ביומן בלי להפעיל קודם את list_events!
-- אסור להמציא זמנים או אירועים שלא חזרו מהכלי!
-- אם מישהו שואל "יש לי פגישה?" — חובה להפעיל list_events קודם!
-- אם מישהו (שהוא לא רני) מבקש פגישה — חובה להשתמש ב-request_meeting. אסור לקבוע ישירות!
-- אסור לשלוח send_calendar_invite אלא אם רני אישר דרך request_meeting!`;
+  // Anti-hallucination rules for calendar — CRITICAL
+  systemPrompt += `\n\n🚨 כללים חמורים ביותר — הפרה = כשל קריטי:
+
+1. אם מישהו מבקש פגישה עם רני — חובה להפעיל את הכלי request_meeting בפועל! אסור רק לכתוב "שולחת בקשה" בלי להפעיל את הכלי!
+2. אסור בשום מצב לטעון שיש פגישה ביומן בלי להפעיל קודם את list_events!
+3. אסור להמציא זמנים או אירועים!
+4. אסור לשלוח send_calendar_invite בלי שרני אישר באמת!
+5. אם יש לך כלי זמין — חובה להשתמש בו! אסור לשקר שעשית פעולה בלי להפעיל את הכלי!
+6. אם אתה אומר למשתמש "שולחת בקשה לרני" — חייב להפעיל request_meeting באותו תור! אחרת זה שקר!`;
 
   // Add sender context so bot knows who's talking
   if (sender) {
@@ -191,5 +193,18 @@ export async function sendMessage(
   }
 
   const textBlock = response.content.find((block) => block.type === "text");
-  return textBlock ? textBlock.text : "אופס, לא הצלחתי לייצר תשובה 😅 נסה שוב?";
+  const finalText = textBlock ? textBlock.text : "אופס, לא הצלחתי לייצר תשובה 😅 נסה שוב?";
+
+  // Hallucination guard: if AI claims it did something but no tool was called
+  const hadToolCalls = response.content.some((b) => b.type === "tool_use") ||
+    messages.some((m) => m.role === "user" && Array.isArray(m.content) && m.content.some((c: any) => c.type === "tool_result"));
+
+  if (!hadToolCalls && tools.length > 0) {
+    const claimsAction = /שולחת בקשה|שלחתי בקשה|שולחת לרני|העברתי לרני|קבעתי|שלחתי זימון|שולחת זימון/.test(finalText);
+    if (claimsAction) {
+      console.warn(`[hallucination-guard] ⚠️ AI claimed action but no tool was called! Text: ${finalText.substring(0, 100)}`);
+    }
+  }
+
+  return finalText;
 }
