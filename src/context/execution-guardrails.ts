@@ -1,8 +1,12 @@
 /**
- * Execution Guardrails — final operational decision layer.
- * Determines whether the system can safely proceed to tool execution
- * or must constrain behavior first.
- * Deterministic rules, no AI calls.
+ * Execution Guardrails — advisory decision layer.
+ * NEVER blocks tools. Tools are ALWAYS available.
+ * Instead, provides guidance on whether to ask the owner first,
+ * request clarification, or proceed directly.
+ *
+ * Philosophy: Let Claude decide, but give it clear guidance.
+ * If unsure — ask Rani via notify_owner / request_meeting.
+ * Never silently block and cause Claude to hallucinate actions.
  */
 import type { ResolvedContext, ExecutionDecision } from "./context-types";
 
@@ -10,66 +14,45 @@ type GuardrailInput = Omit<ResolvedContext, "executionDecision" | "toolRoutingPo
 
 /**
  * Resolve the execution decision based on all resolved context layers.
- * Priority-ordered rules — first match wins.
+ * Tools are ALWAYS allowed — guidance only.
  */
-// Tool intent types that should always allow tool access even when strategy says clarify.
-// Calendar = includes request_meeting which only forwards to owner, not a dangerous action.
-// Messaging = includes notify_owner.
-const FORWARDING_INTENT_TYPES = new Set(["calendar", "messaging"]);
-
 export function resolveExecutionDecision(resolved: GuardrailInput): ExecutionDecision {
   const { responseStrategy, contradictions, toolIntent, actionPlan, bundle } = resolved;
 
-  // Rule 0: For non-owner users requesting meetings/messaging — always allow tools
-  // because request_meeting and notify_owner only forward to the owner, they don't execute.
-  if (
-    toolIntent.shouldUseTool &&
-    FORWARDING_INTENT_TYPES.has(toolIntent.type) &&
-    !bundle.person.isOwner
-  ) {
+  // 1. Clarify-first strategy — suggest clarification but keep tools open
+  if (responseStrategy.type === "clarify_first") {
     return {
-      type: "allow_tool_execution",
-      summary: "כלי העברת בקשה — תמיד מותר לאנשי קשר",
-      reason: `${toolIntent.type} — כלי בקשה/העברה, לא פעולה מסוכנת`,
-      confidence: 0.95,
+      type: "clarify_before_execution",
+      summary: "מומלץ לבקש הבהרה, אבל כלים זמינים",
+      reason: responseStrategy.reason,
+      confidence: 0.9,
       allowTools: true,
     };
   }
 
-  // 1. Clarify-first strategy — block everything
-  if (responseStrategy.type === "clarify_first") {
-    return {
-      type: "clarify_before_execution",
-      summary: "לבקש הבהרה לפני כל ביצוע",
-      reason: responseStrategy.reason,
-      confidence: 0.98,
-      allowTools: false,
-    };
-  }
-
-  // 2. Reference conflict — ambiguity blocks execution
+  // 2. Reference conflict — suggest clarification
   if (contradictions.some((c) => c.type === "reference_conflict")) {
     return {
       type: "clarify_before_execution",
-      summary: "יש ambiguity בייחוס — חייבים הבהרה",
+      summary: "יש ambiguity — מומלץ לשאול, כלים זמינים",
       reason: "יש יותר מייחוס אחד אפשרי",
-      confidence: 0.97,
-      allowTools: false,
+      confidence: 0.9,
+      allowTools: true,
     };
   }
 
-  // 3. Intent vs missing info conflict — critical info missing
+  // 3. Intent vs missing info — suggest asking for missing detail
   if (contradictions.some((c) => c.type === "intent_vs_missing_info")) {
     return {
       type: "clarify_before_execution",
-      summary: "חסר מידע קריטי לביצוע",
+      summary: "חסר מידע — מומלץ לשאול, כלים זמינים",
       reason: "יש בקשת פעולה אך חסר פרט הכרחי",
-      confidence: 0.97,
-      allowTools: false,
+      confidence: 0.9,
+      allowTools: true,
     };
   }
 
-  // 4. Tool ready + clear strategy — allow execution
+  // 4. Tool ready + clear strategy — full green light
   if (
     toolIntent.shouldUseTool &&
     !actionPlan.needsClarification &&
@@ -79,39 +62,28 @@ export function resolveExecutionDecision(resolved: GuardrailInput): ExecutionDec
       type: "allow_tool_execution",
       summary: "אפשר להתקדם לביצוע",
       reason: toolIntent.summary,
-      confidence: 0.92,
+      confidence: 0.95,
       allowTools: true,
     };
   }
 
-  // 5. Tool intent but strategy doesn't support execution yet
-  if (toolIntent.shouldUseTool && responseStrategy.type !== "acknowledge_and_execute") {
+  // 5. Tool intent exists but strategy not fully aligned — allow but suggest caution
+  if (toolIntent.shouldUseTool) {
     return {
-      type: "block_tool_execution",
-      summary: "יש פוטנציאל לכלי אבל לא נכון לבצע עדיין",
-      reason: "אסטרטגיית התגובה הנוכחית לא תומכת בביצוע מיידי",
-      confidence: 0.88,
-      allowTools: false,
+      type: "allow_tool_execution",
+      summary: "כלים זמינים, מומלץ לוודא פרטים לפני ביצוע",
+      reason: "יש כוונת כלי — אם חסר פרט, לשאול את המשתמש או את רני",
+      confidence: 0.85,
+      allowTools: true,
     };
   }
 
-  // 6. Status vs new request contradiction — safe fallback
-  if (contradictions.some((c) => c.type === "status_vs_new_request")) {
-    return {
-      type: "safe_fallback_reply",
-      summary: "לתת קודם מענה בטוח ולא לבצע",
-      reason: "יש ערבוב בין סטטוס לפעולה חדשה",
-      confidence: 0.9,
-      allowTools: false,
-    };
-  }
-
-  // Default: reply only
+  // Default: tools always available
   return {
     type: "reply_only",
-    summary: "להשיב בטקסט בלבד",
-    reason: "לא זוהה צורך ודאי בביצוע",
+    summary: "תגובה רגילה, כלים זמינים אם צריך",
+    reason: "לא זוהה צורך ודאי בכלי, אבל אם יש צורך — אפשר",
     confidence: 0.7,
-    allowTools: false,
+    allowTools: true,
   };
 }
