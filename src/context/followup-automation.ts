@@ -44,6 +44,11 @@ export function resolveFollowupAutomationDecision(
     return DEFAULT_DECISION;
   }
 
+  // Gate 4: never create followup on the owner themselves
+  if (bundle.person.isOwner) {
+    return DEFAULT_DECISION;
+  }
+
   // Build suggested reason based on action plan type
   const suggestedReason = buildSuggestedReason(resolved);
   const suggestedDueAt = new Date(
