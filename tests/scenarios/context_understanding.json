@@ -1,0 +1,51 @@
+[
+  {
+    "name": "owner mentions known contact by name",
+    "category": "context_understanding",
+    "turns": [
+      {
+        "chatId": "owner@c.us",
+        "message": "מה קורה עם עמית? דיברת איתו?",
+        "sender": { "name": "רני", "isOwner": true, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "turnIntent": "followup_query",
+      "mentionedEntities": ["עמית"],
+      "shouldUseTool": false,
+      "needsClarification": false
+    }
+  },
+  {
+    "name": "contact sends message with context reference",
+    "category": "context_understanding",
+    "turns": [
+      {
+        "chatId": "contact1@c.us",
+        "message": "לגבי מה שדיברנו אתמול על הפגישה",
+        "sender": { "name": "דנה", "isOwner": false, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "turnIntent": "continuation",
+      "shouldUseTool": false,
+      "needsClarification": false
+    }
+  },
+  {
+    "name": "owner asks about specific person status",
+    "category": "context_understanding",
+    "turns": [
+      {
+        "chatId": "owner@c.us",
+        "message": "יש משהו חדש מיוסי?",
+        "sender": { "name": "רני", "isOwner": true, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "turnIntent": "followup_query",
+      "mentionedEntities": ["יוסי"],
+      "shouldUseTool": false
+    }
+  }
+]

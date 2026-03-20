@@ -1,0 +1,49 @@
+[
+  {
+    "name": "send message without recipient",
+    "category": "missing_info",
+    "turns": [
+      {
+        "chatId": "owner@c.us",
+        "message": "תשלחי הודעה",
+        "sender": { "name": "רני", "isOwner": true, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "missingInfo": ["recipient"],
+      "needsClarification": true,
+      "turnIntent": "action_request"
+    }
+  },
+  {
+    "name": "schedule meeting without time",
+    "category": "missing_info",
+    "turns": [
+      {
+        "chatId": "owner@c.us",
+        "message": "תקבעי פגישה עם דנה",
+        "sender": { "name": "רני", "isOwner": true, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "missingInfo": ["time"],
+      "needsClarification": true,
+      "turnIntent": "action_request"
+    }
+  },
+  {
+    "name": "complete request has no missing info",
+    "category": "missing_info",
+    "turns": [
+      {
+        "chatId": "owner@c.us",
+        "message": "תשלחי לעמית שלום וברכות",
+        "sender": { "name": "רני", "isOwner": true, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "noMissingInfo": true,
+      "turnIntent": "action_request"
+    }
+  }
+]

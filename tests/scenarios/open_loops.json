@@ -1,0 +1,34 @@
+[
+  {
+    "name": "greeting from owner with pending followups",
+    "category": "open_loops",
+    "turns": [
+      {
+        "chatId": "owner@c.us",
+        "message": "בוקר טוב",
+        "sender": { "name": "רני", "isOwner": true, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "turnIntent": "greeting",
+      "shouldUseTool": false,
+      "responseModeShouldMentionOpenLoops": true
+    }
+  },
+  {
+    "name": "owner asks about pending items",
+    "category": "open_loops",
+    "turns": [
+      {
+        "chatId": "owner@c.us",
+        "message": "מה יש לי היום?",
+        "sender": { "name": "רני", "isOwner": true, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "turnIntent": "status_query",
+      "primaryFocus": ["status", "followup"],
+      "shouldUseTool": false
+    }
+  }
+]

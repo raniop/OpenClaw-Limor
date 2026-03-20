@@ -1,0 +1,54 @@
+[
+  {
+    "name": "new chat greeting from contact",
+    "category": "conversation_state",
+    "turns": [
+      {
+        "chatId": "new-contact@c.us",
+        "message": "היי, מה שלומך?",
+        "sender": { "name": "גל", "isOwner": false, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "conversationState": "new_chat",
+      "turnIntent": "greeting",
+      "shouldUseTool": false
+    }
+  },
+  {
+    "name": "correction flow after initial request",
+    "category": "conversation_state",
+    "turns": [
+      {
+        "chatId": "owner@c.us",
+        "message": "תשלחי לעמית שלום",
+        "sender": { "name": "רני", "isOwner": true, "isGroup": false }
+      },
+      {
+        "chatId": "owner@c.us",
+        "message": "לא, התכוונתי לדנה לא לעמית",
+        "sender": { "name": "רני", "isOwner": true, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "lastTurnIntent": "correction",
+      "lastConversationState": "correction_flow"
+    }
+  },
+  {
+    "name": "awaiting user detail after vague request",
+    "category": "conversation_state",
+    "turns": [
+      {
+        "chatId": "owner@c.us",
+        "message": "תשלחי הודעה",
+        "sender": { "name": "רני", "isOwner": true, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "turnIntent": "action_request",
+      "needsClarification": true,
+      "missingInfo": ["recipient"]
+    }
+  }
+]

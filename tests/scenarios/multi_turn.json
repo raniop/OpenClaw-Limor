@@ -1,0 +1,54 @@
+[
+  {
+    "name": "greeting then request then correction",
+    "category": "multi_turn",
+    "turns": [
+      {
+        "chatId": "owner@c.us",
+        "message": "היי",
+        "sender": { "name": "רני", "isOwner": true, "isGroup": false }
+      },
+      {
+        "chatId": "owner@c.us",
+        "message": "תשלחי לעמית שנפגש מחר",
+        "sender": { "name": "רני", "isOwner": true, "isGroup": false }
+      },
+      {
+        "chatId": "owner@c.us",
+        "message": "רגע, לא מחר, ביום ראשון",
+        "sender": { "name": "רני", "isOwner": true, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "turnIntents": ["greeting", "action_request", "correction"],
+      "lastTurnIntent": "correction",
+      "turnCount": 3
+    }
+  },
+  {
+    "name": "contact multi-turn conversation flow",
+    "category": "multi_turn",
+    "turns": [
+      {
+        "chatId": "contact@c.us",
+        "message": "שלום",
+        "sender": { "name": "עמית", "isOwner": false, "isGroup": false }
+      },
+      {
+        "chatId": "contact@c.us",
+        "message": "רציתי לשאול משהו",
+        "sender": { "name": "עמית", "isOwner": false, "isGroup": false }
+      },
+      {
+        "chatId": "contact@c.us",
+        "message": "אפשר לקבוע פגישה השבוע?",
+        "sender": { "name": "עמית", "isOwner": false, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "turnCount": 3,
+      "lastTurnIntent": "action_request",
+      "lastShouldUseTool": false
+    }
+  }
+]

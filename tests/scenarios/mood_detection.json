@@ -1,0 +1,45 @@
+[
+  {
+    "name": "stressed urgent message",
+    "category": "mood_detection",
+    "turns": [
+      {
+        "chatId": "owner@c.us",
+        "message": "דחוף!!! אין לי זמן, תעשי את זה עכשיו",
+        "sender": { "name": "רני", "isOwner": true, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "mood": ["stressed", "rushed"],
+      "brevity": "short"
+    }
+  },
+  {
+    "name": "happy excited message",
+    "category": "mood_detection",
+    "turns": [
+      {
+        "chatId": "owner@c.us",
+        "message": "מדהים! סוף סוף הצלחנו!",
+        "sender": { "name": "רני", "isOwner": true, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "mood": ["happy", "excited"]
+    }
+  },
+  {
+    "name": "neutral casual message",
+    "category": "mood_detection",
+    "turns": [
+      {
+        "chatId": "contact@c.us",
+        "message": "היי, אפשר לדבר?",
+        "sender": { "name": "דנה", "isOwner": false, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "mood": ["neutral"]
+    }
+  }
+]

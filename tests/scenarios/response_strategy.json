@@ -1,0 +1,50 @@
+[
+  {
+    "name": "owner status query gets summary strategy",
+    "category": "response_strategy",
+    "turns": [
+      {
+        "chatId": "owner@c.us",
+        "message": "מה המצב היום?",
+        "sender": { "name": "רני", "isOwner": true, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "responseStrategy": ["owner_summary", "status_then_action"],
+      "turnIntent": "status_query",
+      "shouldUseTool": false
+    }
+  },
+  {
+    "name": "simple question gets direct reply",
+    "category": "response_strategy",
+    "turns": [
+      {
+        "chatId": "contact@c.us",
+        "message": "מה שלומך?",
+        "sender": { "name": "עמית", "isOwner": false, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "responseStrategy": ["direct_reply", "brief_answer"],
+      "turnIntent": "greeting",
+      "shouldUseTool": false
+    }
+  },
+  {
+    "name": "missing info triggers clarify first",
+    "category": "response_strategy",
+    "turns": [
+      {
+        "chatId": "owner@c.us",
+        "message": "תקבעי פגישה",
+        "sender": { "name": "רני", "isOwner": true, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "responseStrategy": ["clarify_first"],
+      "needsClarification": true,
+      "missingInfo": ["time"]
+    }
+  }
+]

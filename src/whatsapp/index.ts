@@ -29,6 +29,7 @@ import { updateFromMessage } from "../relationship-memory";
 import { approvalStore } from "../stores";
 import { learnFromCorrection } from "../context/correction-learner";
 import { startProactiveScheduler, recordOwnerResponse } from "../proactive";
+import { buildOperationalTrace, saveOperationalTrace, formatTraceSummary, runSelfCheck } from "../ops";
 
 let latestQR: string | null = null;
 let qrServer: http.Server | null = null;
@@ -449,6 +450,51 @@ async function handleMessage(msg: Message): Promise<void> {
     const outcome = response.trim() === "[SKIP]" ? "skip" :
       response.startsWith("[REACT:") ? "react" : "text";
     log.traceEnd(trace, outcome, elapsed(trace));
+
+    // --- Operational trace + self-check ---
+    if (resolvedCtx) {
+      try {
+        const opTrace = buildOperationalTrace(resolvedCtx, {
+          traceId: trace.traceId,
+          chatId,
+          contactName,
+          isOwner,
+          isGroup,
+          userInput: body,
+        });
+
+        // Fill execution results — sendMessage doesn't expose tool names,
+        // so we detect from the hallucination-guard regex pattern
+        opTrace.responseLength = response.length;
+        opTrace.aiDurationMs = aiDurationMs;
+        opTrace.totalDurationMs = elapsed(trace);
+        const actionClaimPattern = /שולחת בקשה|שלחתי בקשה|שולחת לרני|העברתי לרני|קבעתי|שלחתי זימון|שולחת זימון|שלחתי הודעה|שלחתי ל|העברתי ל|בדקתי את|מצאתי (מסעדה|טיסה|מלון)|הזמנתי|ביטלתי|יצרתי|נוצרה|הוספתי|מחקתי/;
+        opTrace.hadHallucination = actionClaimPattern.test(response) && opTrace.toolsUsed.length === 0;
+
+        // Run self-check
+        const selfCheckResult = runSelfCheck(opTrace, response, opTrace.toolsUsed);
+        opTrace.selfCheck = selfCheckResult;
+
+        // Save trace
+        saveOperationalTrace(opTrace);
+
+        // Log summary
+        console.log(formatTraceSummary(opTrace));
+
+        // Notify owner on critical alert (non-owner chat only)
+        if (selfCheckResult.alertLevel === "critical" && !isOwner) {
+          try {
+            const { getNotifyOwnerCallback } = require("../ai/callbacks");
+            const notify = getNotifyOwnerCallback();
+            if (notify) {
+              notify(`[ops:critical] ${contactName}: ${selfCheckResult.summary}`).catch(() => {});
+            }
+          } catch {}
+        }
+      } catch (err) {
+        console.error("[ops] Operational trace error:", err);
+      }
+    }
 
     // --- Followup automation ---
     if (resolvedCtx) {

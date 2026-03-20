@@ -1,0 +1,49 @@
+[
+  {
+    "name": "send message to contact requires messaging tool",
+    "category": "tool_usage",
+    "turns": [
+      {
+        "chatId": "owner@c.us",
+        "message": "תשלחי לעמית שלום",
+        "sender": { "name": "רני", "isOwner": true, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "shouldUseTool": true,
+      "toolIntentType": "messaging",
+      "turnIntent": "action_request"
+    }
+  },
+  {
+    "name": "casual question does not need tool",
+    "category": "tool_usage",
+    "turns": [
+      {
+        "chatId": "contact@c.us",
+        "message": "מה שלומך?",
+        "sender": { "name": "דנה", "isOwner": false, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "shouldUseTool": false,
+      "toolIntentType": "none"
+    }
+  },
+  {
+    "name": "schedule meeting requires calendar tool",
+    "category": "tool_usage",
+    "turns": [
+      {
+        "chatId": "owner@c.us",
+        "message": "תקבעי פגישה מחר ב-10 עם יוסי",
+        "sender": { "name": "רני", "isOwner": true, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "shouldUseTool": true,
+      "toolIntentType": "calendar",
+      "turnIntent": "action_request"
+    }
+  }
+]

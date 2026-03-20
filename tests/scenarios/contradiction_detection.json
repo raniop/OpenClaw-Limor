@@ -1,0 +1,36 @@
+[
+  {
+    "name": "user says X then not X in same conversation",
+    "category": "contradiction_detection",
+    "turns": [
+      {
+        "chatId": "owner@c.us",
+        "message": "תשלחי לעמית שלום",
+        "sender": { "name": "רני", "isOwner": true, "isGroup": false }
+      },
+      {
+        "chatId": "owner@c.us",
+        "message": "אל תשלחי שום דבר לעמית",
+        "sender": { "name": "רני", "isOwner": true, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "lastTurnIntent": "correction",
+      "hasContradictions": true
+    }
+  },
+  {
+    "name": "no contradiction in normal flow",
+    "category": "contradiction_detection",
+    "turns": [
+      {
+        "chatId": "owner@c.us",
+        "message": "תשלחי לדנה שלום",
+        "sender": { "name": "רני", "isOwner": true, "isGroup": false }
+      }
+    ],
+    "expectations": {
+      "noContradictions": true
+    }
+  }
+]
