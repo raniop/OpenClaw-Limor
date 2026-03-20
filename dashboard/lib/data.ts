@@ -415,12 +415,26 @@ export function getLogs(limit: number = 200, level?: string, domain?: string): L
 }
 
 export function isLimorRunning(): boolean {
+  // Try pm2 first
+  try {
+    const { execSync } = require("child_process");
+    const BOT_DIR = resolve(process.cwd(), "..");
+    const pm2Result = execSync("npx pm2 jlist 2>/dev/null", { encoding: "utf-8", cwd: BOT_DIR, timeout: 5000 }).trim();
+    const processes = JSON.parse(pm2Result);
+    const limor = processes.find((p: any) => p.name === "limor" && p.pm2_env?.status === "online");
+    if (limor) return true;
+  } catch {}
+  // Fallback: check pgrep
+  try {
+    const { execSync } = require("child_process");
+    const result = execSync("pgrep -f 'node dist/index.js'", { encoding: "utf-8" }).trim();
+    if (result.length > 0) return true;
+  } catch {}
+  // Fallback: log freshness
   if (!existsSync(LOG_PATH)) return false;
   try {
     const stats = require("fs").statSync(LOG_PATH);
-    const lastModified = stats.mtimeMs;
-    // Consider running if log was written in last 5 minutes
-    return Date.now() - lastModified < 5 * 60 * 1000;
+    return Date.now() - stats.mtimeMs < 5 * 60 * 1000;
   } catch {
     return false;
   }

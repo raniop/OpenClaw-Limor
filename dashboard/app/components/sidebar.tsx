@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { href: "/contacts", label: "Contacts", icon: "👥" },
   { href: "/sms", label: "SMS & Deliveries", icon: "📦" },
   { href: "/telegram", label: "Telegram", icon: "📡" },
+  { href: "/ops", label: "Operations", icon: "🔬" },
   { href: "/logs", label: "Logs", icon: "📟" },
 ];
 
