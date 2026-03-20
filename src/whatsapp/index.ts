@@ -130,6 +130,18 @@ export function createWhatsAppClient(): Client {
     } catch (err) {
       console.error("[sms] Failed to start delivery poller:", err);
     }
+
+    // Poll Telegram alert channel for rocket/missile alerts
+    try {
+      const { startAlertPoller } = require("../telegram/alert-poller");
+      startAlertPoller(async (text: string) => {
+        if (config.ownerChatId && whatsappClient) {
+          await whatsappClient.sendMessage(config.ownerChatId, text);
+        }
+      });
+    } catch (err) {
+      console.error("[telegram] Failed to start alert poller:", err);
+    }
   });
 
   client.on("authenticated", () => { console.log("WhatsApp authenticated successfully."); });
