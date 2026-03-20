@@ -270,7 +270,7 @@ function buildSummary(r: CompressorInput, sections: PromptSection[]): string {
   const { primaryFocus, responseStrategy, executionDecision, actionPlan } = r;
 
   if (actionPlan.needsClarification) {
-    return `יש בקשה עם פרט חסר ולכן יש לבקש הבהרה לפני ביצוע.`;
+    return `יש בקשה שאולי חסר בה פרט — אם אפשר לבצע בלי, תבצעי. אם באמת חסר משהו קריטי, שאלי. ⚠️ כלים זמינים — חובה להשתמש בהם לפעולות!`;
   }
   if (executionDecision.allowTools && executionDecision.type === "allow_tool_execution") {
     return `זוהתה בקשה ברורה וניתן להתקדם לביצוע.`;

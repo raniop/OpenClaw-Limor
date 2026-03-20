@@ -12,16 +12,24 @@ export interface ProactiveMessage {
   priority: "low" | "medium" | "high";
 }
 
+// Track which followup IDs were already reminded, so we don't spam
+const remindedFollowupIds = new Set<string>();
+
 /**
  * Check for overdue followups and return a reminder message if found.
+ * Each followup is only reminded ONCE.
  */
 export function checkOverdueFollowups(): ProactiveMessage | null {
   const overdue = getDueFollowups();
   if (overdue.length === 0) return null;
 
-  const top = overdue[0];
-  const reason = top.reason.substring(0, 80);
-  const name = top.contactName || "מישהו";
+  // Find first overdue that hasn't been reminded yet
+  const unreminded = overdue.find(fu => !remindedFollowupIds.has(fu.id));
+  if (!unreminded) return null;
+
+  remindedFollowupIds.add(unreminded.id);
+  const reason = unreminded.reason.substring(0, 80);
+  const name = unreminded.contactName || "מישהו";
 
   return {
     type: "followup_reminder",
