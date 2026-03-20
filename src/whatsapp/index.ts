@@ -398,6 +398,7 @@ async function handleMessage(msg: Message): Promise<void> {
     if (!isGroup) await chat.sendStateTyping();
 
     const memoryContext = getMemoryContext(chatId);
+    const conversationSummary = conversationStore.getSummary(chatId);
     const history = conversationStore.getHistory(chatId);
     const sender = { chatId, name: contactName, isOwner };
 
@@ -411,9 +412,15 @@ async function handleMessage(msg: Message): Promise<void> {
     let allowTools = true;
     let allowedToolNames: string[] | undefined;
     let resolvedCtx: ResolvedContext | undefined;
+
+    // Inject conversation summary if history was trimmed
+    if (conversationSummary) {
+      extraContext += `\n\n⚠️ שים לב: יש היסטוריה ישנה שלא נראית בשיחה הנוכחית. סיכום: ${conversationSummary}`;
+    }
+
     try {
       resolvedCtx = getResolvedContext(chatId, body, { name: contactName, isOwner, isGroup });
-      extraContext = "\n\n" + formatCompressedContextForPrompt(resolvedCtx);
+      extraContext += "\n\n" + formatCompressedContextForPrompt(resolvedCtx);
       allowTools = resolvedCtx.executionDecision.allowTools;
       if (resolvedCtx.toolRoutingPolicy.allowedToolNames.length > 0) {
         allowedToolNames = resolvedCtx.toolRoutingPolicy.allowedToolNames;

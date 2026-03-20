@@ -72,4 +72,5 @@ export interface IConversationStore {
   addMessage(chatId: string, role: "user" | "assistant", content: string): void;
   getHistory(chatId: string): ConversationMessage[];
   clearHistory(chatId: string): void;
+  getSummary(chatId: string): string;
 }

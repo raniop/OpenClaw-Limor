@@ -7,6 +7,7 @@ import {
   addMessage,
   getHistory,
   clearHistory,
+  getSummary,
 } from "../conversation";
 
 export class FileConversationStore implements IConversationStore {
@@ -20,5 +21,9 @@ export class FileConversationStore implements IConversationStore {
 
   clearHistory(chatId: string): void {
     clearHistory(chatId);
+  }
+
+  getSummary(chatId: string): string {
+    return getSummary(chatId);
   }
 }

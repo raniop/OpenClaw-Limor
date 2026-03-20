@@ -14,7 +14,7 @@ export const config = {
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || "",
   systemPrompt: process.env.SYSTEM_PROMPT || systemPrompt,
   botName: soul.name,
-  maxHistory: parseInt(process.env.MAX_HISTORY || "20", 10),
+  maxHistory: parseInt(process.env.MAX_HISTORY || "100", 10),
   model: soul.model.name,
   maxTokens: soul.model.maxTokens,
   ownerChatId: process.env.OWNER_CHAT_ID || "",
