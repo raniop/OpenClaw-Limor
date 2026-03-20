@@ -1,54 +1,90 @@
 /**
- * Telegram public channel poller for rocket/missile alerts.
- * Monitors https://t.me/s/beforeredalert for launch alerts
- * and forwards them to the owner via WhatsApp.
+ * Telegram public channel poller for multiple channels.
+ * Monitors public Telegram channels via web preview scraping.
+ * No Telegram bot or API key needed.
  *
- * No Telegram bot needed — scrapes the public web preview.
- * Polls every 15 seconds for near-real-time alerts.
+ * Channels:
+ *   - beforeredalert: rocket/missile alerts → filtered by keywords
+ *   - almogboker78: Almog Boker news/alerts → forwarded as-is
  */
 
-const CHANNEL_URL = "https://t.me/s/beforeredalert";
+// --- Channel configuration ---
+
+interface ChannelConfig {
+  /** Telegram channel username (used in URL) */
+  name: string;
+  /** Display label for WhatsApp messages */
+  label: string;
+  /** Emoji prefix for forwarded messages */
+  emoji: string;
+  /** If set, only forward messages containing one of these keywords */
+  alertKeywords?: string[];
+  /** Messages containing these are always excluded */
+  excludeKeywords?: string[];
+}
+
+const CHANNELS: ChannelConfig[] = [
+  {
+    name: "beforeredalert",
+    label: "beforeredalert",
+    emoji: "🚨",
+    alertKeywords: [
+      "שיגור",
+      "צבע אדום",
+      "ירי רקטות",
+      "התרעה",
+      "כניסה למרחב מוגן",
+      "יירוט",
+      "טיל",
+      "רקטה",
+      "ירי לעבר",
+    ],
+    excludeKeywords: [
+      "כניסה למבוגרים",
+      "הסרטון כבר מסתובב",
+      "תיעוד שלא היה אמור",
+      "הלינק ימחק",
+      "🔞",
+    ],
+  },
+  {
+    name: "almogboker78",
+    label: "אלמוג בוקר",
+    emoji: "📢",
+    // No keyword filter — forward everything
+    excludeKeywords: [
+      "כניסה למבוגרים",
+      "🔞",
+      "הלינק ימחק",
+    ],
+  },
+];
+
+// --- State per channel ---
+
+interface ChannelState {
+  lastSeenId: number;
+}
+
+const channelState = new Map<string, ChannelState>();
+
 const POLL_INTERVAL_MS = 15_000; // 15 seconds
-
-// Keywords that indicate a real launch/alert (not spam or ads)
-const ALERT_KEYWORDS = [
-  "שיגור",
-  "צבע אדום",
-  "ירי רקטות",
-  "התרעה",
-  "כניסה למרחב מוגן",
-  "יירוט",
-  "טיל",
-  "רקטה",
-  "ירי לעבר",
-];
-
-// Keywords to EXCLUDE (spam, ads, links to other channels)
-const EXCLUDE_KEYWORDS = [
-  "כניסה למבוגרים",
-  "הסרטון כבר מסתובב",
-  "תיעוד שלא היה אמור",
-  "הלינק ימחק",
-  "🔞",
-];
-
-let lastSeenId = 0;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let notifyCallback: ((message: string) => Promise<void>) | null = null;
 
-/**
- * Parse messages from the Telegram public channel HTML.
- */
-function parseMessages(html: string): Array<{ id: number; text: string }> {
-  const results: Array<{ id: number; text: string }> = [];
+// --- Parsing ---
 
-  // Match message blocks: data-post="beforeredalert/ID" ... message text
-  const msgPattern = /data-post="beforeredalert\/(\d+)"[\s\S]*?class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/g;
+function parseMessages(html: string, channelName: string): Array<{ id: number; text: string }> {
+  const results: Array<{ id: number; text: string }> = [];
+  const escaped = channelName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const msgPattern = new RegExp(
+    `data-post="${escaped}/(\\d+)"[\\s\\S]*?class="tgme_widget_message_text[^"]*"[^>]*>([\\s\\S]*?)<\\/div>`,
+    "g"
+  );
   let match;
 
   while ((match = msgPattern.exec(html)) !== null) {
     const id = parseInt(match[1], 10);
-    // Strip HTML tags
     const text = match[2].replace(/<[^>]+>/g, "").trim();
     if (text && id) {
       results.push({ id, text });
@@ -58,99 +94,106 @@ function parseMessages(html: string): Array<{ id: number; text: string }> {
   return results;
 }
 
-/**
- * Check if a message is a real alert (not spam/ad).
- */
-function isAlertMessage(text: string): boolean {
+// --- Filtering ---
+
+function shouldForward(text: string, config: ChannelConfig): boolean {
   const lower = text.toLowerCase();
 
-  // Exclude spam
-  for (const exclude of EXCLUDE_KEYWORDS) {
-    if (lower.includes(exclude.toLowerCase())) return false;
+  // Always exclude
+  if (config.excludeKeywords) {
+    for (const kw of config.excludeKeywords) {
+      if (lower.includes(kw.toLowerCase())) return false;
+    }
   }
 
-  // Must contain an alert keyword
-  for (const keyword of ALERT_KEYWORDS) {
-    if (lower.includes(keyword.toLowerCase())) return true;
+  // If no alert keywords defined, forward everything (news channel)
+  if (!config.alertKeywords || config.alertKeywords.length === 0) {
+    return true;
+  }
+
+  // Must match at least one alert keyword
+  for (const kw of config.alertKeywords) {
+    if (lower.includes(kw.toLowerCase())) return true;
   }
 
   return false;
 }
 
-/**
- * Fetch and check for new alerts.
- */
-async function checkForAlerts(): Promise<void> {
+// --- Poll single channel ---
+
+async function checkChannel(config: ChannelConfig): Promise<void> {
   try {
-    const response = await fetch(CHANNEL_URL, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; alert-monitor/1.0)",
-      },
+    const url = `https://t.me/s/${config.name}`;
+    const response = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; alert-monitor/1.0)" },
     });
 
     if (!response.ok) {
-      console.error(`[telegram] Failed to fetch channel: ${response.status}`);
+      console.error(`[telegram] Failed to fetch ${config.name}: ${response.status}`);
       return;
     }
 
     const html = await response.text();
-    const messages = parseMessages(html);
-
+    const messages = parseMessages(html, config.name);
     if (messages.length === 0) return;
 
-    // On first run, just record the latest ID
-    if (lastSeenId === 0) {
-      lastSeenId = Math.max(...messages.map((m) => m.id));
-      console.log(`[telegram] Initialized, latest message ID: ${lastSeenId}`);
+    let state = channelState.get(config.name);
+    if (!state) {
+      state = { lastSeenId: Math.max(...messages.map((m) => m.id)) };
+      channelState.set(config.name, state);
+      console.log(`[telegram] ${config.name} initialized, latest ID: ${state.lastSeenId}`);
       return;
     }
 
-    // Find new messages since last check
-    const newMessages = messages.filter((m) => m.id > lastSeenId);
+    const newMessages = messages.filter((m) => m.id > state!.lastSeenId);
     if (newMessages.length === 0) return;
 
-    // Update last seen
-    lastSeenId = Math.max(...newMessages.map((m) => m.id));
+    state.lastSeenId = Math.max(...newMessages.map((m) => m.id));
 
-    // Filter for actual alerts
-    const alerts = newMessages.filter((m) => isAlertMessage(m.text));
+    const toForward = newMessages.filter((m) => shouldForward(m.text, config));
 
-    for (const alert of alerts) {
-      const cleanText = alert.text
-        .replace(/🚨שתפו-https:\/\/t\.me\/beforeredalert/g, "")
-        .replace(/https:\/\/t\.me\/beforeredalert/g, "")
+    for (const msg of toForward) {
+      const cleanText = msg.text
+        .replace(/🚨שתפו-https:\/\/t\.me\/\w+/g, "")
+        .replace(/https:\/\/t\.me\/\w+/g, "")
         .trim();
 
-      const whatsappMsg = `🚨 *התרעה!*\n${cleanText}\n\n_מקור: beforeredalert_`;
+      if (!cleanText) continue;
 
-      console.log(`[telegram] 🚨 ALERT: ${cleanText.substring(0, 80)}`);
+      const whatsappMsg = `${config.emoji} *${config.label}*\n${cleanText}`;
+
+      console.log(`[telegram] ${config.emoji} ${config.name}: ${cleanText.substring(0, 80)}`);
 
       if (notifyCallback) {
         try {
           await notifyCallback(whatsappMsg);
         } catch (err) {
-          console.error("[telegram] Failed to send alert to owner:", err);
+          console.error(`[telegram] Failed to forward from ${config.name}:`, err);
         }
       }
     }
   } catch (err) {
-    console.error("[telegram] Poll error:", err);
+    console.error(`[telegram] Poll error for ${config.name}:`, err);
+  }
+}
+
+// --- Poll all channels ---
+
+async function checkAllChannels(): Promise<void> {
+  for (const config of CHANNELS) {
+    await checkChannel(config);
   }
 }
 
 /**
- * Start the alert poller.
+ * Start the Telegram channel poller.
  * @param onAlert callback to send message to owner via WhatsApp
  */
 export function startAlertPoller(onAlert: (message: string) => Promise<void>): void {
   notifyCallback = onAlert;
-
-  // Initial check
-  checkForAlerts();
-
-  // Poll every 15 seconds
-  pollTimer = setInterval(checkForAlerts, POLL_INTERVAL_MS);
-  console.log("[telegram] Alert poller started (checking every 15s)");
+  checkAllChannels();
+  pollTimer = setInterval(checkAllChannels, POLL_INTERVAL_MS);
+  console.log(`[telegram] Alert poller started (${CHANNELS.length} channels, every ${POLL_INTERVAL_MS / 1000}s)`);
 }
 
 /**
