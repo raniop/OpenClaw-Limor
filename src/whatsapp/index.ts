@@ -21,7 +21,7 @@ import { processMedia } from "./media-handler";
 import { handleOwnerCommand } from "./owner-commands";
 import { checkApprovalGate } from "./approval-gate";
 import { handleResponse } from "./response-handler";
-import { classifyGroupMessage, recordGroupResponse } from "./group-classifier";
+import { classifyGroupMessage, recordGroupResponse, hasRecentGroupResponse } from "./group-classifier";
 import { getResolvedContext, formatCompressedContextForPrompt, formatDebugTrace, applyFollowupAutomation } from "../context";
 import type { ResolvedContext } from "../context";
 import { extractFollowups } from "../followups";
@@ -333,6 +333,10 @@ async function handleMessage(msg: Message): Promise<void> {
       // Still save to history so owner can ask "what happened in the group" later
       const messageForHistory = `[${contactName}]: ${body}`;
       conversationStore.addMessage(chatId, "user", messageForHistory);
+      try {
+        const { trackGroupPerson } = require("../conversation");
+        trackGroupPerson(chatId, contactName, body);
+      } catch {}
       log.traceEnd(trace, "muted_group", elapsed(trace));
       return;
     }
@@ -450,12 +454,21 @@ async function handleMessage(msg: Message): Promise<void> {
       } catch {}
 
       const mentionsLimor = /(^|\s)לימור($|\s|[?.!,])/i.test(body) || /\blimor\b/i.test(body);
-      extraContext += `\n\nזו קבוצת וואטסאפ. ההודעה האחרונה נכתבה על ידי ${contactName}.${mentionsLimor ? " ⚠️ שימי לב: השם שלך (לימור) מוזכר בהודעה — חובה להגיב! אסור SKIP!" : ""} תגיבי (טקסט בלבד, 1-2 משפטים) רק אם: (1) פונים אלייך בשם (לימור/Limor) — גם אם מזכירים שמות נוספים! (2) שואלים שאלה שמופנית אלייך (3) מגיבים למשהו שאמרת (4) שואלים שאלה כללית שלא פונה לאף אחד ספציפי. ⚠️ תחזירי [SKIP] (ולא ריאקציה!) אם: ההודעה פונה למישהו אחר בלבד (בלי להזכיר אותך), או שהיא שיחה בין אנשים שלא קשורה אלייך. [SKIP] = שתיקה מוחלטת.`;
+      const recentlyResponded = hasRecentGroupResponse(chatId);
+      extraContext += `\n\nזו קבוצת וואטסאפ. ההודעה האחרונה נכתבה על ידי ${contactName}.${mentionsLimor ? " ⚠️ שימי לב: השם שלך (לימור) מוזכר בהודעה — חובה להגיב! אסור SKIP!" : ""}${recentlyResponded ? " ⚠️ הגבת לאחרונה בקבוצה — סביר שההודעה הזו היא המשך שיחה איתך." : ""} תגיבי (טקסט בלבד, 1-2 משפטים) אם: (1) פונים אלייך בשם (לימור/Limor) (2) שואלים שאלה (3) מגיבים למשהו שאמרת (4) שאלה כללית. אם מישהו פנה אלייך לאחרונה וההודעה הנוכחית יכולה להיות המשך — תגיבי! ספק = תגיבי. תחזירי [SKIP] רק אם ההודעה ברור שפונה למישהו אחר ולא קשורה אלייך כלל.`;
     }
+
+    // Build model routing params from resolved context
+    const modelRouting = resolvedCtx ? {
+      isOwner,
+      isGroup,
+      turnIntent: resolvedCtx.bundle.turnIntent.category,
+      toolIntentType: resolvedCtx.toolIntent.type,
+    } : undefined;
 
     log.aiRequestStart(trace);
     const aiTimer = startTimer();
-    const response = await sendMessage(history, (memoryContext || "") + extraContext, sender, { allowTools, allowedToolNames });
+    const response = await sendMessage(history, (memoryContext || "") + extraContext, sender, { allowTools, allowedToolNames, modelRouting });
     const aiDurationMs = aiTimer.stop();
     log.aiRequestEnd(aiDurationMs, 0, trace); // tool count is tracked inside send-message
 

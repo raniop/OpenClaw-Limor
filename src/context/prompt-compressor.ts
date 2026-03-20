@@ -287,5 +287,5 @@ function buildSummary(r: CompressorInput, sections: PromptSection[]): string {
   if (responseStrategy.type === "brief_answer") {
     return `יש כמה הודעות בלי מענה — לתת תשובה קצרה וישירה.`;
   }
-  return `שיחה רגילה — לתת מענה ישיר. ⚠️ אם צריך לבצע פעולה (שליחה, קביעה, חיפוש) — חובה להשתמש בכלי! אסור לטעון שביצעת פעולה בלי להפעיל tool.`;
+  return `שיחה רגילה — לתת מענה ישיר. ⚠️ חוק ברזל: אם צריך לבצע פעולה — חובה להשתמש בכלי! אסור לטעון שביצעת פעולה בלי tool call.`;
 }

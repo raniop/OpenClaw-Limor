@@ -160,9 +160,13 @@ export function buildAndTest(capId: string): string {
 
   console.log(`[sandbox] Building and testing in ${capId}...`);
 
-  // Build
-  const buildResult = execInDir(worktreePath, "npx tsc 2>&1", 120_000);
-  if (buildResult.includes("error TS")) {
+  // Build using npm run build (not bare tsc — it may not be in PATH)
+  const buildResult = execInDir(worktreePath, "npm run build 2>&1", 120_000);
+  const buildFailed = buildResult.includes("error TS") ||
+    buildResult.includes("EXIT CODE:") ||
+    buildResult.includes("command not found");
+  if (buildFailed) {
+    console.error(`[sandbox] Build failed in ${capId}: ${buildResult.substring(0, 300)}`);
     return `❌ Build failed:\n${buildResult}`;
   }
 
@@ -210,7 +214,8 @@ export function applyWorktree(capId: string): string {
     const branchName = `limor/${capId}`;
     execInDir(PROJECT_ROOT, `git merge "${branchName}" --no-edit`);
 
-    // Cleanup worktree (force, ignore errors)
+    // Cleanup worktree (remove node_modules first, then force remove)
+    try { execInDir(worktreePath, "rm -rf node_modules"); } catch {}
     try {
       execInDir(PROJECT_ROOT, `git worktree remove "${worktreePath}" --force`);
     } catch {}
@@ -263,6 +268,8 @@ export function cleanupWorktree(capId: string): string {
 
   try {
     const branchName = `limor/${capId}`;
+    // Remove node_modules first — symlink or real dir blocks git worktree remove
+    try { execInDir(worktreePath, "rm -rf node_modules"); } catch {}
     execInDir(PROJECT_ROOT, `git worktree remove "${worktreePath}" --force`);
     try { execInDir(PROJECT_ROOT, `git branch -D "${branchName}"`); } catch {}
     console.log(`[sandbox] Cleaned up worktree: ${capId}`);

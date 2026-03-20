@@ -15,6 +15,8 @@ import {
   crmTools, instructionTools, fileTools, contactTools, smartHomeTools, capabilityTools, modelTools, codingTools, gettTools, whatsappExtraTools, smsTools,
 } from "./tools";
 import { handleToolCall } from "./handle-tool-call";
+import { selectModel } from "./model-router";
+import type { ModelRouterParams } from "./model-router";
 import { log } from "../logger";
 import { startTimer } from "../observability";
 
@@ -23,6 +25,8 @@ export interface SendMessageOptions {
   allowTools?: boolean;
   /** When provided and non-empty, filter tools to only these names. Empty array = no tools. */
   allowedToolNames?: string[];
+  /** Model routing parameters — when provided, selectModel() picks the model. */
+  modelRouting?: ModelRouterParams;
 }
 
 export async function sendMessage(
@@ -141,8 +145,16 @@ export async function sendMessage(
   // Debug: log tool count and names
   console.log(`[send-message] Tools: ${tools.length} | allowTools=${options?.allowTools} | allowedNames=${options?.allowedToolNames?.length ?? 'none'} | names=${tools.map(t=>t.name).join(',')}`);
 
+  // Model routing: pick model based on context, or fall back to config default
+  let selectedModel = config.model;
+  if (options?.modelRouting) {
+    const selection = selectModel(options.modelRouting);
+    selectedModel = selection.model;
+    console.log(`[model-router] Selected: ${selection.model} (${selection.reason})`);
+  }
+
   const apiParams: any = {
-    model: config.model,
+    model: selectedModel,
     max_tokens: config.maxTokens,
     system: systemPrompt,
     messages,
@@ -152,6 +164,9 @@ export async function sendMessage(
   let response = await withRetry(() => client.messages.create(apiParams));
 
   // Handle tool use loop (supports multiple parallel tool calls)
+  // Track retry counts per tool name so failed tools get one retry
+  const toolRetries = new Map<string, number>();
+
   while (response.stop_reason === "tool_use") {
     const toolBlocks = response.content.filter((b) => b.type === "tool_use") as Anthropic.ToolUseBlock[];
     if (toolBlocks.length === 0) break;
@@ -166,23 +181,37 @@ export async function sendMessage(
           sender
         );
         log.toolCall(toolBlock.name, result, timer.stop());
-        return { id: toolBlock.id, result };
+        return { id: toolBlock.id, name: toolBlock.name, result };
       })
     );
 
-    // Send all tool results back
-    messages.push({ role: "assistant", content: response.content });
-    messages.push({
-      role: "user",
-      content: toolResults.map((tr) => ({
+    // Build tool result content, adding retry hint for first-time failures
+    const toolResultContent = toolResults.map((tr) => {
+      const isError = tr.result.includes("\u274C"); // ❌ character
+      const retryCount = toolRetries.get(tr.name) || 0;
+
+      if (isError) {
+        toolRetries.set(tr.name, retryCount + 1);
+      }
+
+      // On first failure, add hint so Claude tries a different approach
+      const content = (isError && retryCount === 0)
+        ? `${tr.result}\n\n[Tool failed on first attempt — you may retry with different parameters or try a different approach.]`
+        : tr.result;
+
+      return {
         type: "tool_result" as const,
         tool_use_id: tr.id,
-        content: tr.result,
-      })),
+        content,
+      };
     });
 
+    // Send all tool results back
+    messages.push({ role: "assistant", content: response.content });
+    messages.push({ role: "user", content: toolResultContent });
+
     const loopParams: any = {
-      model: config.model,
+      model: selectedModel,
       max_tokens: config.maxTokens,
       system: systemPrompt,
       messages,

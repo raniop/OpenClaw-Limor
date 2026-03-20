@@ -20,6 +20,12 @@ export function recordGroupResponse(chatId: string): void {
   lastResponseTime.set(chatId, Date.now());
 }
 
+/** Check if Limor responded recently in this group (within conversation window) */
+export function hasRecentGroupResponse(chatId: string): boolean {
+  const lastResponse = lastResponseTime.get(chatId);
+  return !!lastResponse && Date.now() - lastResponse < CONVERSATION_WINDOW_MS;
+}
+
 // Bot name patterns (case-insensitive)
 // Note: \b doesn't work with Hebrew characters, so we use (^|\s) and ($|\s|[?.!,])
 const NAME_PATTERNS = [

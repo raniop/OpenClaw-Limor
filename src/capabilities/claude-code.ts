@@ -153,7 +153,7 @@ ${spec.level}
 - workspace/policies/ — behavioral policies loaded into prompt
 - .env — API keys and secrets (add new vars here)
 
-After implementing, run: npx tsc
+After implementing, run: npm run build
 Fix any compilation errors before finishing.`;
 }
 
@@ -171,10 +171,16 @@ function runClaudeCode(cwd: string, prompt: string): Promise<string> {
     const claudeCli = findClaudeCli();
     console.log(`[claude-code] Starting in ${cwd} (CLI: ${claudeCli})`);
 
+    // Ensure PATH includes node_modules/.bin so tsc, eslint etc. are found
+    const extendedPath = `${join(cwd, "node_modules", ".bin")}:${process.env.PATH || ""}`;
     const proc = spawn(claudeCli, args, {
       cwd,
       timeout: 900_000, // 15 minutes (large changes need time)
-      env: { ...process.env, CLAUDE_CODE_ENTRYPOINT: "limor-bot" },
+      env: {
+        ...process.env,
+        PATH: extendedPath,
+        CLAUDE_CODE_ENTRYPOINT: "limor-bot",
+      },
     });
 
     let stdout = "";
@@ -188,12 +194,14 @@ function runClaudeCode(cwd: string, prompt: string): Promise<string> {
       stderr += data.toString();
     });
 
-    proc.on("close", (code: number | null) => {
-      console.log(`[claude-code] Finished with code ${code}`);
+    proc.on("close", (code: number | null, signal: string | null) => {
       if (code === 0) {
+        console.log(`[claude-code] Finished successfully`);
         resolve(stdout);
       } else {
-        reject(new Error(`Claude Code exited with ${code}: ${stderr.substring(0, 500)}`));
+        const reason = signal ? `killed by signal ${signal}` : `exit code ${code}`;
+        console.error(`[claude-code] Failed: ${reason}\nSTDERR: ${stderr.substring(0, 500)}\nSTDOUT (tail): ${stdout.substring(Math.max(0, stdout.length - 300))}`);
+        reject(new Error(`Claude Code ${reason}: ${stderr.substring(0, 500)}`));
       }
     });
 
