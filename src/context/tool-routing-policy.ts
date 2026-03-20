@@ -24,57 +24,26 @@ const TOOL_GROUPS: Record<string, string[]> = {
 
 /**
  * Resolve which tool group should be exposed for this turn.
- * Priority-ordered rules — first match wins.
+ *
+ * POLICY: Never restrict tools. All tools are always available.
+ * The AI is smart enough to pick the right ones.
+ * Restricting tools causes more problems than it solves
+ * (AI can't send messages, can't notify owner, can't use tools it needs).
  */
 export function resolveToolRoutingPolicy(resolved: RoutingInput): ToolRoutingPolicy {
-  const { executionDecision, responseStrategy, primaryFocus, toolIntent } = resolved;
+  const { toolIntent } = resolved;
 
-  // 1. Tools blocked entirely — expose nothing
-  if (!executionDecision.allowTools) {
-    return {
-      group: "none",
-      summary: "לא לחשוף כלים",
-      reason: executionDecision.reason,
-      confidence: 0.8,
-      allowedToolNames: [],
-    };
-  }
-
-  // 2. Status/summary mode — readonly tools only
-  if (responseStrategy.type === "owner_summary" || primaryFocus.type === "status") {
-    return {
-      group: "owner_safe_readonly",
-      summary: "לחשוף רק כלים בטוחים לקריאה",
-      reason: "מדובר בסטטוס/סיכום ולא בביצוע ישיר",
-      confidence: 0.85,
-      allowedToolNames: TOOL_GROUPS.owner_safe_readonly,
-    };
-  }
-
-  // 3-10. Route by tool intent type
+  // Always expose all tools — never restrict
   const intentType = toolIntent.type;
-  if (intentType !== "none" && intentType in TOOL_GROUPS) {
-    // Always include notify_owner — Limor must always be able to reach the owner
-    const tools = [...TOOL_GROUPS[intentType]];
-    if (!tools.includes("notify_owner")) {
-      tools.push("notify_owner");
-    }
-    return {
-      group: intentType as any,
-      summary: `לחשוף כלי ${intentType}`,
-      reason: toolIntent.reason,
-      confidence: 0.92,
-      allowedToolNames: tools,
-    };
-  }
+  const summary = intentType !== "none"
+    ? `זוהה כלי ${intentType} — כל הכלים חשופים`
+    : "כל הכלים חשופים";
 
-  // Default: tools are allowed but no specific routing — expose all
-  // (This preserves backward compatibility when allowTools=true but no intent detected)
   return {
-    group: "none",
-    summary: "לא זוהה כלי ספציפי — כל הכלים חשופים",
-    reason: "אין מיקוד ברור לסוג כלי מסוים",
-    confidence: 0.6,
+    group: intentType !== "none" ? (intentType as any) : "none",
+    summary,
+    reason: "כל הכלים תמיד זמינים — אין חסימות",
+    confidence: 0.95,
     allowedToolNames: [], // empty = don't filter (expose all)
   };
 }
