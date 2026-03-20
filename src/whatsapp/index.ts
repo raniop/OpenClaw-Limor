@@ -397,6 +397,14 @@ async function handleMessage(msg: Message): Promise<void> {
     conversationStore.addMessage(chatId, "user", messageForHistory);
     if (!isGroup) await chat.sendStateTyping();
 
+    // Track per-person activity in groups
+    if (isGroup) {
+      try {
+        const { trackGroupPerson } = require("../conversation");
+        trackGroupPerson(chatId, contactName, body);
+      } catch {}
+    }
+
     const memoryContext = getMemoryContext(chatId);
     const conversationSummary = conversationStore.getSummary(chatId);
     const history = conversationStore.getHistory(chatId);
@@ -434,6 +442,13 @@ async function handleMessage(msg: Message): Promise<void> {
     }
 
     if (isGroup) {
+      // Add per-person group memory
+      try {
+        const { getGroupPeopleContext } = require("../conversation");
+        const groupPeopleCtx = getGroupPeopleContext(chatId);
+        if (groupPeopleCtx) extraContext += "\n\n" + groupPeopleCtx;
+      } catch {}
+
       const mentionsLimor = /(^|\s)לימור($|\s|[?.!,])/i.test(body) || /\blimor\b/i.test(body);
       extraContext += `\n\nזו קבוצת וואטסאפ. ההודעה האחרונה נכתבה על ידי ${contactName}.${mentionsLimor ? " ⚠️ שימי לב: השם שלך (לימור) מוזכר בהודעה — חובה להגיב! אסור SKIP!" : ""} תגיבי (טקסט בלבד, 1-2 משפטים) רק אם: (1) פונים אלייך בשם (לימור/Limor) — גם אם מזכירים שמות נוספים! (2) שואלים שאלה שמופנית אלייך (3) מגיבים למשהו שאמרת (4) שואלים שאלה כללית שלא פונה לאף אחד ספציפי. ⚠️ תחזירי [SKIP] (ולא ריאקציה!) אם: ההודעה פונה למישהו אחר בלבד (בלי להזכיר אותך), או שהיא שיחה בין אנשים שלא קשורה אלייך. [SKIP] = שתיקה מוחלטת.`;
     }
