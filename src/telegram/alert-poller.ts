@@ -38,6 +38,9 @@ const CHANNELS: ChannelConfig[] = [
       "טיל",
       "רקטה",
       "ירי לעבר",
+      "יציאה",
+      "יציאות",
+      "התרחב",
     ],
     excludeKeywords: [
       "כניסה למבוגרים",
