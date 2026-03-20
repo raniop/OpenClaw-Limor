@@ -202,9 +202,16 @@ export async function sendMessage(
   if (!hadToolCalls && tools.length > 0) {
     const claimsAction = /שולחת בקשה|שלחתי בקשה|שולחת לרני|העברתי לרני|קבעתי|שלחתי זימון|שולחת זימון|שלחתי הודעה|שלחתי ל|העברתי ל|בדקתי את|מצאתי (מסעדה|טיסה|מלון)|הזמנתי|ביטלתי|יצרתי|נוצרה|הוספתי|מחקתי|החלפתי|עברתי ל|שיניתי|עדכנתי|בוצע|הופעל|הוגדר|נשמר|הועבר/.test(finalText);
     if (claimsAction) {
-      console.error(`[hallucination-guard] 🚨 BLOCKED: AI claimed action but no tool was called! Text: ${finalText.substring(0, 200)}`);
-      // BLOCK the lying response and return honest error
-      return "אופס, רציתי לבצע את הפעולה אבל לא באמת הפעלתי כלי. תגיד לי שוב מה לעשות ואני אטפל בזה באמת הפעם 🙏";
+      console.error(`[hallucination-guard] ⚠️ AI claimed action but no tool was called! Text: ${finalText.substring(0, 200)}`);
+      // Don't block — but ALWAYS notify owner (even when owner is the sender)
+      try {
+        const { getNotifyOwnerCallback } = require("./callbacks");
+        const notify = getNotifyOwnerCallback();
+        if (notify) {
+          const who = sender?.isOwner ? "בשיחה איתך" : `צ'אט: ${sender?.name || "unknown"}`;
+          notify(`⚠️ [hallucination] לימור טענה שביצעה פעולה בלי tool!\n${who}\nטקסט: ${finalText.substring(0, 120)}`).catch(() => {});
+        }
+      } catch {}
     }
   }
 
