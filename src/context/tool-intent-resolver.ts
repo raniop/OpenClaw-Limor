@@ -12,7 +12,7 @@ interface ToolIntentInput {
 }
 
 const MESSAGING_VERBS = /(תשלחי|תכתבי|תגידי\s+ל|תעני\s+ל|תעבירי|send\b|forward)/i;
-const CALENDAR_PATTERNS = /(תקבעי|תתאמי|ביומן|פגישה|זימון|calendar|meeting)/i;
+const CALENDAR_PATTERNS = /(תקבעי|תתאמי|ביומן|פגישה|זימון|calendar|meeting|לתאם|לקבוע|נקבע|נעשה מחדש|שיחה עם|לדבר עם|פנוי ב|פנוי מחר|מתי (פנוי|נוח|אפשר)|נפגש|להיפגש)/i;
 const BOOKING_PATTERNS = /(מסעדה|להזמין מקום|שולחן|booking|book restaurant)/i;
 const TRAVEL_PATTERNS = /(טיסה|מלון|חופשה|flight|hotel)/i;
 const CRM_PATTERNS = /(פוליסה|ביטוח|לקוח|crm|policy|insurance)/i;
@@ -30,8 +30,15 @@ export function resolveToolIntent(resolved: ToolIntentInput): ToolIntent {
   const message = resolved.bundle.conversation.lastUserMessage;
   const needsClarification = resolved.actionPlan.needsClarification;
 
-  // Check each tool category in priority order
-  const match = matchToolCategory(message);
+  // Check current message first, then recent conversation context for multi-turn intent
+  let match = matchToolCategory(message);
+
+  // If no match on last message, check assistant's last response for ongoing intent
+  // (e.g., bot said "שולחת בקשה לרני! פגישה היום..." and user replies "היום ב-17:00")
+  if (!match && resolved.bundle.conversation.lastAssistantMessage) {
+    const contextText = resolved.bundle.conversation.lastAssistantMessage;
+    match = matchToolCategory(contextText);
+  }
 
   if (!match) {
     return {
