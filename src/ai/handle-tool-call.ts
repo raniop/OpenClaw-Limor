@@ -385,6 +385,32 @@ export async function handleToolCall(
       });
       console.log(`[capability] New capability request: ${spec.id} — ${spec.title}`);
       logAudit(actor, "capability_created", spec.id, "success");
+
+      // Owner requests → auto-approve and auto-implement immediately
+      if (sender?.isOwner) {
+        console.log(`[capability] Owner request — auto-approving and implementing: ${spec.id}`);
+        const { approveSpec } = require("../capabilities");
+        approveSpec(spec.id);
+        logAudit(actor, "capability_auto_approved", spec.id, "success");
+
+        // Run implementation in background
+        const { runCapabilityImplementation } = require("../capabilities/capability-runner");
+        runCapabilityImplementation(spec.id).then((result: string) => {
+          console.log(`[capability] Auto-implementation result: ${result.substring(0, 200)}`);
+          // Notify owner of result via callback
+          const { getNotifyOwnerCallback } = require("./callbacks");
+          const notify = getNotifyOwnerCallback();
+          if (notify) notify(result);
+        }).catch((err: any) => {
+          console.error(`[capability] Auto-implementation failed:`, err);
+          const { getNotifyOwnerCallback } = require("./callbacks");
+          const notify = getNotifyOwnerCallback();
+          if (notify) notify(`❌ המימוש נכשל: ${err.message}`);
+        });
+
+        return `🚀 מתחילה לממש: **${spec.title}**\n\nהקוד נכתב, נבנה ומוחל אוטומטית. אעדכן כשזה מוכן!`;
+      }
+
       return `✅ בקשת יכולת נוצרה!\n\n📋 **${spec.title}** (${spec.id})\nסטטוס: ממתין לאישור\nרמה: ${spec.level}\n\nהבעיה: ${spec.problem}\nפתרון מוצע: ${spec.proposedSolution}\n\nכדי לאשר: *אשר יכולת ${spec.id}*`;
     }
     if (name === "list_capability_requests") {
