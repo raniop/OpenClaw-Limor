@@ -9,16 +9,19 @@ import { findContactByName } from "../contacts";
 const MINIMAL_PATTERN = /^[?!.…·\-\s]{1,5}$/;
 
 // Greeting patterns (Hebrew + English)
-const GREETING_PATTERN = /^(היי|שלום|בוקר טוב|ערב טוב|מה קורה|מה נשמע|אהלן|hey|hi|hello|good morning)/i;
+const GREETING_PATTERN = /^(היי|שלום|בוקר טוב|ערב טוב|מה קורה|מה נשמע|מה שלומך|אהלן|hey|hi|hello|good morning)/i;
 
 // Status/overview queries
-const STATUS_PATTERN = /(מה הסטטוס|מה פתוח|מה ממתין|סטטוס|תעדכני|עדכון|סיכום|status|what.?s pending|update me)/i;
+const STATUS_PATTERN = /(מה הסטטוס|מה המצב|מה פתוח|מה ממתין|מה יש לי|סטטוס|תעדכני|עדכון|סיכום|status|what.?s pending|update me)/i;
 
 // Correction intent — user is fixing something
-const CORRECTION_PATTERN = /^(לא[,.\s]|תשני|תתקני|תעדכני|תחליפי|לא נכון|טעות|fix|change|update|not that|wrong)/i;
+const CORRECTION_PATTERN = /^(לא[,.\s]|רגע[,.\s]|אל\s+ת|תשני|תתקני|תעדכני|תחליפי|לא נכון|טעות|fix|change|update|not that|wrong)/i;
 
 // Followup query — asking about pending items
-const FOLLOWUP_PATTERN = /(מה עם|מה לגבי|עדכון על|נושא של|טיפלת|עשית|סידרת|what about|did you|have you)/i;
+const FOLLOWUP_PATTERN = /(מה עם|מה קורה עם\s|מה לגבי|עדכון על|נושא של|טיפלת|עשית|סידרת|דיברת|יש משהו חדש|יש חדש מ|what about|did you|have you)/i;
+
+// Continuation — reference to previous conversation
+const CONTINUATION_PATTERN = /^(לגבי\s|בקשר ל|בהמשך ל|regarding|about what we)/i;
 
 // Reminder request
 const REMINDER_PATTERN = /(תזכירי|תזכרי|אל תשכחי|remind|תזכורת|לזכור|תרשמי|רשמי לי)/i;
@@ -28,7 +31,7 @@ const MULTI_STEP_PATTERN = /(תתכנני|תארגני|תסדרי לי|סדרי 
 const MULTI_STEP_KEYWORDS = /(ערב|יום|אירוע|טיול|חופשה|מסיבה|פגישות|לו"ז|evening|trip|event|party)/i;
 
 // Action request — asking Limor to do something
-const ACTION_PATTERN = /(תשלחי|תקבעי|תבדקי|תחפשי|תעשי|תמצאי|תזמיני|send|book|check|search|do|find)/i;
+const ACTION_PATTERN = /(תשלחי|תקבעי|תבדקי|תחפשי|תעשי|תמצאי|תזמיני|אפשר לקבוע|אפשר לתאם|send|book|check|search|do|find)/i;
 
 /**
  * Classify the intent of an incoming message.
@@ -44,19 +47,29 @@ export function classifyTurnIntent(message: string): TurnIntent {
     return { category: "continuation", confidence: 0.7, mentionedEntities, isMinimal: true };
   }
 
-  // Greeting
-  if (GREETING_PATTERN.test(trimmed)) {
-    return { category: "greeting", confidence: 0.9, mentionedEntities, isMinimal: false };
-  }
-
-  // Correction — check before other intents
+  // Correction — check early, user is fixing something
   if (CORRECTION_PATTERN.test(trimmed)) {
     return { category: "correction", confidence: 0.85, mentionedEntities, isMinimal: false };
   }
 
-  // Status query
+  // Status query — before greeting since "מה המצב" is a status query not a greeting
   if (STATUS_PATTERN.test(trimmed)) {
     return { category: "status_query", confidence: 0.9, mentionedEntities, isMinimal: false };
+  }
+
+  // Followup query — before greeting since "מה קורה עם X" is a followup not a greeting
+  if (FOLLOWUP_PATTERN.test(trimmed)) {
+    return { category: "followup_query", confidence: 0.8, mentionedEntities, isMinimal: false };
+  }
+
+  // Continuation — reference to previous conversation without action
+  if (CONTINUATION_PATTERN.test(trimmed)) {
+    return { category: "continuation", confidence: 0.75, mentionedEntities, isMinimal: false };
+  }
+
+  // Greeting
+  if (GREETING_PATTERN.test(trimmed)) {
+    return { category: "greeting", confidence: 0.9, mentionedEntities, isMinimal: false };
   }
 
   // Multi-step request — before action request since it's more specific
@@ -67,11 +80,6 @@ export function classifyTurnIntent(message: string): TurnIntent {
   // Reminder request
   if (REMINDER_PATTERN.test(trimmed)) {
     return { category: "reminder_request", confidence: 0.9, mentionedEntities, isMinimal: false };
-  }
-
-  // Followup query
-  if (FOLLOWUP_PATTERN.test(trimmed)) {
-    return { category: "followup_query", confidence: 0.8, mentionedEntities, isMinimal: false };
   }
 
   // Action request

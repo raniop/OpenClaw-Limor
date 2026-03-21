@@ -12,22 +12,54 @@ export interface ProactiveMessage {
   priority: "low" | "medium" | "high";
 }
 
-// Track which followup IDs were already reminded, so we don't spam
-const remindedFollowupIds = new Set<string>();
+// Track which followup IDs were already reminded — persisted to disk
+import { existsSync, readFileSync, writeFileSync } from "fs";
+import { statePath } from "../state-dir";
+
+const REMINDED_PATH = statePath("reminded-followups.json");
+
+function loadRemindedIds(): Set<string> {
+  try {
+    if (existsSync(REMINDED_PATH)) {
+      return new Set(JSON.parse(readFileSync(REMINDED_PATH, "utf-8")));
+    }
+  } catch {}
+  return new Set();
+}
+
+function saveRemindedId(id: string): void {
+  const ids = loadRemindedIds();
+  ids.add(id);
+  // Keep last 100 only
+  const arr = [...ids].slice(-100);
+  writeFileSync(REMINDED_PATH, JSON.stringify(arr), "utf-8");
+}
+
+// Junk followup reasons that should never be reminded
+const JUNK_REASONS = ["עדכון", "מעקב", "follow up", "לחזור למשתמש אם לא שלח את הפרט החסר"];
 
 /**
  * Check for overdue followups and return a reminder message if found.
- * Each followup is only reminded ONCE.
+ * Each followup is only reminded ONCE (persisted across restarts).
+ * Junk followups are skipped entirely.
  */
 export function checkOverdueFollowups(): ProactiveMessage | null {
   const overdue = getDueFollowups();
   if (overdue.length === 0) return null;
 
-  // Find first overdue that hasn't been reminded yet
-  const unreminded = overdue.find(fu => !remindedFollowupIds.has(fu.id));
+  const remindedIds = loadRemindedIds();
+
+  // Find first overdue that hasn't been reminded and isn't junk
+  const unreminded = overdue.find(fu => {
+    if (remindedIds.has(fu.id)) return false;
+    const reason = fu.reason.trim().toLowerCase();
+    if (JUNK_REASONS.some(j => reason === j.toLowerCase() || reason.includes(j.toLowerCase()))) return false;
+    return true;
+  });
+
   if (!unreminded) return null;
 
-  remindedFollowupIds.add(unreminded.id);
+  saveRemindedId(unreminded.id);
   const reason = unreminded.reason.substring(0, 80);
   const name = unreminded.contactName || "מישהו";
 
