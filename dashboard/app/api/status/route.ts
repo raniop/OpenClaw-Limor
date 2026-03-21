@@ -16,16 +16,29 @@ interface FeedEntry {
 export async function GET() {
   // 1. Check if bot process is running
   let isOnline = false;
+  let botPid: number | null = null;
   try {
-    const ps = execSync("pgrep -f 'node dist/index.js'", { encoding: "utf-8" }).trim();
-    isOnline = ps.length > 0;
+    // Try PM2 first
+    const pm2Out = execSync("npx pm2 jlist 2>/dev/null", { encoding: "utf-8" }).trim();
+    const pm2Procs = JSON.parse(pm2Out);
+    const limor = pm2Procs.find((p: any) => p.name === "limor");
+    if (limor && limor.pm2_env?.status === "online") {
+      isOnline = true;
+      botPid = limor.pid;
+    }
   } catch {
-    // Also check log freshness as fallback
-    if (existsSync(LOG_PATH)) {
-      try {
-        const stats = statSync(LOG_PATH);
-        isOnline = Date.now() - stats.mtimeMs < 5 * 60 * 1000;
-      } catch {}
+    // Fallback: pgrep
+    try {
+      const ps = execSync("pgrep -f 'node dist/index.js'", { encoding: "utf-8" }).trim();
+      isOnline = ps.length > 0;
+    } catch {
+      // Last fallback: log freshness
+      if (existsSync(LOG_PATH)) {
+        try {
+          const stats = statSync(LOG_PATH);
+          isOnline = Date.now() - stats.mtimeMs < 5 * 60 * 1000;
+        } catch {}
+      }
     }
   }
 
@@ -106,6 +119,7 @@ export async function GET() {
 
   return NextResponse.json({
     isOnline,
+    botPid,
     lastMessageAt,
     messagesToday,
     groupsFiltered,
