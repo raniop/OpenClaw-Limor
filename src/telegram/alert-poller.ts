@@ -85,8 +85,13 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
+    .replace(/&rlm;/g, "")   // right-to-left mark — strip it
+    .replace(/&lrm;/g, "")   // left-to-right mark — strip it
+    .replace(/&zwnj;/g, "")  // zero-width non-joiner — strip it
+    .replace(/&zwj;/g, "")   // zero-width joiner — strip it
     .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
-    .replace(/&nbsp;/g, " ");
+    .replace(/&nbsp;/g, " ")
+    .replace(/&[a-zA-Z]+;/g, ""); // catch any remaining named entities
 }
 
 function parseMessages(html: string, channelName: string): Array<{ id: number; text: string; imageUrl?: string }> {
