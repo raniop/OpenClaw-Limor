@@ -77,6 +77,17 @@ let notifyCallback: ((message: string) => Promise<void>) | null = null;
 
 // --- Parsing ---
 
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
+    .replace(/&nbsp;/g, " ");
+}
+
 function parseMessages(html: string, channelName: string): Array<{ id: number; text: string }> {
   const results: Array<{ id: number; text: string }> = [];
   const escaped = channelName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -88,7 +99,7 @@ function parseMessages(html: string, channelName: string): Array<{ id: number; t
 
   while ((match = msgPattern.exec(html)) !== null) {
     const id = parseInt(match[1], 10);
-    const text = match[2].replace(/<[^>]+>/g, "").trim();
+    const text = decodeHtmlEntities(match[2].replace(/<[^>]+>/g, "")).trim();
     if (text && id) {
       results.push({ id, text });
     }
