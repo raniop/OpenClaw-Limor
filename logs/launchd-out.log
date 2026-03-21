@@ -23,3 +23,40 @@ Use --update-env to update environment variables
 
  ✓ Starting...
  ✓ Ready in 1366ms
+
+✅ Limor + Dashboard running!
+   Dashboard: http://localhost:3848
+   PM2 logs:  npx pm2 logs limor
+   PM2 status: npx pm2 status
+
+Press Ctrl+C to stop dashboard (Limor keeps running in PM2)
+ ○ Compiling / ...
+ ✓ Compiled / in 1675ms (612 modules)
+ GET / 200 in 3126ms
+ ✓ Compiled /api/ops in 387ms (638 modules)
+ GET /api/bot 200 in 1357ms
+ GET /api/bot 200 in 1359ms
+ GET /api/logs?limit=50 200 in 1790ms
+ GET /api/ops 200 in 1800ms
+ GET /api/qr 200 in 1805ms
+ GET /api/qr 200 in 1806ms
+ ✓ Compiled /api/status in 102ms (640 modules)
+ GET /api/status 200 in 168ms
+ GET /api/bot 200 in 417ms
+ GET /api/logs?limit=50 200 in 836ms
+ GET /api/qr 200 in 842ms
+ GET /api/bot 200 in 483ms
+ GET /api/logs?limit=50 200 in 874ms
+ GET /api/status 200 in 914ms
+ GET /api/qr 200 in 915ms
+ GET /api/qr 200 in 895ms
+ GET /api/bot 200 in 1283ms
+ GET /api/qr 200 in 34ms
+ GET /api/logs?limit=50 200 in 444ms
+ GET /api/bot 200 in 827ms
+ GET /api/qr 200 in 40ms
+ GET /api/status 200 in 77ms
+ GET /api/logs?limit=50 200 in 481ms
+ GET /api/bot 200 in 1226ms
+ GET /api/bot 200 in 1222ms
+ GET /api/qr 200 in 1238ms

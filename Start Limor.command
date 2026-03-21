@@ -1,35 +1,23 @@
 #!/bin/bash
 cd "$(dirname "$0")"
 
-echo "🐾 Starting OpenClaw..."
-echo ""
-
-# Build
-npm run build
+# Build silently
+npm run build > /dev/null 2>&1
 if [ $? -ne 0 ]; then
-  echo "❌ Build failed!"
-  read -p "Press Enter to close..."
+  osascript -e 'display notification "Build failed!" with title "Limor ❌"'
   exit 1
 fi
 
-# Start Limor with PM2 (auto-restart on crash)
-npx pm2 start dist/index.js --name limor --update-env 2>/dev/null || npx pm2 restart limor
+# Start Limor with PM2 (background, auto-restart on crash)
+npx pm2 start dist/index.js --name limor --update-env --silent 2>/dev/null || npx pm2 restart limor --silent 2>/dev/null
 
-# Start Dashboard
-cd dashboard && npm run dev &
+# Start Dashboard silently
+cd dashboard && npm run dev > /dev/null 2>&1 &
 cd ..
 
 # Wait for dashboard to be ready, then open browser
 sleep 5
 open http://localhost:3848
 
-echo ""
-echo "✅ Limor + Dashboard running!"
-echo "   Dashboard: http://localhost:3848"
-echo "   PM2 logs:  npx pm2 logs limor"
-echo "   PM2 status: npx pm2 status"
-echo ""
-echo "Press Ctrl+C to stop dashboard (Limor keeps running in PM2)"
-
-trap "kill 0; exit" INT TERM
-wait
+# Notify success
+osascript -e 'display notification "Limor + Dashboard running!" with title "Limor ✅"'
