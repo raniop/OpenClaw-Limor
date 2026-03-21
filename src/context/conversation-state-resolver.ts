@@ -20,12 +20,12 @@ interface StateInput {
 export function resolveConversationState(resolved: StateInput): ConversationState {
   const { bundle, primaryFocus, actionPlan, toolIntent } = resolved;
 
-  // 1. New chat — very little history
-  if (bundle.conversation.messageCount <= 1) {
+  // 1. Correction flow — strong signal, check before new_chat
+  if (bundle.turnIntent.category === "correction") {
     return {
-      type: "new_chat",
-      summary: "תחילת שיחה",
-      reason: "מעט מאוד היסטוריה",
+      type: "correction_flow",
+      summary: "זרימת תיקון",
+      reason: "המשתמש מתקן מידע קיים",
       confidence: 0.9,
     };
   }
@@ -40,37 +40,7 @@ export function resolveConversationState(resolved: StateInput): ConversationStat
     };
   }
 
-  // 3. Owner with pending approvals
-  if (bundle.signals.includes("pending_approvals_exist") && bundle.person.isOwner) {
-    return {
-      type: "awaiting_owner_approval",
-      summary: "ממתינים לאישור בעלים",
-      reason: "יש אישורים פתוחים לטיפול",
-      confidence: 0.85,
-    };
-  }
-
-  // 4. Followup conversation
-  if (primaryFocus.type === "followup") {
-    return {
-      type: "awaiting_followup",
-      summary: "שיחת followup",
-      reason: primaryFocus.reason,
-      confidence: 0.9,
-    };
-  }
-
-  // 5. Meeting response
-  if (primaryFocus.type === "meeting") {
-    return {
-      type: "awaiting_meeting_response",
-      summary: "שיחת פגישה",
-      reason: primaryFocus.reason,
-      confidence: 0.9,
-    };
-  }
-
-  // 6. Status discussion
+  // 3. Status discussion — check before new_chat so status queries get proper state
   if (primaryFocus.type === "status") {
     return {
       type: "status_discussion",
@@ -80,12 +50,42 @@ export function resolveConversationState(resolved: StateInput): ConversationStat
     };
   }
 
-  // 7. Correction flow
-  if (bundle.turnIntent.category === "correction") {
+  // 4. New chat — very little history (and not a strong intent like correction/status)
+  if (bundle.conversation.messageCount <= 1) {
     return {
-      type: "correction_flow",
-      summary: "זרימת תיקון",
-      reason: "המשתמש מתקן מידע קיים",
+      type: "new_chat",
+      summary: "תחילת שיחה",
+      reason: "מעט מאוד היסטוריה",
+      confidence: 0.9,
+    };
+  }
+
+  // 5. Owner with pending approvals
+  if (bundle.signals.includes("pending_approvals_exist") && bundle.person.isOwner) {
+    return {
+      type: "awaiting_owner_approval",
+      summary: "ממתינים לאישור בעלים",
+      reason: "יש אישורים פתוחים לטיפול",
+      confidence: 0.85,
+    };
+  }
+
+  // 6. Followup conversation
+  if (primaryFocus.type === "followup") {
+    return {
+      type: "awaiting_followup",
+      summary: "שיחת followup",
+      reason: primaryFocus.reason,
+      confidence: 0.9,
+    };
+  }
+
+  // 7. Meeting response
+  if (primaryFocus.type === "meeting") {
+    return {
+      type: "awaiting_meeting_response",
+      summary: "שיחת פגישה",
+      reason: primaryFocus.reason,
       confidence: 0.9,
     };
   }

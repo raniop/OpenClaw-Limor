@@ -76,7 +76,17 @@ export function resolveContradictions(resolved: ContradictionInput): Contradicti
     });
   }
 
-  // 5. Urgency conflict — low priority but overdue followup exists
+  // 5. Correction override — user is correcting/cancelling a previous instruction
+  if (bundle.turnIntent.category === "correction") {
+    flags.push({
+      type: "correction_override",
+      summary: "המשתמש מתקן או מבטל הוראה קודמת",
+      resolution: "לבטל את הפעולה הקודמת ולפעול לפי ההוראה החדשה",
+      confidence: 0.9,
+    });
+  }
+
+  // 6. Urgency conflict — low priority but overdue followup exists
   if (
     bundle.urgency.priority === "low" &&
     bundle.openLoops.followups.some((f) => f.isOverdue)

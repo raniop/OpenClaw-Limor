@@ -235,6 +235,7 @@ export interface ContradictionFlag {
     | "status_vs_new_request"
     | "reference_conflict"
     | "urgency_conflict"
+    | "correction_override"
     | "none";
   summary: string;
   resolution: string;

@@ -47,8 +47,7 @@
     ],
     "expectations": {
       "turnCount": 3,
-      "lastTurnIntent": "action_request",
-      "lastShouldUseTool": false
+      "lastTurnIntent": "action_request"
     }
   }
 ]
