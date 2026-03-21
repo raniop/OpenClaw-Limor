@@ -1,0 +1,25 @@
+🐾 Starting OpenClaw...
+
+
+> openclaw@2026.3.13 build
+> rm -rf dist && tsc
+
+Use --update-env to update environment variables
+[PM2] Applying action restartProcessId on app [limor](ids: [ 0 ])
+[PM2] [limor](0) ✓
+┌────┬──────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name     │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼──────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ limor    │ default     │ 2026.3… │ fork    │ 4194     │ 0s     │ 143  │ online    │ 0%       │ 3.5mb    │ ranioph… │ disabled │
+└────┴──────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+
+> openclaw-dashboard@1.0.0 dev
+> next dev -p 3848
+
+   ▲ Next.js 15.5.13
+   - Local:        http://localhost:3848
+   - Network:      http://192.168.1.46:3848
+   - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1366ms

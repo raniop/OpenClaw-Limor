@@ -19,6 +19,10 @@ npx pm2 start dist/index.js --name limor --update-env 2>/dev/null || npx pm2 res
 cd dashboard && npm run dev &
 cd ..
 
+# Wait for dashboard to be ready, then open browser
+sleep 5
+open http://localhost:3848
+
 echo ""
 echo "✅ Limor + Dashboard running!"
 echo "   Dashboard: http://localhost:3848"
