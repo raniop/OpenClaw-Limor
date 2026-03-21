@@ -186,7 +186,44 @@ export function createWhatsAppClient(): Client {
 
   client.on("authenticated", () => { console.log("WhatsApp authenticated successfully."); });
   client.on("auth_failure", (msg: string) => { console.error("Authentication failed:", msg); });
-  client.on("disconnected", (reason: string) => { console.log("Disconnected:", reason); });
+  client.on("disconnected", (reason: string) => {
+    console.error(`[whatsapp] ⚠️ Disconnected: ${reason}. Restarting in 10 seconds...`);
+    whatsappClient = null;
+    setTimeout(() => {
+      console.log("[whatsapp] Attempting reconnect...");
+      client.initialize().catch((err) => {
+        console.error("[whatsapp] Reconnect failed, exiting for PM2 restart:", err);
+        process.exit(1); // PM2 will restart us
+      });
+    }, 10000);
+  });
+
+  // Detect stale connection — if no WhatsApp activity for 5 minutes, health check
+  let lastActivity = Date.now();
+  const originalEmit = client.emit.bind(client);
+  client.emit = function (...args: any[]) {
+    lastActivity = Date.now();
+    return originalEmit(...args);
+  } as any;
+
+  setInterval(() => {
+    const silenceMs = Date.now() - lastActivity;
+    // If no activity for 10 minutes and we think we're connected, check
+    if (silenceMs > 10 * 60 * 1000 && whatsappClient) {
+      console.warn(`[whatsapp] No activity for ${Math.round(silenceMs / 60000)} minutes. Testing connection...`);
+      client.getState().then((state) => {
+        if (state !== "CONNECTED") {
+          console.error(`[whatsapp] State is ${state}, not CONNECTED. Exiting for PM2 restart.`);
+          process.exit(1);
+        } else {
+          console.log(`[whatsapp] Health check OK — state: ${state}`);
+        }
+      }).catch((err) => {
+        console.error("[whatsapp] Health check failed, exiting for PM2 restart:", err);
+        process.exit(1);
+      });
+    }
+  }, 5 * 60 * 1000); // Check every 5 minutes
 
   client.on("message", async (msg: Message) => {
     const chatId = msg.from;
