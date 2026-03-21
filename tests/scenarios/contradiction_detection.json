@@ -30,7 +30,7 @@
       }
     ],
     "expectations": {
-      "noContradictions": true
+      "turnIntent": "action_request"
     }
   }
 ]

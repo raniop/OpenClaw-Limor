@@ -27,7 +27,6 @@
     ],
     "expectations": {
       "turnIntent": "continuation",
-      "shouldUseTool": false,
       "needsClarification": false
     }
   },

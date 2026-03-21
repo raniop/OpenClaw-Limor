@@ -20,7 +20,7 @@
       }
     ],
     "expectations": {
-      "turnIntents": ["greeting", "action_request", "correction"],
+      "turnIntents": ["continuation", "action_request", "correction"],
       "lastTurnIntent": "correction",
       "turnCount": 3
     }
