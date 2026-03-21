@@ -16,7 +16,7 @@ function resetState() {
 // We test the parts that DON'T call sendMessage — contact approval/rejection and bare approve logic.
 // Meeting approval/rejection flows that call sendMessage are integration-tested manually.
 
-import { approvalStore, meetingStore } from "../src/stores";
+import { approvalStore } from "../src/stores";
 import { parseOwnerCommand } from "../src/command-parser";
 
 describe("owner-commands (unit logic)", () => {
@@ -85,40 +85,6 @@ describe("owner-commands (unit logic)", () => {
     });
   });
 
-  describe("meeting request end-to-end", () => {
-    it("full flow: request → pending → owner approves by ID", () => {
-      // Step 1: Meeting request created
-      const id = meetingStore.addMeetingRequest("requester@lid", "יוני", "פגישה על הפרויקט", "מחר ב-10");
-      assert.ok(id.startsWith("M"));
-      assert.ok(meetingStore.hasPendingRequest("requester@lid"));
-
-      // Step 2: Owner parses approval command
-      const cmd = parseOwnerCommand(`אשר פגישה ${id}`);
-      assert.ok(cmd);
-      assert.strictEqual(cmd!.type, "approve_meeting");
-      assert.strictEqual((cmd as any).id, id);
-
-      // Step 3: Lookup by ID
-      const req = meetingStore.getMeetingRequestById(id);
-      assert.ok(req);
-      assert.strictEqual(req!.requesterName, "יוני");
-      assert.strictEqual(req!.topic, "פגישה על הפרויקט");
-    });
-
-    it("full flow: request → owner rejects by ID → request removed", () => {
-      const id = meetingStore.addMeetingRequest("requester@lid", "עמית", "שיחה");
-
-      const cmd = parseOwnerCommand(`דחה פגישה ${id}`);
-      assert.strictEqual(cmd!.type, "reject_meeting");
-
-      const removed = meetingStore.removeMeetingRequest(id);
-      assert.ok(removed);
-      assert.ok(!meetingStore.hasPendingRequest("requester@lid"));
-    });
-
-    it("invalid meeting ID returns null", () => {
-      const req = meetingStore.getMeetingRequestById("MZZZZZ");
-      assert.strictEqual(req, null);
-    });
-  });
+  // Meeting request tests removed — old FileMeetingRequestStore API (addMeetingRequest) is deprecated.
+  // Meeting system was rebuilt; see src/meetings/meeting-state.ts for the new API.
 });

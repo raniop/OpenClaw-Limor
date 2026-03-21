@@ -44,6 +44,7 @@ function makeBundle(overrides: Partial<ContextBundle> = {}): ContextBundle {
     historySummary: "שיחה רגילה.",
     system: { pendingApprovals: 0, pendingMeetings: 0, pendingFollowups: 0, pendingCapabilities: 0 },
     signals: [],
+    mood: { mood: "neutral", confidence: 0.9, signals: [] },
     ...overrides,
   };
 }
@@ -2000,7 +2001,7 @@ function makeResolvedForTrace(overrides: Partial<Omit<ResolvedContext, "debugTra
   return {
     bundle,
     primaryFocus: { type: "message", summary: "הודעה רגילה", reason: "אין פוקוס מיוחד", confidence: 0.8 },
-    responseMode: { tone: "friendly", brevity: "short", structure: "direct_answer", shouldAcknowledgeDelay: false, shouldMentionOpenLoops: false },
+    responseMode: { tone: "friendly", brevity: "short", structure: "direct_answer", register: "professional", shouldAcknowledgeDelay: false, shouldMentionOpenLoops: false },
     actionPlan: { type: "reply_only", summary: "תגובה פשוטה", reason: "אין פעולה נדרשת", confidence: 0.9, needsClarification: false },
     toolIntent: { type: "none", shouldUseTool: false, summary: "אין צורך בכלי", reason: "שיחה רגילה", confidence: 0.9 },
     memoryWriteDecision: { type: "none", shouldWrite: false, summary: "אין מה לשמור", reason: "אין עובדה חדשה", confidence: 0.8 },
@@ -2012,6 +2013,8 @@ function makeResolvedForTrace(overrides: Partial<Omit<ResolvedContext, "debugTra
     toolRoutingPolicy: { group: "none", summary: "ללא ניתוב", reason: "אין כלי", confidence: 0.9, allowedToolNames: [] },
     compressedPrompt: { sections: [{ key: "person", title: "אדם", content: ["test"], priority: "high", included: true, reason: "תמיד" }], summary: "הקשר בסיסי" },
     outcomeEvaluation: { status: "completed", summary: "הושלם", reason: "תגובה פשוטה", confidence: 0.9, requiresFollowup: false },
+    followupAutomationDecision: { action: "skip_not_needed", summary: "לא ליצור followup", reason: "לא נדרש", confidence: 0.7 },
+    domainPolicy: { domain: "general", summary: "כללי", reason: "ברירת מחדל", rules: [], confidence: 0.9 },
     ...overrides,
   };
 }
@@ -2137,7 +2140,7 @@ function makeResolvedForFollowup(overrides: Partial<Omit<ResolvedContext, "follo
   return {
     bundle,
     primaryFocus: { type: "message", summary: "הודעה רגילה", reason: "אין פוקוס מיוחד", confidence: 0.8 },
-    responseMode: { tone: "friendly", brevity: "short", structure: "direct_answer", shouldAcknowledgeDelay: false, shouldMentionOpenLoops: false },
+    responseMode: { tone: "friendly", brevity: "short", structure: "direct_answer", register: "professional", shouldAcknowledgeDelay: false, shouldMentionOpenLoops: false },
     actionPlan: { type: "reply_only", summary: "תגובה פשוטה", reason: "אין פעולה נדרשת", confidence: 0.9, needsClarification: false },
     toolIntent: { type: "none", shouldUseTool: false, summary: "אין צורך בכלי", reason: "שיחה רגילה", confidence: 0.9 },
     memoryWriteDecision: { type: "none", shouldWrite: false, summary: "אין מה לשמור", reason: "אין עובדה חדשה", confidence: 0.8 },
@@ -2150,6 +2153,7 @@ function makeResolvedForFollowup(overrides: Partial<Omit<ResolvedContext, "follo
     compressedPrompt: { sections: [{ key: "person", title: "אדם", content: ["test"], priority: "high", included: true, reason: "תמיד" }], summary: "הקשר בסיסי" },
     outcomeEvaluation: { status: "completed", summary: "הושלם", reason: "תגובה פשוטה", confidence: 0.9, requiresFollowup: false },
     debugTrace: { items: [], summary: "test" },
+    domainPolicy: { domain: "general", summary: "כללי", reason: "ברירת מחדל", rules: [], confidence: 0.9 },
     ...overrides,
   };
 }
@@ -2251,7 +2255,7 @@ function makeResolvedForDomain(overrides: Partial<Omit<ResolvedContext, "domainP
   return {
     bundle,
     primaryFocus: { type: "message", summary: "הודעה רגילה", reason: "אין פוקוס מיוחד", confidence: 0.8 },
-    responseMode: { tone: "friendly", brevity: "short", structure: "direct_answer", shouldAcknowledgeDelay: false, shouldMentionOpenLoops: false },
+    responseMode: { tone: "friendly", brevity: "short", structure: "direct_answer", register: "professional", shouldAcknowledgeDelay: false, shouldMentionOpenLoops: false },
     actionPlan: { type: "reply_only", summary: "תגובה פשוטה", reason: "אין פעולה נדרשת", confidence: 0.9, needsClarification: false },
     toolIntent: { type: "none", shouldUseTool: false, summary: "אין צורך בכלי", reason: "שיחה רגילה", confidence: 0.9 },
     memoryWriteDecision: { type: "none", shouldWrite: false, summary: "אין מה לשמור", reason: "אין עובדה חדשה", confidence: 0.8 },
