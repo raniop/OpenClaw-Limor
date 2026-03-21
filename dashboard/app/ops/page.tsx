@@ -3,12 +3,8 @@
 import { useState, useEffect } from "react";
 
 interface MetricResult {
-  name: string;
   value: number;
   status: "good" | "warning" | "fail";
-  description: string;
-  goodThreshold: number;
-  failThreshold: number;
 }
 
 interface OpsData {
@@ -20,7 +16,7 @@ interface OpsData {
   };
   passFail: {
     verdict: "pass" | "fail" | "warning";
-    gatingMetrics: Array<{ name: string; value: number; threshold: number; passed: boolean }>;
+    gatingMetrics: Array<{ name: string; value: number; threshold: number; passed: boolean; label?: string }>;
     blockers: string[];
     warnings: string[];
     summary: string;
@@ -43,17 +39,38 @@ const FLAG_LABELS: Record<string, string> = {
   response_empty: "תגובה ריקה",
 };
 
-const VERDICT_COLORS: Record<string, string> = {
-  pass: "var(--success)",
-  warning: "var(--warning)",
-  fail: "var(--danger)",
+const METRIC_LABELS: Record<string, { name: string; desc: string; unit: "percent" | "ms" | "rate" }> = {
+  tool_precision: { name: "דיוק כלים", desc: "מתוך כלים שהופעלו — כמה היו נחוצים", unit: "percent" },
+  tool_recall: { name: "כיסוי כלים", desc: "מתוך מצבים שדרשו כלי — כמה באמת הופעלו", unit: "percent" },
+  hallucination_rate: { name: "שיעור הזיות", desc: "טענות לביצוע פעולה בלי tool call", unit: "rate" },
+  task_completion_rate: { name: "השלמת משימות", desc: "אחוז משימות שהושלמו בפועל", unit: "percent" },
+  false_completion_rate: { name: "השלמות כוזבות", desc: "טענה שביצעה משימה אבל לא באמת", unit: "rate" },
+  followup_needed_rate: { name: "follow-up נדרש", desc: "אחוז שיחות שדורשות המשך", unit: "rate" },
+  self_check_critical_rate: { name: "התראות קריטיות", desc: "אחוז הודעות עם כשל קריטי", unit: "rate" },
+  avg_response_time_ms: { name: "זמן תגובה ממוצע", desc: "משך זמן ממוצע לתשובה", unit: "ms" },
+  contradiction_detection_rate: { name: "זיהוי סתירות", desc: "אחוז הודעות שזוהו בהן סתירות", unit: "rate" },
+  mood_adaptation_rate: { name: "התאמת מצב רוח", desc: "התאמת אסטרטגיה למצב רוח", unit: "rate" },
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  good: "var(--success)",
-  warning: "var(--warning)",
-  fail: "var(--danger)",
+const VERDICT_STYLES: Record<string, { bg: string; color: string; label: string }> = {
+  pass: { bg: "#dcfce7", color: "#166534", label: "✅ PASS — המערכת תקינה" },
+  warning: { bg: "#fef9c3", color: "#854d0e", label: "⚠️ WARNING — יש בעיות" },
+  fail: { bg: "#fee2e2", color: "#991b1b", label: "❌ FAIL — כשלים קריטיים" },
 };
+
+const STATUS_DOTS: Record<string, string> = {
+  good: "#22c55e",
+  warning: "#eab308",
+  fail: "#ef4444",
+};
+
+function formatValue(key: string, value: number): string {
+  const meta = METRIC_LABELS[key];
+  if (!meta) return String(value);
+  if (meta.unit === "ms") return `${Math.round(value).toLocaleString()}ms`;
+  if (meta.unit === "percent") return `${(value * 100).toFixed(1)}%`;
+  return `${(value * 100).toFixed(1)}%`; // rate
+}
 
 export default function OpsPage() {
   const [data, setData] = useState<OpsData | null>(null);
@@ -77,37 +94,38 @@ export default function OpsPage() {
     return () => clearInterval(interval);
   }, []);
 
-  if (loading) return <div><h1>Operations</h1><p>Loading...</p></div>;
-  if (error) return <div><h1>Operations</h1><p className="text-danger">Error: {error}</p></div>;
-  if (!data) return <div><h1>Operations</h1><p>No data</p></div>;
+  if (loading) return <div><h1>Operations & QA</h1><p>טוען...</p></div>;
+  if (error) return <div><h1>Operations & QA</h1><p style={{ color: "#ef4444" }}>שגיאה: {error}</p></div>;
+  if (!data) return <div><h1>Operations & QA</h1><p>אין נתונים</p></div>;
 
-  const metrics = data.metrics?.metrics ? Object.values(data.metrics.metrics) : [];
+  const metrics = data.metrics?.metrics ? Object.entries(data.metrics.metrics) : [];
+  const verdict = VERDICT_STYLES[data.passFail?.verdict] || VERDICT_STYLES.warning;
 
   return (
     <div>
       <h1>Operations & QA</h1>
-      <h2>System health, metrics, and alerts</h2>
+      <h2>בריאות המערכת, מדדים והתראות</h2>
 
       {/* Verdict Banner */}
       {data.passFail && (
         <div className="card mt-3" style={{
           padding: "16px 24px",
-          borderLeft: `4px solid ${VERDICT_COLORS[data.passFail.verdict] || "var(--text-tertiary)"}`,
+          background: verdict.bg,
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
         }}>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: VERDICT_COLORS[data.passFail.verdict] }}>
-              {data.passFail.verdict === "pass" ? "✅ PASS" : data.passFail.verdict === "warning" ? "⚠️ WARNING" : "❌ FAIL"}
+            <div style={{ fontSize: 18, fontWeight: 700, color: verdict.color }}>
+              {verdict.label}
             </div>
-            <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 4 }}>
+            <div style={{ fontSize: 13, color: verdict.color, opacity: 0.8, marginTop: 4 }}>
               {data.passFail.summary}
             </div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 24, fontWeight: 700 }}>{data.traces?.total || 0}</div>
-            <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>total traces</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: verdict.color }}>{data.traces?.last24h || 0}</div>
+            <div style={{ fontSize: 11, color: verdict.color, opacity: 0.7 }}>הודעות ב-24ש</div>
           </div>
         </div>
       )}
@@ -115,62 +133,61 @@ export default function OpsPage() {
       {/* Stats Row */}
       <div className="grid grid-3 mt-3">
         <div className="stat-card">
-          <div className="stat-label">Traces (24h)</div>
-          <div className="stat-value">{data.traces?.last24h || 0}</div>
+          <div className="stat-label">סה&quot;כ traces</div>
+          <div className="stat-value">{data.traces?.total || 0}</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Critical Alerts</div>
-          <div className="stat-value" style={{ color: (data.recentAlerts?.length || 0) > 0 ? "var(--danger)" : "var(--success)" }}>
+          <div className="stat-label">התראות קריטיות</div>
+          <div className="stat-value" style={{ color: (data.recentAlerts?.length || 0) > 0 ? "#ef4444" : "#22c55e" }}>
             {data.recentAlerts?.length || 0}
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Top Failure</div>
+          <div className="stat-label">כשל מוביל</div>
           <div className="stat-value" style={{ fontSize: 14 }}>
-            {data.topFailures?.[0] ? FLAG_LABELS[data.topFailures[0]] || data.topFailures[0] : "None"}
+            {data.topFailures?.[0] ? FLAG_LABELS[data.topFailures[0]] || data.topFailures[0] : "אין 🎉"}
           </div>
         </div>
       </div>
 
       {/* Metrics Table */}
-      <div className="section-header mt-4">Metrics</div>
+      <div className="section-header mt-4">מדדים</div>
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         {metrics.length === 0 ? (
-          <div className="empty-state">No metrics yet — need more traces</div>
+          <div className="empty-state">אין מדדים עדיין — צריך יותר traces</div>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                <th style={{ padding: "10px 14px", fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", textAlign: "start", borderBottom: "1px solid var(--glass-border)" }}>Metric</th>
-                <th style={{ padding: "10px 14px", fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", textAlign: "center", borderBottom: "1px solid var(--glass-border)" }}>Value</th>
-                <th style={{ padding: "10px 14px", fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", textAlign: "center", borderBottom: "1px solid var(--glass-border)" }}>Status</th>
-                <th style={{ padding: "10px 14px", fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", textAlign: "start", borderBottom: "1px solid var(--glass-border)" }}>Thresholds</th>
+                <th style={{ padding: "10px 14px", fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textAlign: "start", borderBottom: "1px solid var(--glass-border)" }}>מדד</th>
+                <th style={{ padding: "10px 14px", fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textAlign: "center", borderBottom: "1px solid var(--glass-border)" }}>ערך</th>
+                <th style={{ padding: "10px 14px", fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textAlign: "center", borderBottom: "1px solid var(--glass-border)" }}>סטטוס</th>
               </tr>
             </thead>
             <tbody>
-              {metrics.map((m) => (
-                <tr key={m.name} style={{ borderBottom: "1px solid var(--glass-border)" }}>
-                  <td style={{ padding: "10px 14px" }}>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{m.name}</div>
-                    <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{m.description}</div>
-                  </td>
-                  <td style={{ padding: "10px 14px", textAlign: "center", fontWeight: 700, fontSize: 16, fontFamily: "monospace" }}>
-                    {typeof m.value === "number" ? (m.value > 100 ? Math.round(m.value) : (m.value * 100).toFixed(1) + "%") : "—"}
-                  </td>
-                  <td style={{ padding: "10px 14px", textAlign: "center" }}>
-                    <span style={{
-                      display: "inline-block",
-                      width: 8,
-                      height: 8,
-                      borderRadius: "50%",
-                      background: STATUS_COLORS[m.status] || "var(--text-tertiary)",
-                    }} />
-                  </td>
-                  <td style={{ padding: "10px 14px", fontSize: 11, color: "var(--text-tertiary)" }}>
-                    Good: {m.goodThreshold > 100 ? `<${m.goodThreshold}` : `>${(m.goodThreshold * 100).toFixed(0)}%`} | Fail: {m.failThreshold > 100 ? `>${m.failThreshold}` : `<${(m.failThreshold * 100).toFixed(0)}%`}
-                  </td>
-                </tr>
-              ))}
+              {metrics.map(([key, m]) => {
+                const meta = METRIC_LABELS[key] || { name: key, desc: "", unit: "percent" as const };
+                return (
+                  <tr key={key} style={{ borderBottom: "1px solid var(--glass-border)" }}>
+                    <td style={{ padding: "10px 14px" }}>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>{meta.name}</div>
+                      <div style={{ fontSize: 11, color: "var(--text-tertiary)" }}>{meta.desc}</div>
+                    </td>
+                    <td style={{ padding: "10px 14px", textAlign: "center", fontWeight: 700, fontSize: 16, fontFamily: "monospace" }}>
+                      {formatValue(key, m.value)}
+                    </td>
+                    <td style={{ padding: "10px 14px", textAlign: "center" }}>
+                      <span style={{
+                        display: "inline-block",
+                        width: 10,
+                        height: 10,
+                        borderRadius: "50%",
+                        background: STATUS_DOTS[m.status] || "#9ca3af",
+                      }} />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
@@ -179,17 +196,20 @@ export default function OpsPage() {
       {/* Gating Metrics */}
       {data.passFail?.gatingMetrics && data.passFail.gatingMetrics.length > 0 && (
         <>
-          <div className="section-header mt-4">Gating Metrics (must pass to ship)</div>
+          <div className="section-header mt-4">Gating Metrics (חייבים לעבור)</div>
           <div className="card" style={{ padding: "12px 20px", display: "flex", gap: 24, flexWrap: "wrap" }}>
             {data.passFail.gatingMetrics.map((g) => (
               <div key={g.name} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{
-                  width: 8, height: 8, borderRadius: "50%",
-                  background: g.passed ? "var(--success)" : "var(--danger)",
+                  width: 10, height: 10, borderRadius: "50%",
+                  background: g.passed ? "#22c55e" : "#ef4444",
                 }} />
-                <span style={{ fontSize: 13, fontWeight: 600 }}>{g.name}</span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{g.label || METRIC_LABELS[g.name]?.name || g.name}</span>
                 <span style={{ fontSize: 12, color: "var(--text-tertiary)", fontFamily: "monospace" }}>
-                  {(g.value * 100).toFixed(1)}% (threshold: {(g.threshold * 100).toFixed(0)}%)
+                  {g.name === "avg_response_time_ms"
+                    ? `${Math.round(g.value).toLocaleString()}ms`
+                    : `${(g.value * 100).toFixed(1)}%`
+                  }
                 </span>
               </div>
             ))}
@@ -198,17 +218,17 @@ export default function OpsPage() {
       )}
 
       {/* Recent Alerts */}
-      <div className="section-header mt-4">Recent Alerts</div>
+      <div className="section-header mt-4">התראות אחרונות</div>
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         {(!data.recentAlerts || data.recentAlerts.length === 0) ? (
-          <div className="empty-state">No alerts — system healthy</div>
+          <div className="empty-state">אין התראות — המערכת בריאה 🎉</div>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr>
-                <th style={{ padding: "10px 14px", fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", textAlign: "start", borderBottom: "1px solid var(--glass-border)" }}>Time</th>
-                <th style={{ padding: "10px 14px", fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", textAlign: "start", borderBottom: "1px solid var(--glass-border)" }}>Contact</th>
-                <th style={{ padding: "10px 14px", fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", textAlign: "start", borderBottom: "1px solid var(--glass-border)" }}>Flag</th>
+                <th style={{ padding: "10px 14px", fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textAlign: "start", borderBottom: "1px solid var(--glass-border)" }}>שעה</th>
+                <th style={{ padding: "10px 14px", fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textAlign: "start", borderBottom: "1px solid var(--glass-border)" }}>איש קשר</th>
+                <th style={{ padding: "10px 14px", fontSize: 11, fontWeight: 600, color: "var(--text-tertiary)", textAlign: "start", borderBottom: "1px solid var(--glass-border)" }}>בעיה</th>
               </tr>
             </thead>
             <tbody>
@@ -216,7 +236,7 @@ export default function OpsPage() {
                 <tr key={i} style={{ borderBottom: "1px solid var(--glass-border)" }}>
                   <td style={{ padding: "8px 14px", fontSize: 12, fontFamily: "monospace" }}>{new Date(a.timestamp).toLocaleTimeString("he-IL")}</td>
                   <td style={{ padding: "8px 14px", fontSize: 13 }}>{a.contact}</td>
-                  <td style={{ padding: "8px 14px", fontSize: 12, color: "var(--danger)" }}>{FLAG_LABELS[a.flag] || a.flag}</td>
+                  <td style={{ padding: "8px 14px", fontSize: 12, color: "#ef4444" }}>{FLAG_LABELS[a.flag] || a.flag}</td>
                 </tr>
               ))}
             </tbody>
@@ -227,12 +247,12 @@ export default function OpsPage() {
       {/* Top Recurring Failures */}
       {data.topFailures && data.topFailures.length > 0 && (
         <>
-          <div className="section-header mt-4">Top Recurring Failures</div>
+          <div className="section-header mt-4">כשלים חוזרים</div>
           <div className="card" style={{ padding: "12px 20px" }}>
             {data.topFailures.map((f, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0" }}>
-                <span style={{ fontSize: 14 }}>#{i + 1}</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--danger)" }}>{FLAG_LABELS[f] || f}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#ef4444" }}>#{i + 1}</span>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{FLAG_LABELS[f] || f}</span>
               </div>
             ))}
           </div>

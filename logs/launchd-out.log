@@ -392,3 +392,126 @@ Press Ctrl+C to stop dashboard (Limor keeps running in PM2)
  ✓ Compiled /api/daily-summaries in 119ms (649 modules)
  GET /api/daily-summaries 200 in 152ms
  GET /api/daily-summaries 200 in 153ms
+ GET / 200 in 513ms
+ GET /api/qr 200 in 35ms
+ GET /api/qr 200 in 35ms
+ GET /api/logs?limit=50 200 in 422ms
+ GET /api/bot 200 in 1166ms
+ GET /api/bot 200 in 1166ms
+ GET /api/ops 200 in 1174ms
+ GET /api/status 200 in 79ms
+ GET /api/status 200 in 76ms
+ GET /api/ops 200 in 80ms
+ GET /api/logs?limit=50 200 in 455ms
+ GET /api/qr 200 in 460ms
+ GET /api/qr 200 in 459ms
+ GET /api/bot 200 in 1138ms
+ GET /api/bot 200 in 1138ms
+ GET /api/bot 200 in 440ms
+ GET /api/logs?limit=50 200 in 826ms
+ GET /api/qr 200 in 829ms
+ ✓ Compiled /ops in 219ms (654 modules)
+ GET /ops 200 in 270ms
+ GET /api/ops 200 in 18ms
+ GET /api/ops 200 in 18ms
+ GET /api/ops 200 in 31ms
+ ✓ Compiled /sms in 216ms (662 modules)
+ GET /sms 200 in 446ms
+ ✓ Compiled /telegram in 153ms (664 modules)
+ GET /telegram 200 in 230ms
+ GET /telegram 200 in 189ms
+ ✓ Compiled /activity in 201ms (658 modules)
+ GET /activity 200 in 290ms
+ ✓ Compiled /capabilities in 333ms (666 modules)
+ GET /capabilities 200 in 384ms
+ GET / 200 in 462ms
+ ✓ Compiled /api/logs in 161ms (426 modules)
+ ✓ Compiled (430 modules)
+ GET /api/logs?limit=50 200 in 705ms
+ GET /api/bot 200 in 1494ms
+ GET /api/bot 200 in 1490ms
+ GET /api/ops 200 in 1498ms
+ GET /api/qr 200 in 1552ms
+ GET /api/qr 200 in 1563ms
+ ✓ Compiled /api/status in 333ms (432 modules)
+ GET /api/bot 200 in 1335ms
+ GET /api/logs?limit=50 200 in 1296ms
+ GET /api/ops 200 in 1296ms
+ GET /api/qr 200 in 1339ms
+ GET /api/qr 200 in 1339ms
+ GET /api/status 200 in 1374ms
+ GET /api/bot 200 in 428ms
+ GET /api/status 200 in 464ms
+ ✓ Compiled /approvals in 334ms (682 modules)
+ GET /approvals 200 in 790ms
+ GET /approvals 200 in 69ms
+ GET /approvals 200 in 827ms
+ ✓ Compiled /followups in 259ms (693 modules)
+ GET /followups 200 in 318ms
+ GET /activity 200 in 115ms
+ GET / 200 in 428ms
+ GET /api/qr 200 in 20ms
+ GET /api/bot 200 in 404ms
+ GET /api/ops 200 in 411ms
+ GET /api/logs?limit=50 200 in 808ms
+ GET /api/qr 200 in 812ms
+ GET /api/status 200 in 846ms
+ GET /api/bot 200 in 447ms
+ GET /api/ops 200 in 451ms
+ GET /api/qr 200 in 456ms
+ GET /api/qr 200 in 460ms
+ GET /api/logs?limit=50 200 in 843ms
+ GET /api/status 200 in 839ms
+ GET /api/bot 200 in 801ms
+ GET /api/bot 200 in 795ms
+ GET /activity 200 in 80ms
+ GET /capabilities 200 in 47ms
+ ✓ Compiled /digests in 303ms (690 modules)
+ GET /digests 200 in 388ms
+ ✓ Compiled /summaries in 204ms (437 modules)
+ GET /summaries 200 in 277ms
+ ✓ Compiled /api/daily-summaries in 232ms (439 modules)
+ GET /api/daily-summaries 200 in 269ms
+ GET /api/daily-summaries 200 in 271ms
+ ✓ Compiled /contacts in 321ms (688 modules)
+ GET /contacts 200 in 388ms
+ GET /telegram 200 in 59ms
+ ✓ Compiled /ops in 235ms (446 modules)
+ GET /ops 200 in 292ms
+ GET /api/ops 200 in 15ms
+ GET /api/ops 200 in 19ms
+ GET / 200 in 477ms
+ GET /api/bot 200 in 408ms
+ GET /api/qr 200 in 410ms
+ GET /api/ops 200 in 423ms
+ GET /api/logs?limit=50 200 in 813ms
+ GET /api/qr 200 in 818ms
+ GET /api/status 200 in 851ms
+ GET /api/bot 200 in 843ms
+ GET /api/qr 200 in 849ms
+ GET /api/qr 200 in 446ms
+ GET /api/ops 200 in 413ms
+ GET /api/bot 200 in 812ms
+ GET /api/logs?limit=50 200 in 783ms
+ GET /api/status 200 in 811ms
+ GET /api/bot 200 in 1177ms
+ GET /api/bot 200 in 396ms
+ GET /api/logs?limit=50 200 in 752ms
+ GET /api/qr 200 in 755ms
+ GET /api/bot 200 in 419ms
+ GET /api/qr 200 in 420ms
+ GET /api/bot 200 in 770ms
+ GET /api/status 200 in 805ms
+ GET /api/logs?limit=50 200 in 1173ms
+ GET /api/qr 200 in 1174ms
+ ✓ Compiled in 398ms (693 modules)
+ GET /api/qr 200 in 39ms
+ GET /api/bot 200 in 413ms
+ GET /api/logs?limit=50 200 in 795ms
+ GET /api/bot 200 in 422ms
+ GET /api/status 200 in 450ms
+ GET /api/qr 200 in 456ms
+ GET /api/qr 200 in 449ms
+ GET /api/logs?limit=50 200 in 849ms
+ GET /api/bot 200 in 1236ms
+ GET /api/qr 200 in 26ms

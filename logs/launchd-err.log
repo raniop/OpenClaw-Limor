@@ -6,3 +6,6 @@
    * /Users/raniophir/Open Claude Bot AI/dashboard/package-lock.json
    * /Users/raniophir/Open Claude Bot AI/package-lock.json
 
+Traceback (most recent call last):
+  File "<stdin>", line 19, in <module>
+sqlite3.OperationalError: unable to open database file
