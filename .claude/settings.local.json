@@ -219,7 +219,8 @@
       "Bash(python3:*)",
       "Bash(kill 45187)",
       "Bash(kill 47007)",
-      "Bash(pip3 install:*)"
+      "Bash(pip3 install:*)",
+      "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); [print\\(k\\) for k in data.get\\(''''approved'''',data\\) if ''''oron'''' in str\\(k\\).lower\\(\\) or ''''דורון'''' in str\\(k\\).lower\\(\\)]\")"
     ]
   }
 }

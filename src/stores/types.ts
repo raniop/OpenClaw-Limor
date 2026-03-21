@@ -29,8 +29,13 @@ export interface IApprovalStore {
   getPendingCount(): number;
 }
 
-// --- Meeting Requests ---
+// --- Meeting Requests (v2 — delegates to meetings/meeting-state.ts) ---
 
+export type { MeetingRequest as MeetingRequestV2 } from "../meetings/meeting-state";
+
+/**
+ * Legacy meeting request shape for backward compatibility.
+ */
 export interface MeetingRequest {
   requesterChatId: string;
   requesterName: string;
@@ -43,19 +48,22 @@ export interface MeetingRequestWithId extends MeetingRequest {
   id: string;
 }
 
-export interface IMeetingRequestStore {
+/**
+ * Meeting store interface v2.
+ * Backed by the state machine in meetings/meeting-state.ts.
+ */
+export interface IMeetingStore {
   hasPendingRequest(requesterChatId: string): boolean;
-  addMeetingRequest(
-    requesterChatId: string,
-    requesterName: string,
-    topic: string,
-    preferredTime?: string
-  ): string; // returns id
-  getMeetingRequestById(id: string): MeetingRequestWithId | null;
+  createRequest(chatId: string, contactName: string, topic: string, preferredTime?: string): Promise<{ id: string; alreadyPending: boolean }>;
+  approve(id: string, date?: string, time?: string): Promise<{ success: boolean; error?: string; needsDateTime?: boolean }>;
+  reject(id: string, reason?: string): Promise<{ success: boolean; error?: string }>;
+  getMeetingById(id: string): MeetingRequestWithId | null;
   getLastMeetingRequest(): MeetingRequestWithId | null;
   getMeetingRequestCount(): number;
-  removeMeetingRequest(id: string): MeetingRequest | null;
 }
+
+/** @deprecated Use IMeetingStore */
+export type IMeetingRequestStore = IMeetingStore;
 
 // --- Conversations ---
 

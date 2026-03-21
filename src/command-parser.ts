@@ -6,8 +6,8 @@
 export type OwnerCommand =
   | { type: "approve_contact"; code: string }
   | { type: "reject_contact"; code: string }
-  | { type: "approve_meeting"; id: string }
-  | { type: "reject_meeting"; id: string }
+  | { type: "approve_meeting"; id: string; extraText?: string }
+  | { type: "reject_meeting"; id: string; reason?: string }
   | { type: "approve_capability"; id: string }
   | { type: "reject_capability"; id: string }
   | { type: "bare_approve" }
@@ -32,16 +32,25 @@ export function parseOwnerCommand(body: string): OwnerCommand {
     return { type: "reject_contact", code: contactReject[1].toUpperCase() };
   }
 
-  // "אשר פגישה MXXXXX" / "approve meeting MXXXXX"
-  const meetingApprove = lower.match(/^(?:אשר(?:\s+פגישה)?)\s+(M[A-Za-z0-9]{4,7})$/i);
+  // "אשר פגישה MXXXXX" or "אשר פגישה MXXXXX מחר ב-14:00"
+  // Note: uses original body for extraText to preserve Hebrew casing
+  const meetingApprove = body.match(/^(?:אשר(?:\s+פגישה)?)\s+(M[A-Za-z0-9]{4,7})(?:\s+(.+))?$/i);
   if (meetingApprove) {
-    return { type: "approve_meeting", id: meetingApprove[1].toUpperCase() };
+    return {
+      type: "approve_meeting",
+      id: meetingApprove[1].toUpperCase(),
+      extraText: meetingApprove[2]?.trim() || undefined,
+    };
   }
 
-  // "דחה פגישה MXXXXX"
-  const meetingReject = lower.match(/^(?:דחה(?:\s+פגישה)?)\s+(M[A-Za-z0-9]{4,7})$/i);
+  // "דחה פגישה MXXXXX" or "דחה פגישה MXXXXX [reason]"
+  const meetingReject = body.match(/^(?:דחה(?:\s+פגישה)?)\s+(M[A-Za-z0-9]{4,7})(?:\s+(.+))?$/i);
   if (meetingReject) {
-    return { type: "reject_meeting", id: meetingReject[1].toUpperCase() };
+    return {
+      type: "reject_meeting",
+      id: meetingReject[1].toUpperCase(),
+      reason: meetingReject[2]?.trim() || undefined,
+    };
   }
 
   // "אשר יכולת cap-XXXX" / "approve capability cap-XXXX"

@@ -3,7 +3,8 @@
  * Replaces boolean "hasFollowup" with concrete task descriptions.
  */
 import { getPendingFollowups, getDueFollowups } from "../followups";
-import { meetingStore, conversationStore } from "../stores";
+import { conversationStore } from "../stores";
+import { getActiveMeeting } from "../meetings";
 import type { OpenLoopContext } from "./context-types";
 
 /**
@@ -26,14 +27,14 @@ export function resolveOpenLoops(chatId: string): OpenLoopContext {
     requesterName: f.requesterName,
   }));
 
-  // Check for pending meeting request from this chat
+  // Check for pending meeting request from this chat (uses state machine)
   let pendingMeeting: OpenLoopContext["pendingMeeting"];
-  const lastMeeting = meetingStore.getLastMeetingRequest();
-  if (lastMeeting && lastMeeting.requesterChatId === chatId) {
+  const activeMeeting = getActiveMeeting(chatId);
+  if (activeMeeting) {
     pendingMeeting = {
-      requesterName: lastMeeting.requesterName,
-      topic: lastMeeting.topic,
-      id: lastMeeting.id,
+      requesterName: activeMeeting.contactName,
+      topic: activeMeeting.topic,
+      id: activeMeeting.id,
     };
   }
 

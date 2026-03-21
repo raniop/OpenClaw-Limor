@@ -5,7 +5,8 @@
  */
 import { createEvent, listEvents } from "../calendar";
 import { sendCalendarInviteEmail } from "../email";
-import { approvalStore, meetingStore } from "../stores";
+import { approvalStore } from "../stores";
+import { createMeetingRequest } from "../meetings";
 import { searchAvailability, bookOntopo } from "../ontopo";
 import { searchTabit, bookTabit } from "../tabit";
 import { findContactByName, findContactByPhone, getRecentContacts, addManualContact, listAllContacts, removeContact } from "../contacts";
@@ -53,10 +54,14 @@ export async function handleToolCall(
     logAudit(actor, "tool_call", name, "started", { input: Object.keys(input) });
 
     if (name === "create_event") {
+      // Block non-owner contacts from creating events directly
+      if (!sender?.isOwner) {
+        return "❌ רק רני יכול ליצור אירועים ביומן ישירות. השתמשי ב-request_meeting.";
+      }
       const start = new Date(input.start_date);
       const durationMs = (input.duration_minutes || 60) * 60 * 1000;
       const end = new Date(start.getTime() + durationMs);
-      await createEvent(input.title, start, end);
+      const result = await createEvent(input.title, start, end);
       return `אירוע "${input.title}" נוצר בהצלחה ליום ${start.toLocaleDateString("he-IL")} בשעה ${start.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}`;
     }
     if (name === "list_events") {
@@ -64,26 +69,27 @@ export async function handleToolCall(
       return await listEvents(date);
     }
     if (name === "request_meeting") {
-      const requesterName = sender?.name || "מישהו";
+      // Block owner from using request_meeting (owner should use create_event directly)
+      if (sender?.isOwner) {
+        return "❌ אתה הבעלים — השתמש ב-create_event ישירות כדי לקבוע אירוע ביומן.";
+      }
+
+      const contactName = sender?.name || "מישהו";
       const chatId = sender?.chatId || "";
 
-      if (meetingStore.hasPendingRequest(chatId)) {
-        return `כבר שלחתי בקשה לרני בנושא הזה. מחכים לתשובה שלו – לא צריך לשלוח שוב.`;
+      // State machine handles duplicate check, owner notification, and state transitions
+      const { id, alreadyPending } = await createMeetingRequest(
+        chatId,
+        contactName,
+        input.topic,
+        input.preferred_time
+      );
+
+      if (alreadyPending) {
+        return `כבר שלחתי בקשה לרני בנושא הזה (${id}). מחכים לתשובה שלו – לא צריך לשלוח שוב.`;
       }
 
-      const meetingId = meetingStore.addMeetingRequest(chatId, requesterName, input.topic, input.preferred_time);
-
-      const timeInfo = input.preferred_time ? `\n⏰ זמן מועדף: ${input.preferred_time}` : "";
-      const ownerMsg = `📅 בקשת פגישה חדשה! (${meetingId})\n👤 ${requesterName} רוצה לקבוע פגישה עם רני\n📋 נושא: ${input.topic}${timeInfo}\n\n✅ לאשר: *אשר פגישה ${meetingId}*\nאו פשוט ענה עם תאריך ושעה ואני אסדר הכל 😊\n\n💡 הצעות: *אשר* / *דחה פגישה ${meetingId}* / *נדבר מחר*`;
-
-      if (getNotifyOwnerCallback()) {
-        getNotifyOwnerCallback()!(ownerMsg).catch((err) =>
-          console.error("Failed to notify owner:", err)
-        );
-      }
-
-      logAudit(requesterName, "meeting_request", meetingId, "created");
-      return `בקשת פגישה נשלחה לרני. הוא יחזור עם זמן מתאים.`;
+      return `בקשת פגישה נשלחה לרני (${id}). הוא יחזור עם זמן מתאים.`;
     }
     if (name === "notify_owner") {
       if (getNotifyOwnerCallback()) {

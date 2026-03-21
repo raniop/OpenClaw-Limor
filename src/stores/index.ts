@@ -6,6 +6,7 @@
 export type {
   IApprovalStore,
   IMeetingRequestStore,
+  IMeetingStore,
   IConversationStore,
   PendingEntry,
   PendingEntryWithCode,

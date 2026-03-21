@@ -12,11 +12,16 @@ function getCalendarClient() {
   return google.calendar({ version: "v3", auth: oauth2Client });
 }
 
+export interface CreateEventResult {
+  eventId: string;
+  summary: string;
+}
+
 export async function createEvent(
   title: string,
   startDate: Date,
   endDate: Date
-): Promise<string> {
+): Promise<CreateEventResult> {
   const calendar = getCalendarClient();
   const event = await calendar.events.insert({
     calendarId: "primary",
@@ -32,7 +37,10 @@ export async function createEvent(
       },
     },
   });
-  return event.data.summary || title;
+  return {
+    eventId: event.data.id || "",
+    summary: event.data.summary || title,
+  };
 }
 
 export async function listEvents(

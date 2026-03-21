@@ -1,14 +1,15 @@
 /**
  * Owner command handling — approval/rejection of contacts and meeting requests.
+ * Meeting approval now delegates to the meeting state machine (code-enforced, not AI-prompted).
  */
-import { sendMessage } from "../ai";
 import { parseOwnerCommand } from "../command-parser";
-import { getMemoryContext } from "../memory";
-import { approvalStore, meetingStore, conversationStore } from "../stores";
+import { approvalStore } from "../stores";
 import { log } from "../logger";
 import type { TraceContext } from "../observability";
-import { approveSpec, rejectSpec, getSpec } from "../capabilities";
+import { approveSpec, rejectSpec } from "../capabilities";
 import { generateDailyDigest } from "../digest";
+import { getMeetingById, approveMeeting, rejectMeeting } from "../meetings";
+import { parseHebrewTime } from "../meetings";
 
 interface OwnerCommandContext {
   chatId: string;
@@ -74,29 +75,70 @@ export async function handleOwnerCommand(ctx: OwnerCommandContext): Promise<bool
     // pendingCount === 0: fall through
   }
 
-  // --- Meeting approval by ID ---
+  // --- Meeting approval by ID (state-machine enforced) ---
   if (cmd?.type === "approve_meeting") {
-    const meetingReq = meetingStore.getMeetingRequestById(cmd.id);
-    if (!meetingReq) {
+    const meeting = getMeetingById(cmd.id);
+    if (!meeting) {
       await ctx.reply(`❌ לא מצאתי בקשת פגישה עם קוד ${cmd.id}.`);
       return true;
     }
-    // Extract time from Rani's message if present (e.g. "14:00", "ב-15:30")
-    const timeMatch = ctx.body.match(/(\d{1,2}:\d{2})/);
-    const approvedTime = timeMatch ? timeMatch[1] : undefined;
-    meetingStore.approveMeeting(meetingReq.id, approvedTime);
-    await handleMeetingResponse(ctx.chatId, ctx.body, meetingReq, ctx.reply);
+
+    // Parse date/time from extra text in owner's command
+    let date: string | undefined;
+    let time: string | undefined;
+
+    if (cmd.extraText) {
+      const parsed = parseHebrewTime(cmd.extraText);
+      if (parsed) {
+        date = parsed.date;
+        time = parsed.time;
+      }
+    }
+
+    // The state machine handles everything: create event + notify contact
+    const result = await approveMeeting(cmd.id, date, time);
+
+    if (result.needsDateTime) {
+      await ctx.reply(`📅 באיזה תאריך ושעה?\nלמשל: *אשר פגישה ${cmd.id} מחר ב-14:00*`);
+      return true;
+    }
+
+    if (!result.success) {
+      await ctx.reply(`❌ ${result.error}`);
+      return true;
+    }
+
+    // Success — event created + contact notified (all done by state machine)
+    const dateFormatted = date
+      ? new Date(`${date}T${time || "12:00"}:00`).toLocaleDateString("he-IL", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+        })
+      : "";
+    await ctx.reply(
+      `✅ אושר! פגישה עם ${meeting.contactName} נקבעה${dateFormatted ? ` ל-${dateFormatted}` : ""}${time ? ` בשעה ${time}` : ""}.\nאירוע נוצר ביומן + הודעה נשלחה ל${meeting.contactName}.`
+    );
     return true;
   }
 
-  // --- Meeting rejection by ID ---
+  // --- Meeting rejection by ID (state-machine enforced) ---
   if (cmd?.type === "reject_meeting") {
-    const req = meetingStore.removeMeetingRequest(cmd.id);
-    if (req) {
-      await ctx.reply(`🚫 דחיתי את בקשת הפגישה מ-${req.requesterName} (${cmd.id}).`);
-    } else {
+    const meeting = getMeetingById(cmd.id);
+    if (!meeting) {
       await ctx.reply(`❌ לא מצאתי בקשת פגישה עם קוד ${cmd.id}.`);
+      return true;
     }
+
+    // State machine handles: update state + notify contact
+    const result = await rejectMeeting(cmd.id, cmd.reason);
+
+    if (!result.success) {
+      await ctx.reply(`❌ ${result.error}`);
+      return true;
+    }
+
+    await ctx.reply(`🚫 דחיתי את בקשת הפגישה מ-${meeting.contactName} (${cmd.id}).`);
     return true;
   }
 
@@ -140,24 +182,5 @@ export async function handleOwnerCommand(ctx: OwnerCommandContext): Promise<bool
     return true;
   }
 
-  // Legacy meeting fallback removed — was intercepting unrelated owner messages.
-  // Meeting responses now handled through the normal AI flow with tools.
-
   return false;
-}
-
-/** Send owner's response to AI with meeting context injected. */
-async function handleMeetingResponse(
-  chatId: string,
-  body: string,
-  meetingReq: { requesterName: string; requesterChatId: string; topic: string; preferredTime?: string; id: string },
-  reply: (text: string) => Promise<void>
-): Promise<void> {
-  conversationStore.addMessage(chatId, "user", body);
-  const memoryContext = getMemoryContext(chatId);
-  const history = conversationStore.getHistory(chatId);
-  const meetingContext = `\n\nהקשר: יש בקשת פגישה פתוחה (${meetingReq.id}) מ-${meetingReq.requesterName} (chatId: ${meetingReq.requesterChatId}) בנושא "${meetingReq.topic}"${meetingReq.preferredTime ? ` (זמן מועדף: ${meetingReq.preferredTime})` : ""}. רני עכשיו עונה לגבי הזמינות שלו. אם הוא אישר או נתן תאריך ושעה – עשי את שני הדברים האלה: (1) קבעי את הפגישה ביומן עם create_event (2) שלחי הודעה ל-${meetingReq.requesterName} עם send_message שרני אישר ומתי הפגישה. חשוב: עשי את שניהם!`;
-  const response = await sendMessage(history, (memoryContext || "") + meetingContext, { chatId, name: "רני", isOwner: true });
-  conversationStore.addMessage(chatId, "assistant", response);
-  await reply(response);
 }

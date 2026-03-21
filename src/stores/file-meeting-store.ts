@@ -1,64 +1,105 @@
 /**
- * File-based implementation of IMeetingRequestStore.
- * Delegates to the existing meeting-requests.ts module — no logic duplication.
+ * File-based meeting store v2.
+ * Delegates entirely to the meeting state machine.
+ * Provides backward-compatible interface for existing consumers.
  */
-import type { IMeetingRequestStore, MeetingRequest, MeetingRequestWithId } from "./types";
+import type { IMeetingStore, MeetingRequestWithId } from "./types";
 import {
-  hasPendingRequest,
-  addMeetingRequest,
-  getMeetingRequestById,
-  getLastMeetingRequest,
-  getMeetingRequestCount,
-  removeMeetingRequest,
-  isApprovedMeeting,
-  getApprovedMeeting,
+  hasPendingMeeting,
+  createMeetingRequest,
   approveMeeting,
-  completeApprovedMeeting,
-} from "../meeting-requests";
+  rejectMeeting,
+  getMeetingById,
+  getLastMeetingRequest,
+  getPendingMeetingCount,
+} from "../meetings/meeting-state";
 
-export class FileMeetingRequestStore implements IMeetingRequestStore {
+export class FileMeetingRequestStore implements IMeetingStore {
   hasPendingRequest(requesterChatId: string): boolean {
-    return hasPendingRequest(requesterChatId);
+    return hasPendingMeeting(requesterChatId);
   }
 
-  addMeetingRequest(
-    requesterChatId: string,
-    requesterName: string,
+  async createRequest(
+    chatId: string,
+    contactName: string,
     topic: string,
     preferredTime?: string
-  ): string {
-    return addMeetingRequest(requesterChatId, requesterName, topic, preferredTime);
+  ): Promise<{ id: string; alreadyPending: boolean }> {
+    return createMeetingRequest(chatId, contactName, topic, preferredTime);
   }
 
+  async approve(
+    id: string,
+    date?: string,
+    time?: string
+  ): Promise<{ success: boolean; error?: string; needsDateTime?: boolean }> {
+    return approveMeeting(id, date, time);
+  }
+
+  async reject(
+    id: string,
+    reason?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    return rejectMeeting(id, reason);
+  }
+
+  getMeetingById(id: string): MeetingRequestWithId | null {
+    const m = getMeetingById(id);
+    if (!m) return null;
+    return {
+      id: m.id,
+      requesterChatId: m.chatId,
+      requesterName: m.contactName,
+      topic: m.topic,
+      preferredTime: m.preferredTime,
+      createdAt: m.createdAt,
+    };
+  }
+
+  /** @deprecated Use getMeetingById */
   getMeetingRequestById(id: string): MeetingRequestWithId | null {
-    return getMeetingRequestById(id);
+    return this.getMeetingById(id);
   }
 
   getLastMeetingRequest(): MeetingRequestWithId | null {
-    return getLastMeetingRequest();
+    const m = getLastMeetingRequest();
+    if (!m) return null;
+    return {
+      id: m.id,
+      requesterChatId: m.chatId,
+      requesterName: m.contactName,
+      topic: m.topic,
+      preferredTime: m.preferredTime,
+      createdAt: m.createdAt,
+    };
   }
 
   getMeetingRequestCount(): number {
-    return getMeetingRequestCount();
+    return getPendingMeetingCount();
   }
 
-  removeMeetingRequest(id: string): MeetingRequest | null {
-    return removeMeetingRequest(id);
+  /** @deprecated No longer needed — state machine handles removal via state transitions */
+  removeMeetingRequest(_id: string): null {
+    return null;
   }
 
-  isApproved(chatId: string): boolean {
-    return isApprovedMeeting(chatId);
+  /** @deprecated Use approve/reject instead */
+  approveMeeting(_id: string, _approvedTime?: string): void {
+    // No-op — use approve() instead
   }
 
-  getApprovedMeeting(chatId: string): { approvedTime?: string } | null {
-    return getApprovedMeeting(chatId);
+  /** @deprecated */
+  isApproved(_chatId: string): boolean {
+    return false;
   }
 
-  approveMeeting(id: string, approvedTime?: string): void {
-    approveMeeting(id, approvedTime);
+  /** @deprecated */
+  getApprovedMeeting(_chatId: string): null {
+    return null;
   }
 
-  completeApprovedMeeting(chatId: string): void {
-    completeApprovedMeeting(chatId);
+  /** @deprecated */
+  completeApprovedMeeting(_chatId: string): void {
+    // No-op
   }
 }

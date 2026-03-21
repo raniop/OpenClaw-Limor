@@ -544,15 +544,9 @@ async function handleMessage(msg: Message): Promise<void> {
         // Log summary
         console.log(formatTraceSummary(opTrace));
 
-        // Notify owner on critical alert (non-owner chat only)
-        if (selfCheckResult.alertLevel === "critical" && !isOwner) {
-          try {
-            const { getNotifyOwnerCallback } = require("../ai/callbacks");
-            const notify = getNotifyOwnerCallback();
-            if (notify) {
-              notify(`[ops:critical] ${contactName}: ${selfCheckResult.summary}`).catch(() => {});
-            }
-          } catch {}
+        // Log critical alerts — don't spam owner with raw ops data via WhatsApp
+        if (selfCheckResult.alertLevel === "critical") {
+          console.error(`[ops:critical] ${contactName}: ${selfCheckResult.summary}`);
         }
       } catch (err) {
         console.error("[ops] Operational trace error:", err);

@@ -5,7 +5,8 @@
  */
 import type { ContextBundle, PersonContext, ConversationContext, UrgencyContext, SystemContext, OpenLoopContext, ResolvedContext, MoodContext } from "./context-types";
 import { getProfile } from "../relationship-memory/relationship-store";
-import { conversationStore, approvalStore, meetingStore } from "../stores";
+import { conversationStore, approvalStore } from "../stores";
+import { getPendingMeetingCount, getLastMeetingRequest } from "../meetings";
 import { getPendingFollowups, getDueFollowups } from "../followups";
 import { listPending as listPendingCapabilities } from "../capabilities/spec-store";
 import { resolveOpenLoops } from "./open-loop-resolver";
@@ -198,7 +199,7 @@ function buildUrgencyContext(
 function buildSystemContext(): SystemContext {
   return {
     pendingApprovals: approvalStore.getPendingCount(),
-    pendingMeetings: meetingStore.getMeetingRequestCount(),
+    pendingMeetings: getPendingMeetingCount(),
     pendingFollowups: getPendingFollowups().length,
     pendingCapabilities: listPendingCapabilities().length,
   };

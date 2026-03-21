@@ -65,29 +65,15 @@ export async function sendMessage(
     systemPrompt += `\n\nאנשי קשר מוכרים (השתמשי בשמות האלה בדיוק כשמשתמשת ב-send_message): ${contactsList}`;
   }
 
-  // Check if Rani ACTUALLY approved a meeting via the meeting store (not AI hallucination)
-  const { meetingStore } = require("../stores");
-  const chatId = sender?.chatId || "";
-  const raniApproved = !sender?.isOwner && meetingStore.isApproved(chatId);
-
-  // Extract approved time from meeting store (not from AI messages)
-  let mentionedTime = "";
-  if (raniApproved) {
-    const approvedMeeting = meetingStore.getApprovedMeeting(chatId);
-    if (approvedMeeting?.approvedTime) {
-      mentionedTime = approvedMeeting.approvedTime;
-    }
-  }
-
   // Anti-hallucination rules for calendar — CRITICAL
   systemPrompt += `\n\n🚨 כללים חמורים ביותר — הפרה = כשל קריטי:
 
 1. אם מישהו מבקש פגישה עם רני — חובה להפעיל את הכלי request_meeting בפועל! אסור רק לכתוב "שולחת בקשה" בלי להפעיל את הכלי!
 2. אסור בשום מצב לטעון שיש פגישה ביומן בלי להפעיל קודם את list_events!
 3. אסור להמציא זמנים או אירועים!
-4. אסור לשלוח send_calendar_invite בלי שרני אישר באמת!
-5. אם יש לך כלי זמין — חובה להשתמש בו! אסור לשקר שעשית פעולה בלי להפעיל את הכלי!
-6. אם אתה אומר למשתמש "שולחת בקשה לרני" — חייב להפעיל request_meeting באותו תור! אחרת זה שקר!`;
+4. אם אתה אומר למשתמש "שולחת בקשה לרני" — חייב להפעיל request_meeting באותו תור! אחרת זה שקר!
+5. ⛔ אסור להשתמש ב-create_event עבור אנשים שהם לא רני! המערכת תחסום את זה אוטומטית.
+6. אחרי שהפעלת request_meeting — אמרי "שלחתי בקשה לרני, אעדכן אותך!" ולא "קבעתי" או "סידרתי"!`;
 
   // Add sender context so bot knows who's talking
   if (sender) {
@@ -97,12 +83,7 @@ export async function sendMessage(
         systemPrompt += `\n\n📋 פרטי רני להזמנת מסעדות (השתמשי בהם אוטומטית בלי לשאול!): שם: ${config.ownerName}, טלפון: ${config.ownerPhone}, מייל: ${config.ownerEmail || ""}`;
       }
     } else {
-      if (raniApproved) {
-        const timeInfo = mentionedTime ? ` השעה שאושרה: ${mentionedTime}.` : "";
-        systemPrompt += `\n\nהמשתמש הנוכחי: ${sender.name} (לא הבעלים). ⚠️ רני אישר את הפגישה דרך המערכת!${timeInfo} בקשי מ-${sender.name} את כתובת המייל שלו ושלחי זימון עם send_calendar_invite. נושא: "שיחה עם רני".`;
-      } else {
-        systemPrompt += `\n\nהמשתמש הנוכחי: ${sender.name} (לא הבעלים). אם הוא רוצה לקבוע פגישה עם רני – חובה להשתמש ב-request_meeting! אסור לקבוע ישירות או לשלוח זימון בלי אישור רני!`;
-      }
+      systemPrompt += `\n\nהמשתמש הנוכחי: ${sender.name} (לא הבעלים). אם הוא רוצה לקבוע פגישה עם רני – חובה להשתמש ב-request_meeting! המערכת מטפלת בשאר (שליחה לרני, יצירת אירוע, ועדכון חזרה). אסור לקבוע ישירות או לשלוח זימון בלי אישור רני!`;
     }
   }
 

@@ -20,6 +20,9 @@ export function getRole(sender?: SenderContext): Role {
  * Tools not listed here are available to all roles.
  */
 const TOOL_PERMISSIONS: Record<string, Role[]> = {
+  // Calendar — direct event creation is owner-only
+  create_event: ["owner"],
+
   // Messaging
   send_message: ["owner"],
   mute_group: ["owner"],
@@ -97,10 +100,11 @@ const TOOL_PERMISSIONS: Record<string, Role[]> = {
 };
 
 // Tools available to approved contacts (in addition to universal tools)
+// Note: create_event is NOT here — contacts must use request_meeting instead.
+// The handler also enforces this, but belt-and-suspenders.
 const APPROVED_CONTACT_TOOLS = new Set([
   "request_meeting",
   "notify_owner",
-  "create_event",
   "list_events",
   "send_calendar_invite",
 ]);

@@ -2,7 +2,8 @@
  * Daily executive digest generator.
  * Collects data from all stores and produces a structured Hebrew summary.
  */
-import { approvalStore, meetingStore, conversationStore } from "../stores";
+import { approvalStore, conversationStore } from "../stores";
+import { getPendingMeetingCount, getPendingMeetings } from "../meetings";
 import { listPending as listPendingCapabilities } from "../capabilities/spec-store";
 import { getPendingFollowups, getDueFollowups } from "../followups";
 import { getRecentActivity } from "../audit/audit-log";
@@ -40,16 +41,12 @@ export async function generateDailyDigest(): Promise<string> {
     data.urgent.push(`${pendingCount} אנשי קשר ממתינים לאישור`);
   }
 
-  // --- Pending meetings ---
-  const meetingCount = meetingStore.getMeetingRequestCount();
+  // --- Pending meetings (from state machine) ---
+  const pendingMeetingsList = getPendingMeetings();
+  const meetingCount = pendingMeetingsList.length;
   if (meetingCount > 0) {
-    // Get details about pending meetings
-    const lastMeeting = meetingStore.getLastMeetingRequest();
-    if (lastMeeting) {
-      data.meetings.push(`${lastMeeting.requesterName}: ${lastMeeting.topic} (${lastMeeting.id})`);
-    }
-    if (meetingCount > 1) {
-      data.meetings.push(`+ עוד ${meetingCount - 1} בקשות פגישה ממתינות`);
+    for (const m of pendingMeetingsList) {
+      data.meetings.push(`${m.contactName}: ${m.topic} (${m.id}) [${m.state}]`);
     }
     data.urgent.push(`${meetingCount} בקשות פגישה ממתינות`);
   }
