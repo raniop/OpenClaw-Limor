@@ -14,16 +14,16 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: "/", labelHe: "לוח בקרה", labelEn: "Dashboard", icon: "◫" },
   { href: "/approvals", labelHe: "אישורים", labelEn: "Approvals", icon: "✓" },
-  { href: "/followups", labelHe: "מעקבים", labelEn: "Followups", icon: "⏱" },
+  { href: "/followups", labelHe: "מעקבים", labelEn: "Followups", icon: "⏰" },
   { href: "/activity", labelHe: "פעילות", labelEn: "Activity", icon: "◈" },
   { href: "/capabilities", labelHe: "יכולות", labelEn: "Capabilities", icon: "⚡" },
   { href: "/digests", labelHe: "דיג׳סטים", labelEn: "Digests", icon: "📋" },
-  { href: "/summaries", labelHe: "סיכומים", labelEn: "Summaries", icon: "💬" },
+  { href: "/summaries", labelHe: "סיכומים", labelEn: "Summaries", icon: "📝" },
   { href: "/contacts", labelHe: "אנשי קשר", labelEn: "Contacts", icon: "👥" },
   { href: "/sms", labelHe: "SMS ומשלוחים", labelEn: "SMS & Deliveries", icon: "📦" },
   { href: "/telegram", labelHe: "טלגרם", labelEn: "Telegram", icon: "📡" },
-  { href: "/ops", labelHe: "תפעול ובקרה", labelEn: "Operations", icon: "🔬" },
-  { href: "/logs", labelHe: "לוגים", labelEn: "Logs", icon: "📟" },
+  { href: "/ops", labelHe: "תפעול ובקרה", labelEn: "Operations", icon: "📊" },
+  { href: "/logs", labelHe: "לוגים", labelEn: "Logs", icon: "🔍" },
 ];
 
 export function Sidebar() {
