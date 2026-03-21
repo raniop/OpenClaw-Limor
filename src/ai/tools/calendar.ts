@@ -27,9 +27,28 @@ export const calendarTools: Anthropic.Tool[] = [
     },
   },
   {
+    name: "delete_event",
+    description:
+      "מחיקת אירוע מהיומן של רני. רק רני (הבעלים) יכול למחוק אירועים! אפשר למחוק לפי שם אירוע + תאריך, או למחוק את כל האירועים ביום מסוים.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        date: {
+          type: "string",
+          description: "תאריך בפורמט ISO 8601 (למשל: '2026-03-23')",
+        },
+        title: {
+          type: "string",
+          description: "שם האירוע למחיקה (למשל: 'פגישה עם דורון'). אם ריק — ימחוק את כל האירועים ביום",
+        },
+      },
+      required: ["date"],
+    },
+  },
+  {
     name: "list_events",
     description:
-      "הצגת אירועים ביומן של רני ליום מסוים. עובד עם Google Calendar.",
+      "הצגת אירועים ביומן של רני ליום מסוים. רק רני (הבעלים) יכול לראות את היומן!",
     input_schema: {
       type: "object" as const,
       properties: {

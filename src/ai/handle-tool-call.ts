@@ -64,7 +64,22 @@ export async function handleToolCall(
       const result = await createEvent(input.title, start, end);
       return `אירוע "${input.title}" נוצר בהצלחה ליום ${start.toLocaleDateString("he-IL")} בשעה ${start.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}`;
     }
+    if (name === "delete_event") {
+      if (!sender?.isOwner) {
+        return "❌ רק רני יכול למחוק אירועים מהיומן.";
+      }
+      const { findAndDeleteEvent, deleteAllEventsOnDate } = require("../calendar");
+      const date = new Date(input.date);
+      if (input.title) {
+        return await findAndDeleteEvent(date, input.title);
+      } else {
+        return await deleteAllEventsOnDate(date);
+      }
+    }
     if (name === "list_events") {
+      if (!sender?.isOwner) {
+        return "❌ רק רני יכול לראות את היומן. אם את צריכה לדעת אם רני פנוי — השתמשי ב-notify_owner.";
+      }
       const date = new Date(input.date);
       return await listEvents(date);
     }

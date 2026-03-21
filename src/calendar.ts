@@ -43,6 +43,95 @@ export async function createEvent(
   };
 }
 
+export async function deleteEvent(eventId: string): Promise<string> {
+  const calendar = getCalendarClient();
+  try {
+    await calendar.events.delete({
+      calendarId: "primary",
+      eventId,
+    });
+    return `✅ האירוע נמחק בהצלחה.`;
+  } catch (err: any) {
+    return `❌ לא הצלחתי למחוק: ${err.message}`;
+  }
+}
+
+export async function findAndDeleteEvent(date: Date, titleQuery: string): Promise<string> {
+  const calendar = getCalendarClient();
+  const startOfDay = new Date(date);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(date);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const res = await calendar.events.list({
+    calendarId: "primary",
+    timeMin: startOfDay.toISOString(),
+    timeMax: endOfDay.toISOString(),
+    singleEvents: true,
+    orderBy: "startTime",
+  });
+
+  const events = res.data.items;
+  if (!events || events.length === 0) {
+    return "❌ לא נמצאו אירועים ביום הזה.";
+  }
+
+  // Find matching events by title
+  const query = titleQuery.toLowerCase();
+  const matching = events.filter(e =>
+    e.summary?.toLowerCase().includes(query)
+  );
+
+  if (matching.length === 0) {
+    const available = events.map(e => `• ${e.summary}`).join("\n");
+    return `❌ לא נמצא אירוע שמתאים ל-"${titleQuery}". אירועים ביום הזה:\n${available}`;
+  }
+
+  // Delete all matching
+  const results: string[] = [];
+  for (const event of matching) {
+    if (event.id) {
+      await calendar.events.delete({ calendarId: "primary", eventId: event.id });
+      const time = event.start?.dateTime
+        ? new Date(event.start.dateTime).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })
+        : "כל היום";
+      results.push(`✅ נמחק: ${time} - ${event.summary}`);
+    }
+  }
+
+  return results.join("\n");
+}
+
+export async function deleteAllEventsOnDate(date: Date): Promise<string> {
+  const calendar = getCalendarClient();
+  const startOfDay = new Date(date);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(date);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const res = await calendar.events.list({
+    calendarId: "primary",
+    timeMin: startOfDay.toISOString(),
+    timeMax: endOfDay.toISOString(),
+    singleEvents: true,
+  });
+
+  const events = res.data.items;
+  if (!events || events.length === 0) {
+    return "אין אירועים ביום הזה.";
+  }
+
+  const results: string[] = [];
+  for (const event of events) {
+    if (event.id) {
+      await calendar.events.delete({ calendarId: "primary", eventId: event.id });
+      results.push(`✅ נמחק: ${event.summary}`);
+    }
+  }
+
+  return results.join("\n");
+}
+
 export async function listEvents(
   date: Date
 ): Promise<string> {
