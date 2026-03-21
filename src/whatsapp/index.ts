@@ -137,11 +137,27 @@ export function createWhatsAppClient(): Client {
     // Poll Telegram alert channel for rocket/missile alerts
     try {
       const { startAlertPoller } = require("../telegram/alert-poller");
-      startAlertPoller(async (text: string) => {
-        if (config.ownerChatId && whatsappClient) {
-          await whatsappClient.sendMessage(config.ownerChatId, text);
+      startAlertPoller(
+        // Text-only callback
+        async (text: string) => {
+          if (config.ownerChatId && whatsappClient) {
+            await whatsappClient.sendMessage(config.ownerChatId, text);
+          }
+        },
+        // Image + caption callback
+        async (imageUrl: string, caption: string) => {
+          if (config.ownerChatId && whatsappClient) {
+            try {
+              const media = await MessageMedia.fromUrl(imageUrl, { unsafeMime: true });
+              await whatsappClient.sendMessage(config.ownerChatId, media, { caption });
+            } catch (imgErr) {
+              // Fallback to text if image download fails
+              console.error("[telegram] Image download failed, sending text only:", imgErr);
+              await whatsappClient.sendMessage(config.ownerChatId, caption);
+            }
+          }
         }
-      });
+      );
     } catch (err) {
       console.error("[telegram] Failed to start alert poller:", err);
     }

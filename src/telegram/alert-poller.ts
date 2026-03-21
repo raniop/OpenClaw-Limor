@@ -74,6 +74,7 @@ const channelState = new Map<string, ChannelState>();
 const POLL_INTERVAL_MS = 15_000; // 15 seconds
 let pollTimer: ReturnType<typeof setInterval> | null = null;
 let notifyCallback: ((message: string) => Promise<void>) | null = null;
+let notifyWithImageCallback: ((imageUrl: string, caption: string) => Promise<void>) | null = null;
 
 // --- Parsing ---
 
@@ -88,20 +89,31 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&nbsp;/g, " ");
 }
 
-function parseMessages(html: string, channelName: string): Array<{ id: number; text: string }> {
-  const results: Array<{ id: number; text: string }> = [];
+function parseMessages(html: string, channelName: string): Array<{ id: number; text: string; imageUrl?: string }> {
+  const results: Array<{ id: number; text: string; imageUrl?: string }> = [];
   const escaped = channelName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const msgPattern = new RegExp(
-    `data-post="${escaped}/(\\d+)"[\\s\\S]*?class="tgme_widget_message_text[^"]*"[^>]*>([\\s\\S]*?)<\\/div>`,
+
+  // Split HTML into individual message blocks
+  const msgBlockPattern = new RegExp(
+    `data-post="${escaped}/(\\d+)"([\\s\\S]*?)(?=data-post="${escaped}/\\d+"|$)`,
     "g"
   );
-  let match;
+  let blockMatch;
 
-  while ((match = msgPattern.exec(html)) !== null) {
-    const id = parseInt(match[1], 10);
-    const text = decodeHtmlEntities(match[2].replace(/<[^>]+>/g, "")).trim();
-    if (text && id) {
-      results.push({ id, text });
+  while ((blockMatch = msgBlockPattern.exec(html)) !== null) {
+    const id = parseInt(blockMatch[1], 10);
+    const block = blockMatch[2];
+
+    // Extract text
+    const textMatch = block.match(/class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/);
+    const text = textMatch ? decodeHtmlEntities(textMatch[1].replace(/<[^>]+>/g, "")).trim() : "";
+
+    // Extract photo URL from background-image
+    const photoMatch = block.match(/tgme_widget_message_photo_wrap[^"]*"[^>]*style="[^"]*background-image:url\('([^']+)'\)/);
+    const imageUrl = photoMatch ? photoMatch[1] : undefined;
+
+    if ((text || imageUrl) && id) {
+      results.push({ id, text, imageUrl });
     }
   }
 
@@ -172,18 +184,22 @@ async function checkChannel(config: ChannelConfig): Promise<void> {
         .replace(/https:\/\/t\.me\/\w+/g, "")
         .trim();
 
-      if (!cleanText) continue;
+      if (!cleanText && !msg.imageUrl) continue;
 
-      const whatsappMsg = `${config.emoji} *${config.label}*\n${cleanText}`;
+      const caption = `${config.emoji} *${config.label}*\n${cleanText}`;
 
-      console.log(`[telegram] ${config.emoji} ${config.name}: ${cleanText.substring(0, 80)}`);
+      console.log(`[telegram] ${config.emoji} ${config.name}: ${cleanText.substring(0, 80)}${msg.imageUrl ? " [+image]" : ""}`);
 
-      if (notifyCallback) {
-        try {
-          await notifyCallback(whatsappMsg);
-        } catch (err) {
-          console.error(`[telegram] Failed to forward from ${config.name}:`, err);
+      try {
+        if (msg.imageUrl && notifyWithImageCallback) {
+          // Send with image
+          await notifyWithImageCallback(msg.imageUrl, caption);
+        } else if (notifyCallback) {
+          // Text only
+          await notifyCallback(caption);
         }
+      } catch (err) {
+        console.error(`[telegram] Failed to forward from ${config.name}:`, err);
       }
     }
   } catch (err) {
@@ -203,11 +219,15 @@ async function checkAllChannels(): Promise<void> {
  * Start the Telegram channel poller.
  * @param onAlert callback to send message to owner via WhatsApp
  */
-export function startAlertPoller(onAlert: (message: string) => Promise<void>): void {
+export function startAlertPoller(
+  onAlert: (message: string) => Promise<void>,
+  onAlertWithImage?: (imageUrl: string, caption: string) => Promise<void>
+): void {
   notifyCallback = onAlert;
+  notifyWithImageCallback = onAlertWithImage || null;
   checkAllChannels();
   pollTimer = setInterval(checkAllChannels, POLL_INTERVAL_MS);
-  console.log(`[telegram] Alert poller started (${CHANNELS.length} channels, every ${POLL_INTERVAL_MS / 1000}s)`);
+  console.log(`[telegram] Alert poller started (${CHANNELS.length} channels, every ${POLL_INTERVAL_MS / 1000}s, images: ${!!onAlertWithImage})`);
 }
 
 /**
