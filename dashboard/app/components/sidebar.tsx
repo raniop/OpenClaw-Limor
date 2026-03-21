@@ -22,7 +22,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/contacts", labelHe: "אנשי קשר", labelEn: "Contacts", icon: "👥" },
   { href: "/sms", labelHe: "SMS ומשלוחים", labelEn: "SMS & Deliveries", icon: "📦" },
   { href: "/telegram", labelHe: "טלגרם", labelEn: "Telegram", icon: "📡" },
-  { href: "/ops", labelHe: "תפעול", labelEn: "Operations", icon: "🔬" },
+  { href: "/ops", labelHe: "תפעול ובקרה", labelEn: "Operations", icon: "🔬" },
   { href: "/logs", labelHe: "לוגים", labelEn: "Logs", icon: "📟" },
 ];
 
