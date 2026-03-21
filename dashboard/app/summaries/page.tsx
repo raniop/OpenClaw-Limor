@@ -2,38 +2,22 @@
 
 import { useEffect, useState } from "react";
 
-interface ChatSummary {
+interface DailySummary {
   chatId: string;
   contactName: string;
   isGroup: boolean;
   messageCount: number;
-  summary: string;
-  topics: string[];
-  openItems: string[];
-  mood: string;
+  urgent: string[];
+  open: string[];
+  done: string[];
+  failed: string[];
 }
 
 interface SummaryResponse {
-  summaries: ChatSummary[];
+  summaries: DailySummary[];
   date: string | null;
   availableDates: string[];
 }
-
-const MOOD_LABELS: Record<string, string> = {
-  friendly: "ידידותי",
-  business: "עסקי",
-  urgent: "דחוף",
-  casual: "חופשי",
-  tense: "מתוח",
-};
-
-const MOOD_COLORS: Record<string, string> = {
-  friendly: "#22c55e",
-  business: "#3b82f6",
-  urgent: "#ef4444",
-  casual: "#a78bfa",
-  tense: "#f59e0b",
-};
 
 export default function SummariesPage() {
   const [data, setData] = useState<SummaryResponse | null>(null);
@@ -68,20 +52,34 @@ export default function SummariesPage() {
     fetchSummaries(date);
   }
 
-  const contacts = data?.summaries.filter((s) => !s.isGroup) || [];
-  const groups = data?.summaries.filter((s) => s.isGroup) || [];
+  // Merge all items across summaries
+  const allUrgent: { item: string; contact: string }[] = [];
+  const allOpen: { item: string; contact: string }[] = [];
+  const allDone: { item: string; contact: string }[] = [];
+  const allFailed: { item: string; contact: string }[] = [];
+
+  if (data?.summaries) {
+    for (const s of data.summaries) {
+      for (const item of s.urgent) allUrgent.push({ item, contact: s.contactName });
+      for (const item of s.open) allOpen.push({ item, contact: s.contactName });
+      for (const item of s.done) allDone.push({ item, contact: s.contactName });
+      for (const item of s.failed) allFailed.push({ item, contact: s.contactName });
+    }
+  }
+
+  const totalItems = allUrgent.length + allOpen.length + allDone.length + allFailed.length;
 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", flexWrap: "wrap", gap: 16 }}>
         <div>
-          <h1>Conversation Summaries</h1>
-          <h2>Daily AI-generated conversation summaries</h2>
+          <h1>בריפינג יומי</h1>
+          <h2>סיכום מנהלים — מה קרה, מה פתוח, מה דחוף</h2>
         </div>
 
         {data && data.availableDates.length > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <label style={{ fontSize: 13, color: "var(--text-secondary)" }}>Date:</label>
+            <label style={{ fontSize: 13, color: "var(--text-secondary)" }}>תאריך:</label>
             <select
               value={selectedDate}
               onChange={(e) => handleDateChange(e.target.value)}
@@ -105,141 +103,200 @@ export default function SummariesPage() {
 
       {loading ? (
         <div className="card empty-state">טוען...</div>
-      ) : !data || data.summaries.length === 0 ? (
+      ) : !data || totalItems === 0 ? (
         <div className="card empty-state">
-          אין סיכומים זמינים{selectedDate ? ` עבור ${selectedDate}` : ""}.
-          סיכומים נוצרים מדי יום בשעה 23:00.
+          אין בריפינג זמין{selectedDate ? ` עבור ${selectedDate}` : ""}.
+          בריפינגים נוצרים בשעה 14:00 ו-23:00.
         </div>
       ) : (
         <>
           {/* Stats row */}
           <div className="grid grid-3 mt-3">
-            <div className="stat-card">
-              <div className="stat-label">Total Conversations</div>
-              <div className="stat-value">{data.summaries.length}</div>
+            <div className="stat-card" style={{ borderRight: allUrgent.length > 0 ? "3px solid #ef4444" : undefined }}>
+              <div className="stat-label">דחוף</div>
+              <div className="stat-value" style={{ color: allUrgent.length > 0 ? "#ef4444" : undefined }}>
+                {allUrgent.length}
+              </div>
             </div>
-            <div className="stat-card">
-              <div className="stat-label">Contacts</div>
-              <div className="stat-value">{contacts.length}</div>
+            <div className="stat-card" style={{ borderRight: allOpen.length > 0 ? "3px solid #f59e0b" : undefined }}>
+              <div className="stat-label">פתוח</div>
+              <div className="stat-value" style={{ color: allOpen.length > 0 ? "#f59e0b" : undefined }}>
+                {allOpen.length}
+              </div>
             </div>
-            <div className="stat-card">
-              <div className="stat-label">Groups</div>
-              <div className="stat-value">{groups.length}</div>
+            <div className="stat-card" style={{ borderRight: allDone.length > 0 ? "3px solid #22c55e" : undefined }}>
+              <div className="stat-label">טופל</div>
+              <div className="stat-value" style={{ color: allDone.length > 0 ? "#22c55e" : undefined }}>
+                {allDone.length}
+              </div>
             </div>
           </div>
 
-          {/* Contacts section */}
-          {contacts.length > 0 && (
-            <div className="mt-4">
-              <div className="section-header">Contacts ({contacts.length})</div>
-              {contacts.map((s) => (
-                <SummaryCard key={s.chatId} summary={s} />
-              ))}
-            </div>
+          {/* Urgent section */}
+          {allUrgent.length > 0 && (
+            <BriefingSection
+              icon="🔴"
+              title="דחוף — צריך תשומת לב"
+              items={allUrgent}
+              borderColor="#ef4444"
+              bgColor="rgba(239, 68, 68, 0.06)"
+            />
           )}
 
-          {/* Groups section */}
-          {groups.length > 0 && (
-            <div className="mt-4">
-              <div className="section-header">Groups ({groups.length})</div>
-              {groups.map((s) => (
-                <SummaryCard key={s.chatId} summary={s} />
-              ))}
-            </div>
+          {/* Open section */}
+          {allOpen.length > 0 && (
+            <BriefingSection
+              icon="🟡"
+              title="פתוח — לא סגור"
+              items={allOpen}
+              borderColor="#f59e0b"
+              bgColor="rgba(245, 158, 11, 0.06)"
+            />
           )}
+
+          {/* Done section */}
+          {allDone.length > 0 && (
+            <BriefingSection
+              icon="✅"
+              title="טופל היום"
+              items={allDone}
+              borderColor="#22c55e"
+              bgColor="rgba(34, 197, 94, 0.06)"
+            />
+          )}
+
+          {/* Failed section */}
+          {allFailed.length > 0 && (
+            <BriefingSection
+              icon="⚠️"
+              title="כשלים"
+              items={allFailed}
+              borderColor="#8b5cf6"
+              bgColor="rgba(139, 92, 246, 0.06)"
+            />
+          )}
+
+          {/* Per-contact breakdown */}
+          <div className="mt-4">
+            <div className="section-header">פירוט לפי איש קשר ({data.summaries.length})</div>
+            {data.summaries.map((s) => (
+              <ContactBreakdown key={s.chatId} summary={s} />
+            ))}
+          </div>
         </>
       )}
     </div>
   );
 }
 
-function SummaryCard({ summary }: { summary: ChatSummary }) {
-  const moodColor = MOOD_COLORS[summary.mood] || "#a78bfa";
-  const moodLabel = MOOD_LABELS[summary.mood] || summary.mood;
+function BriefingSection({
+  icon,
+  title,
+  items,
+  borderColor,
+  bgColor,
+}: {
+  icon: string;
+  title: string;
+  items: { item: string; contact: string }[];
+  borderColor: string;
+  bgColor: string;
+}) {
+  return (
+    <div
+      className="card mt-3"
+      style={{
+        borderRight: `3px solid ${borderColor}`,
+        background: bgColor,
+        direction: "rtl",
+        textAlign: "right",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <span style={{ fontSize: 16 }}>{icon}</span>
+        <strong style={{ fontSize: 14, color: "var(--text-primary)" }}>{title}</strong>
+      </div>
+      {items.map((entry, i) => (
+        <div
+          key={i}
+          style={{
+            fontSize: 13,
+            lineHeight: 1.8,
+            color: "var(--text-secondary)",
+            paddingRight: 4,
+          }}
+        >
+          &bull; {entry.item}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ContactBreakdown({ summary }: { summary: DailySummary }) {
+  const hasUrgent = summary.urgent.length > 0;
+  const hasOpen = summary.open.length > 0;
+  const hasDone = summary.done.length > 0;
+  const hasFailed = summary.failed.length > 0;
 
   return (
-    <div className="card" style={{ marginBottom: 12 }}>
-      {/* Header row */}
+    <div className="card" style={{ marginBottom: 12, direction: "rtl", textAlign: "right" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 14 }}>{summary.isGroup ? "👥" : "👤"}</span>
           <strong style={{ fontSize: 14 }}>{summary.contactName}</strong>
-          <span
-            style={{
+          {hasUrgent && (
+            <span style={{
               fontSize: 11,
               padding: "2px 8px",
               borderRadius: 12,
-              background: `${moodColor}20`,
-              color: moodColor,
+              background: "rgba(239, 68, 68, 0.15)",
+              color: "#ef4444",
               fontWeight: 500,
-            }}
-          >
-            {moodLabel}
-          </span>
+            }}>
+              דחוף
+            </span>
+          )}
         </div>
         <span style={{ fontSize: 12, color: "var(--text-tertiary)" }}>
-          {summary.messageCount} messages
+          {summary.messageCount} הודעות
         </span>
       </div>
 
-      {/* Summary text */}
-      <div
-        style={{
-          fontSize: 13,
-          lineHeight: 1.6,
-          color: "var(--text-secondary)",
-          whiteSpace: "pre-wrap",
-          marginBottom: 10,
-          direction: "rtl",
-          textAlign: "right",
-        }}
-      >
-        {summary.summary}
-      </div>
-
-      {/* Topics */}
-      {summary.topics.length > 0 && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-          {summary.topics.map((topic, i) => (
-            <span
-              key={i}
-              style={{
-                fontSize: 11,
-                padding: "2px 8px",
-                borderRadius: 12,
-                background: "rgba(59, 130, 246, 0.1)",
-                color: "var(--text-secondary)",
-              }}
-            >
-              {topic}
-            </span>
-          ))}
-        </div>
+      {hasUrgent && (
+        <ItemList items={summary.urgent} color="#ef4444" />
       )}
+      {hasOpen && (
+        <ItemList items={summary.open} color="#f59e0b" />
+      )}
+      {hasDone && (
+        <ItemList items={summary.done} color="#22c55e" />
+      )}
+      {hasFailed && (
+        <ItemList items={summary.failed} color="#8b5cf6" />
+      )}
+    </div>
+  );
+}
 
-      {/* Open items */}
-      {summary.openItems.length > 0 && (
+function ItemList({ items, color }: { items: string[]; color: string }) {
+  return (
+    <div style={{ marginBottom: 6 }}>
+      {items.map((item, i) => (
         <div
+          key={i}
           style={{
             fontSize: 12,
-            padding: "8px 12px",
-            borderRadius: 8,
-            background: "rgba(239, 68, 68, 0.06)",
-            border: "1px solid rgba(239, 68, 68, 0.12)",
-            direction: "rtl",
-            textAlign: "right",
+            lineHeight: 1.6,
+            color: "var(--text-secondary)",
+            paddingRight: 8,
+            borderRight: `2px solid ${color}`,
+            marginBottom: 2,
           }}
         >
-          <strong style={{ fontSize: 11, color: "var(--text-tertiary)", display: "block", marginBottom: 4 }}>
-            Open Items:
-          </strong>
-          {summary.openItems.map((item, i) => (
-            <div key={i} style={{ color: "var(--text-secondary)", marginBottom: 2 }}>
-              &bull; {item}
-            </div>
-          ))}
+          {item}
         </div>
-      )}
+      ))}
     </div>
   );
 }

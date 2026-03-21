@@ -1,29 +1,30 @@
 /**
- * Daily conversation summary generator.
- * For each chatId with today's messages, generates a Hebrew summary using Sonnet.
+ * Daily executive briefing generator.
+ * For each chatId with today's messages, extracts urgent/open/done/failed items.
  * Saves results to workspace/state/daily-summaries.json.
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { dirname } from "path";
 import { statePath } from "../state-dir";
 import { client, withRetry } from "../ai/client";
+import { getGroupNameById } from "../muted-groups";
 
 // --- Types ---
 
-export interface ChatSummary {
+export interface DailySummary {
   chatId: string;
   contactName: string;
   isGroup: boolean;
   messageCount: number;
-  summary: string;
-  topics: string[];
-  openItems: string[];
-  mood: string;
+  urgent: string[];
+  open: string[];
+  done: string[];
+  failed: string[];
 }
 
 export interface DailySummaryFile {
   date: string;
-  summaries: ChatSummary[];
+  summaries: DailySummary[];
 }
 
 interface StoredMessage {
@@ -32,7 +33,10 @@ interface StoredMessage {
 }
 
 type ConversationStore = Record<string, StoredMessage[]>;
-type ContactsStore = Record<string, { chatId: string; name: string; phone: string }>;
+type ContactsStore = Record<
+  string,
+  { chatId: string; name: string; phone: string }
+>;
 
 // --- Helpers ---
 
@@ -86,60 +90,83 @@ function todayDateString(): string {
 }
 
 /**
- * Extract messages from today based on content timestamps or message position.
- * Since messages don't have timestamps, we use a heuristic:
- * group messages often have [Name]: prefix pattern.
- * We take all messages as "today's" since the store is trimmed regularly.
+ * Resolve chatId to a human-readable name.
+ * Priority: contacts store > group registry > stripped chatId (never raw IDs).
  */
-function getContactName(chatId: string, contacts: ContactsStore): string {
+function resolveContactName(
+  chatId: string,
+  contacts: ContactsStore,
+): string {
+  // Direct contact match
   const contact = contacts[chatId];
-  if (contact) return contact.name;
-  // For groups, try to extract a readable name
+  if (contact?.name) return contact.name;
+
+  // Group — try the group registry
   if (chatId.endsWith("@g.us")) {
-    return `Group ${chatId.split("@")[0].slice(-6)}`;
+    const groupName = getGroupNameById(chatId);
+    if (groupName) return groupName;
+    // Fallback: strip @g.us suffix
+    return chatId.split("@")[0];
   }
-  return chatId.split("@")[0];
+
+  // Personal chat — try to find by phone prefix in contacts
+  const phonePrefix = chatId.split("@")[0];
+  for (const c of Object.values(contacts)) {
+    if (c.phone?.replace(/\D/g, "") === phonePrefix) {
+      return c.name;
+    }
+  }
+
+  return phonePrefix;
 }
 
-async function summarizeChat(
+async function analyzeChat(
   chatId: string,
   messages: StoredMessage[],
   contactName: string,
   isGroup: boolean,
-): Promise<ChatSummary | null> {
+): Promise<DailySummary | null> {
   if (messages.length === 0) return null;
 
   const formattedMessages = messages
-    .map((m) => `${m.role === "user" ? (isGroup ? "משתמש" : contactName) : "לימור"}: ${m.content.substring(0, 300)}`)
+    .map(
+      (m) =>
+        `${m.role === "user" ? (isGroup ? "משתמש" : contactName) : "לימור"}: ${m.content.substring(0, 500)}`,
+    )
     .join("\n");
 
   const groupInstruction = isGroup
-    ? `זו שיחת קבוצה. שים לב למשתתפים השונים (שמות מופיעים בסוגריים מרובעים [שם]:).
-ציין את המשתתפים הבולטים ומה כל אחד אמר.`
+    ? `זו שיחת קבוצה. שמות משתתפים מופיעים בסוגריים מרובעים [שם]:.`
     : "";
 
-  const prompt = `אתה מסכם שיחות יומיות. תפקידך ליצור סיכום תמציתי של השיחה.
+  const prompt = `אתה עוזר אישי שמכין בריפינג לבעלים.
 
 ${groupInstruction}
 
-שיחה עם ${contactName} (${messages.length} הודעות):
+מהשיחות האלה עם ${contactName} (${messages.length} הודעות), חלץ:
+1. דחוף — מה דורש תשומת לב מיידית? (מישהו מחכה, דדליין, בקשה שלא טופלה)
+2. פתוח — מה עדיין לא סגור? (בקשות, שאלות, נושאים שצריך לחזור אליהם)
+3. טופל — מה כן נעשה? (בקצרה, שורה אחת לכל פריט)
+4. כשלים — מה לימור לא הצליחה לעשות? (tool failures, שגיאות, hallucinations)
+
+שיחה:
 ${formattedMessages}
 
-החזר תשובה בפורמט JSON בלבד (בלי markdown, בלי backticks):
+החזר JSON בלבד (בלי markdown, בלי backticks):
 {
-  "summary": "סיכום של 3-5 שורות בעברית: מה דובר, מה הוחלט/נעשה, מה עדיין פתוח, ומה הטון של השיחה",
-  "topics": ["נושא1", "נושא2"],
-  "openItems": ["פריט פתוח 1"],
-  "mood": "friendly/business/urgent/casual/tense"
+  "urgent": ["יוני מחכה לתשובה ממך מ-10 בבוקר"],
+  "open": ["דורון ביקש לבטל פגישות ביום ראשון"],
+  "done": ["פגישה עם עמית ב-15:40 תואמה"],
+  "failed": ["ניסיתי להחליף מודל אבל לא הצלחתי"]
 }
 
 כללים:
+- קצר! שורה אחת לכל פריט
+- שמות אנשים, לא "המשתמש" ולא "הלקוח"
+- רק דברים מהיום — לא היסטוריה ישנה
+- אם אין מה לדווח בקטגוריה — מערך ריק []
 - כתוב בעברית
-- הסיכום צריך להיות תמציתי אבל מקיף
-- topics: רשימת נושאים עיקריים (2-5 נושאים)
-- openItems: דברים שעדיין פתוחים או ממתינים לטיפול (רשימה ריקה אם אין)
-- mood: אחד מ-friendly/business/urgent/casual/tense
-- החזר JSON תקין בלבד`;
+- אקשן-אוריינטד: "יוני מחכה לתשובה" ולא "התנהלה שיחה עם יוני"`;
 
   try {
     const response = await withRetry(() =>
@@ -154,7 +181,10 @@ ${formattedMessages}
     const text = textBlock && "text" in textBlock ? textBlock.text : "";
 
     // Parse JSON from response — strip markdown fences if present
-    const jsonStr = text.replace(/```json?\s*/g, "").replace(/```\s*/g, "").trim();
+    const jsonStr = text
+      .replace(/```json?\s*/g, "")
+      .replace(/```\s*/g, "")
+      .trim();
     const parsed = JSON.parse(jsonStr);
 
     return {
@@ -162,23 +192,25 @@ ${formattedMessages}
       contactName,
       isGroup,
       messageCount: messages.length,
-      summary: parsed.summary || "",
-      topics: parsed.topics || [],
-      openItems: parsed.openItems || [],
-      mood: parsed.mood || "casual",
+      urgent: Array.isArray(parsed.urgent) ? parsed.urgent : [],
+      open: Array.isArray(parsed.open) ? parsed.open : [],
+      done: Array.isArray(parsed.done) ? parsed.done : [],
+      failed: Array.isArray(parsed.failed) ? parsed.failed : [],
     };
   } catch (err) {
-    console.error(`[daily-summaries] Failed to summarize chat ${chatId}:`, err);
-    // Fallback: basic summary without AI
+    console.error(
+      `[daily-summaries] Failed to analyze chat ${chatId}:`,
+      err,
+    );
     return {
       chatId,
       contactName,
       isGroup,
       messageCount: messages.length,
-      summary: `${messages.length} הודעות. לא הצלחתי ליצור סיכום אוטומטי.`,
-      topics: [],
-      openItems: [],
-      mood: "casual",
+      urgent: [],
+      open: [],
+      done: [`${messages.length} הודעות — לא הצלחתי לנתח אוטומטית`],
+      failed: [],
     };
   }
 }
@@ -186,10 +218,10 @@ ${formattedMessages}
 // --- Main export ---
 
 /**
- * Generate daily summaries for all conversations with messages.
+ * Generate daily executive briefing for all conversations with messages.
  * Saves to daily-summaries.json and returns the summaries.
  */
-export async function generateDailySummaries(): Promise<ChatSummary[]> {
+export async function generateDailySummaries(): Promise<DailySummary[]> {
   const conversations = loadConversations();
   const contacts = loadContacts();
   const today = todayDateString();
@@ -203,20 +235,30 @@ export async function generateDailySummaries(): Promise<ChatSummary[]> {
     return [];
   }
 
-  console.log(`[daily-summaries] Summarizing ${chatIds.length} conversations...`);
+  console.log(
+    `[daily-summaries] Analyzing ${chatIds.length} conversations...`,
+  );
 
-  const summaries: ChatSummary[] = [];
+  const summaries: DailySummary[] = [];
 
   for (const chatId of chatIds) {
     const messages = conversations[chatId];
     if (!messages || messages.length === 0) continue;
 
-    const contactName = getContactName(chatId, contacts);
+    const contactName = resolveContactName(chatId, contacts);
     const isGroup = chatId.endsWith("@g.us");
 
-    const summary = await summarizeChat(chatId, messages, contactName, isGroup);
+    const summary = await analyzeChat(chatId, messages, contactName, isGroup);
     if (summary) {
-      summaries.push(summary);
+      // Only include if there's actually something to report
+      const hasContent =
+        summary.urgent.length > 0 ||
+        summary.open.length > 0 ||
+        summary.done.length > 0 ||
+        summary.failed.length > 0;
+      if (hasContent) {
+        summaries.push(summary);
+      }
     }
 
     // Small delay to avoid rate limits
@@ -238,7 +280,9 @@ export async function generateDailySummaries(): Promise<ChatSummary[]> {
 
   saveSummariesFile(allEntries);
 
-  console.log(`[daily-summaries] Generated ${summaries.length} summaries for ${today}`);
+  console.log(
+    `[daily-summaries] Generated ${summaries.length} briefings for ${today}`,
+  );
   return summaries;
 }
 

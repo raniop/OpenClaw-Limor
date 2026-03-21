@@ -1,70 +1,158 @@
 /**
  * Digest scheduler — sends daily digest at 08:00 Israel time,
- * and generates conversation summaries twice daily (14:00 + 23:00).
- * Summaries are sent to owner via WhatsApp when ready.
+ * and generates executive briefings twice daily (14:00 + 23:00).
+ * Evening briefing includes tomorrow's calendar.
  */
 import { schedule, ScheduledTask } from "node-cron";
 import { generateDailyDigest } from "./digest-service";
-import { generateDailySummaries } from "./daily-summaries";
+import { generateDailySummaries, DailySummary } from "./daily-summaries";
 import { getNotifyOwnerCallback } from "../ai/callbacks";
 import { logAudit } from "../audit/audit-log";
+import { listEvents } from "../calendar";
 
 let digestTask: ScheduledTask | null = null;
 let summariesTask1: ScheduledTask | null = null;
 let summariesTask2: ScheduledTask | null = null;
 
-async function runAndSendSummaries(label: string): Promise<void> {
-  console.log(`[daily-summaries] Running ${label} conversation summaries...`);
+function formatBriefingMessage(
+  label: string,
+  summaries: DailySummary[],
+  calendarSection?: string,
+): string {
+  // Merge all items across conversations
+  const allUrgent: string[] = [];
+  const allOpen: string[] = [];
+  const allDone: string[] = [];
+  const allFailed: string[] = [];
+
+  for (const s of summaries) {
+    allUrgent.push(...s.urgent);
+    allOpen.push(...s.open);
+    allDone.push(...s.done);
+    allFailed.push(...s.failed);
+  }
+
+  const lines: string[] = [];
+  lines.push(`📊 *בריפינג ${label}*\n`);
+
+  if (allUrgent.length > 0) {
+    lines.push("🔴 *דחוף — צריך תשומת לב:*");
+    for (const item of allUrgent) lines.push(`• ${item}`);
+    lines.push("");
+  }
+
+  if (allOpen.length > 0) {
+    lines.push("🟡 *פתוח — לא סגור:*");
+    for (const item of allOpen) lines.push(`• ${item}`);
+    lines.push("");
+  }
+
+  if (allDone.length > 0) {
+    lines.push("✅ *טופל היום:*");
+    for (const item of allDone) lines.push(`• ${item}`);
+    lines.push("");
+  }
+
+  if (allFailed.length > 0) {
+    lines.push("⚠️ *כשלים:*");
+    for (const item of allFailed) lines.push(`• ${item}`);
+    lines.push("");
+  }
+
+  if (calendarSection) {
+    lines.push(`📅 *מחר:*`);
+    lines.push(calendarSection);
+    lines.push("");
+  }
+
+  // If nothing at all
+  if (
+    allUrgent.length === 0 &&
+    allOpen.length === 0 &&
+    allDone.length === 0 &&
+    allFailed.length === 0 &&
+    !calendarSection
+  ) {
+    lines.push("אין פעילות מיוחדת לדווח.");
+  }
+
+  lines.push(
+    `\nסה"כ: ${summaries.length} שיחות פעילות`,
+  );
+
+  return lines.join("\n");
+}
+
+async function getTomorrowCalendar(): Promise<string | undefined> {
+  try {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const events = await listEvents(tomorrow);
+    if (events && !events.includes("אין אירועים")) {
+      return events;
+    }
+    return "אין אירועים ביומן";
+  } catch (err) {
+    console.error("[daily-summaries] Failed to fetch tomorrow calendar:", err);
+    return undefined;
+  }
+}
+
+async function runAndSendSummaries(
+  label: string,
+  includeCalendar: boolean,
+): Promise<void> {
+  console.log(
+    `[daily-summaries] Running ${label} executive briefing...`,
+  );
   try {
     const summaries = await generateDailySummaries();
-    logAudit("system", "daily_summaries_generated", "conversations", `success: ${summaries.length} summaries`);
-    console.log(`[daily-summaries] Generated ${summaries.length} conversation summaries`);
+    logAudit(
+      "system",
+      "daily_summaries_generated",
+      "conversations",
+      `success: ${summaries.length} summaries`,
+    );
+    console.log(
+      `[daily-summaries] Generated ${summaries.length} briefings`,
+    );
 
-    // Send summary to owner via WhatsApp
+    // Send briefing to owner via WhatsApp
     if (summaries.length > 0) {
       const notify = getNotifyOwnerCallback();
       if (notify) {
-        const lines: string[] = [];
-        lines.push(`📊 *סיכום שיחות ${label}*\n`);
+        const calendarSection = includeCalendar
+          ? await getTomorrowCalendar()
+          : undefined;
 
-        const contacts = summaries.filter(s => !s.isGroup);
-        const groups = summaries.filter(s => s.isGroup);
-
-        if (contacts.length > 0) {
-          lines.push("👤 *אנשי קשר:*");
-          for (const s of contacts.slice(0, 5)) {
-            const mood = s.mood && s.mood !== "neutral" ? ` (${s.mood})` : "";
-            lines.push(`• *${s.contactName}*${mood} — ${s.messageCount} הודעות`);
-            if (s.summary) lines.push(`  ${s.summary.substring(0, 120)}`);
-            if (s.openItems?.length) lines.push(`  ⚠️ פתוח: ${s.openItems.join(", ")}`);
-          }
-        }
-
-        if (groups.length > 0) {
-          lines.push("\n👥 *קבוצות:*");
-          for (const s of groups.slice(0, 3)) {
-            lines.push(`• *${s.contactName}* — ${s.messageCount} הודעות`);
-            if (s.summary) lines.push(`  ${s.summary.substring(0, 120)}`);
-          }
-        }
-
-        lines.push(`\nסה"כ: ${summaries.length} שיחות`);
-
-        await notify(lines.join("\n"));
-        console.log(`[daily-summaries] Sent ${label} summary to owner`);
+        const message = formatBriefingMessage(
+          label,
+          summaries,
+          calendarSection,
+        );
+        await notify(message);
+        console.log(`[daily-summaries] Sent ${label} briefing to owner`);
       }
     }
   } catch (error: any) {
-    console.error("[daily-summaries] Failed to generate summaries:", error.message);
-    logAudit("system", "daily_summaries_generated", "conversations", `error: ${error.message}`);
+    console.error(
+      "[daily-summaries] Failed to generate briefing:",
+      error.message,
+    );
+    logAudit(
+      "system",
+      "daily_summaries_generated",
+      "conversations",
+      `error: ${error.message}`,
+    );
   }
 }
 
 /**
  * Start the daily digest scheduler.
  * - 08:00: Daily digest (status, followups, calendar)
- * - 14:00: Midday conversation summaries
- * - 23:00: Evening conversation summaries
+ * - 14:00: Midday executive briefing
+ * - 23:00: Evening executive briefing + tomorrow's calendar
  */
 export function startDigestScheduler(): void {
   if (digestTask) {
@@ -73,49 +161,82 @@ export function startDigestScheduler(): void {
   }
 
   // Run at 08:00 every day, Israel timezone
-  digestTask = schedule("0 8 * * *", async () => {
-    console.log("[digest] Running daily digest...");
-    try {
-      const digest = await generateDailyDigest();
-      const notify = getNotifyOwnerCallback();
-      if (notify) {
-        await notify(digest);
-        logAudit("system", "daily_digest_sent", "owner", "success");
-        console.log("[digest] Daily digest sent to owner");
-      } else {
-        console.warn("[digest] No notify callback available — skipping");
+  digestTask = schedule(
+    "0 8 * * *",
+    async () => {
+      console.log("[digest] Running daily digest...");
+      try {
+        const digest = await generateDailyDigest();
+        const notify = getNotifyOwnerCallback();
+        if (notify) {
+          await notify(digest);
+          logAudit("system", "daily_digest_sent", "owner", "success");
+          console.log("[digest] Daily digest sent to owner");
+        } else {
+          console.warn(
+            "[digest] No notify callback available — skipping",
+          );
+        }
+      } catch (error: any) {
+        console.error(
+          "[digest] Failed to send digest:",
+          error.message,
+        );
+        logAudit(
+          "system",
+          "daily_digest_sent",
+          "owner",
+          `error: ${error.message}`,
+        );
       }
-    } catch (error: any) {
-      console.error("[digest] Failed to send digest:", error.message);
-      logAudit("system", "daily_digest_sent", "owner", `error: ${error.message}`);
-    }
-  }, {
-    timezone: "Asia/Jerusalem",
-  });
+    },
+    {
+      timezone: "Asia/Jerusalem",
+    },
+  );
 
-  // Midday summaries at 14:00
-  summariesTask1 = schedule("0 14 * * *", () => {
-    runAndSendSummaries("צהריים");
-  }, {
-    timezone: "Asia/Jerusalem",
-  });
+  // Midday briefing at 14:00 (no calendar)
+  summariesTask1 = schedule(
+    "0 14 * * *",
+    () => {
+      runAndSendSummaries("צהריים", false);
+    },
+    {
+      timezone: "Asia/Jerusalem",
+    },
+  );
 
-  // Evening summaries at 23:00
-  summariesTask2 = schedule("0 23 * * *", () => {
-    runAndSendSummaries("ערב");
-  }, {
-    timezone: "Asia/Jerusalem",
-  });
+  // Evening briefing at 23:00 (with tomorrow's calendar)
+  summariesTask2 = schedule(
+    "0 23 * * *",
+    () => {
+      runAndSendSummaries("ערב", true);
+    },
+    {
+      timezone: "Asia/Jerusalem",
+    },
+  );
 
-  console.log("[digest] Scheduler started — digest 08:00, summaries 14:00 + 23:00 Israel time");
+  console.log(
+    "[digest] Scheduler started — digest 08:00, briefings 14:00 + 23:00 Israel time",
+  );
 }
 
 /**
  * Stop the digest scheduler.
  */
 export function stopDigestScheduler(): void {
-  if (digestTask) { digestTask.stop(); digestTask = null; }
-  if (summariesTask1) { summariesTask1.stop(); summariesTask1 = null; }
-  if (summariesTask2) { summariesTask2.stop(); summariesTask2 = null; }
+  if (digestTask) {
+    digestTask.stop();
+    digestTask = null;
+  }
+  if (summariesTask1) {
+    summariesTask1.stop();
+    summariesTask1 = null;
+  }
+  if (summariesTask2) {
+    summariesTask2.stop();
+    summariesTask2 = null;
+  }
   console.log("[digest] Scheduler stopped");
 }

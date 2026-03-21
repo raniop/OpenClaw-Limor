@@ -356,21 +356,21 @@ export function getContactById(chatId: string): ContactWithRelationship | null {
   return all.find((c) => c.chatId === chatId) || null;
 }
 
-// --- Daily Summaries ---
-export interface ChatSummary {
+// --- Daily Summaries (Executive Briefing) ---
+export interface DailySummary {
   chatId: string;
   contactName: string;
   isGroup: boolean;
   messageCount: number;
-  summary: string;
-  topics: string[];
-  openItems: string[];
-  mood: string;
+  urgent: string[];
+  open: string[];
+  done: string[];
+  failed: string[];
 }
 
 export interface DailySummaryFile {
   date: string;
-  summaries: ChatSummary[];
+  summaries: DailySummary[];
 }
 
 export function getDailySummaries(date?: string): DailySummaryFile | null {

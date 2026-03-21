@@ -42,6 +42,10 @@ export function registerGroup(name: string, chatId: string): void {
   }
 }
 
+export function getGroupNameById(chatId: string): string | undefined {
+  return groupRegistry[chatId];
+}
+
 export function findGroupChatId(name: string): string | undefined {
   // Exact match
   for (const [chatId, groupName] of Object.entries(groupRegistry)) {
