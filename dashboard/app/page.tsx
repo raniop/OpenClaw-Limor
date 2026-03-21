@@ -191,17 +191,17 @@ export default function DashboardHome() {
         <div className="section-header">קישורים מהירים</div>
         <div className="grid grid-3">
           <Link href="/ops" className="card" style={{ textDecoration: "none", textAlign: "center", padding: "20px 16px" }}>
-            <div style={{ fontSize: 24, marginBottom: 6 }}>📊</div>
+            <div style={{ fontSize: 24, marginBottom: 6 }}>🔬</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>תפעול ובקרה</div>
             <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>מדדים, התראות, בריאות</div>
           </Link>
           <Link href="/summaries" className="card" style={{ textDecoration: "none", textAlign: "center", padding: "20px 16px" }}>
-            <div style={{ fontSize: 24, marginBottom: 6 }}>📝</div>
+            <div style={{ fontSize: 24, marginBottom: 6 }}>💬</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>סיכומים</div>
             <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>סיכומי שיחות יומיים</div>
           </Link>
           <Link href="/followups" className="card" style={{ textDecoration: "none", textAlign: "center", padding: "20px 16px" }}>
-            <div style={{ fontSize: 24, marginBottom: 6 }}>⏰</div>
+            <div style={{ fontSize: 24, marginBottom: 6 }}>⏱</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>מעקבים</div>
             <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>תזכורות ומשימות פתוחות</div>
           </Link>
@@ -216,7 +216,7 @@ export default function DashboardHome() {
             <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>ערוצים מנוטרים</div>
           </Link>
           <Link href="/logs" className="card" style={{ textDecoration: "none", textAlign: "center", padding: "20px 16px" }}>
-            <div style={{ fontSize: 24, marginBottom: 6 }}>🔍</div>
+            <div style={{ fontSize: 24, marginBottom: 6 }}>📟</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>לוגים</div>
             <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>לוג מערכת מלא</div>
           </Link>
