@@ -70,11 +70,25 @@ async function sendToChat(chatId: string, text: string): Promise<void> {
   }
 }
 
+function findChromePath(): string | undefined {
+  try {
+    const puppeteer = require("puppeteer");
+    return puppeteer.executablePath();
+  } catch {}
+  return undefined;
+}
+
 export function createWhatsAppClient(): Client {
+  const executablePath = findChromePath();
+  if (executablePath) {
+    console.log(`[chrome] Using: ${executablePath}`);
+  }
+
   const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
       headless: true,
+      executablePath,
       args: ["--no-sandbox", "--disable-setuid-sandbox"],
     },
   });

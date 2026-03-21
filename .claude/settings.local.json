@@ -222,7 +222,13 @@
       "Bash(pip3 install:*)",
       "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); [print\\(k\\) for k in data.get\\(''''approved'''',data\\) if ''''oron'''' in str\\(k\\).lower\\(\\) or ''''דורון'''' in str\\(k\\).lower\\(\\)]\")",
       "Bash(tsc -p tsconfig.test.json)",
-      "Bash(node dist-test/tests/benchmark/run-benchmarks.js)"
+      "Bash(node dist-test/tests/benchmark/run-benchmarks.js)",
+      "Bash(grep -v \"^$\")",
+      "Bash(npx puppeteer:*)",
+      "Bash(node -p \"process.arch\")",
+      "Bash(node -e \"const p = require\\(''puppeteer''\\); console.log\\(''puppeteer version:'', p.default?.version?.\\(\\) || ''unknown''\\); console.log\\(''executablePath:'', p.executablePath\\(\\)\\)\")",
+      "Bash(ln -sf mac_arm-146.0.7680.76 mac-146.0.7680.76)",
+      "Bash(ln -sf chrome-mac-arm64 chrome-mac-x64)"
     ]
   }
 }
