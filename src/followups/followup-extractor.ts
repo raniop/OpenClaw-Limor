@@ -55,7 +55,13 @@ export function extractFollowups(
   for (const pattern of RESPONSE_PATTERNS) {
     if (pattern.regex.test(responseText)) {
       const dueAt = new Date(now.getTime() + pattern.dueOffsetHours * 60 * 60 * 1000);
-      const entry = addFollowup(chatId, contactName, pattern.reason, dueAt);
+      // Build a meaningful reason from user message context, not just the pattern name
+      let reason = pattern.reason;
+      if (userMessage && userMessage.length > 3) {
+        const userContext = userMessage.substring(0, 80).replace(/\n/g, " ");
+        reason = `${pattern.reason} — "${userContext}"`;
+      }
+      const entry = addFollowup(chatId, contactName, reason, dueAt);
       created.push(entry);
       break;
     }

@@ -98,9 +98,13 @@ export async function generateDailyDigest(): Promise<string> {
     data.newContacts.push(c.name);
   }
 
-  // --- Recent activity from audit log ---
+  // --- Recent activity from audit log (skip internal/capability noise) ---
   const recentAudit = getRecentActivity(10);
   for (const entry of recentAudit.slice(-5)) {
+    // Skip internal capability actions — not useful in digest
+    if (entry.action.startsWith("capability_")) continue;
+    if (entry.action === "daily_digest_sent") continue;
+    if (entry.action === "daily_summaries_generated") continue;
     const time = new Date(entry.timestamp).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
     data.recentActivity.push(`${time} - ${entry.action}: ${entry.target} (${entry.result})`);
   }
