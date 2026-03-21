@@ -201,9 +201,9 @@ export function createWhatsAppClient(): Client {
   // Detect stale connection — if no WhatsApp activity for 5 minutes, health check
   let lastActivity = Date.now();
   const originalEmit = client.emit.bind(client);
-  client.emit = function (...args: any[]) {
+  client.emit = function (event: string, ...args: any[]) {
     lastActivity = Date.now();
-    return originalEmit(...args);
+    return originalEmit(event, ...args);
   } as any;
 
   setInterval(() => {
