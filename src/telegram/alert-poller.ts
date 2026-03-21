@@ -94,6 +94,33 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&[a-zA-Z]+;/g, ""); // catch any remaining named entities
 }
 
+/**
+ * Convert Telegram HTML to WhatsApp-formatted text.
+ * Preserves bold, italic, line breaks, and strips everything else.
+ */
+function htmlToWhatsApp(html: string): string {
+  let text = html;
+  // Convert line breaks
+  text = text.replace(/<br\s*\/?>/gi, "\n");
+  // Convert bold
+  text = text.replace(/<b>([\s\S]*?)<\/b>/gi, "*$1*");
+  text = text.replace(/<strong>([\s\S]*?)<\/strong>/gi, "*$1*");
+  // Convert italic
+  text = text.replace(/<i>([\s\S]*?)<\/i>/gi, "_$1_");
+  text = text.replace(/<em>([\s\S]*?)<\/em>/gi, "_$1_");
+  // Convert underline (WhatsApp doesn't have underline, use bold)
+  text = text.replace(/<u>([\s\S]*?)<\/u>/gi, "*$1*");
+  // Convert code/monospace
+  text = text.replace(/<code>([\s\S]*?)<\/code>/gi, "```$1```");
+  // Strip remaining tags
+  text = text.replace(/<[^>]+>/g, "");
+  // Decode HTML entities
+  text = decodeHtmlEntities(text);
+  // Clean up multiple blank lines
+  text = text.replace(/\n{3,}/g, "\n\n");
+  return text;
+}
+
 function parseMessages(html: string, channelName: string): Array<{ id: number; text: string; imageUrl?: string }> {
   const results: Array<{ id: number; text: string; imageUrl?: string }> = [];
   const escaped = channelName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -109,9 +136,9 @@ function parseMessages(html: string, channelName: string): Array<{ id: number; t
     const id = parseInt(blockMatch[1], 10);
     const block = blockMatch[2];
 
-    // Extract text
+    // Extract text — preserve formatting for WhatsApp
     const textMatch = block.match(/class="tgme_widget_message_text[^"]*"[^>]*>([\s\S]*?)<\/div>/);
-    const text = textMatch ? decodeHtmlEntities(textMatch[1].replace(/<[^>]+>/g, "")).trim() : "";
+    const text = textMatch ? htmlToWhatsApp(textMatch[1]).trim() : "";
 
     // Extract photo URL from background-image
     const photoMatch = block.match(/tgme_widget_message_photo_wrap[^"]*"[^>]*style="[^"]*background-image:url\('([^']+)'\)/);
