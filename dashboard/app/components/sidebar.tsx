@@ -24,8 +24,8 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <h1>OpenClaw</h1>
-        <p>Control Panel</p>
+        <h1 style={{ fontSize: "24px", fontWeight: "bold", margin: 0 }}>לימור 🐾</h1>
+        <p style={{ fontSize: "12px", color: "var(--color-secondary, #888)", margin: 0 }}>מרכז בקרה</p>
       </div>
       <nav>
         {NAV_ITEMS.map((item) => (

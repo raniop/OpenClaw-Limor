@@ -46,8 +46,8 @@ export function OpsStatus() {
   if (loading) {
     return (
       <div className="stat-card" style={{ opacity: 0.5 }}>
-        <div className="stat-label">Operations</div>
-        <div className="stat-value" style={{ fontSize: 14 }}>Loading...</div>
+        <div className="stat-label">📊 בריאות</div>
+        <div className="stat-value" style={{ fontSize: 14 }}>טוען...</div>
       </div>
     );
   }
@@ -55,8 +55,8 @@ export function OpsStatus() {
   if (!data) {
     return (
       <Link href="/ops" className="stat-card">
-        <div className="stat-label">Operations</div>
-        <div className="stat-value" style={{ fontSize: 14, color: "var(--text-tertiary)" }}>Unavailable</div>
+        <div className="stat-label">📊 בריאות</div>
+        <div className="stat-value" style={{ fontSize: 14, color: "var(--text-tertiary)" }}>לא זמין</div>
       </Link>
     );
   }
@@ -66,7 +66,7 @@ export function OpsStatus() {
   return (
     <Link href="/ops" className="stat-card" style={{ position: "relative" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div className="stat-label">Operations</div>
+        <div className="stat-label">📊 בריאות</div>
         <span style={{
           fontSize: 10,
           fontWeight: 700,

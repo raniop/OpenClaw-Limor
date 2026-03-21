@@ -67,7 +67,7 @@ export function StatusFeed() {
   if (!data) {
     return (
       <div className="text-muted text-sm" style={{ textAlign: "center", padding: "12px 0" }}>
-        Loading status...
+        טוען סטטוס...
       </div>
     );
   }

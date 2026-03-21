@@ -32,7 +32,7 @@ export function LiveLogs() {
   if (logs.length === 0) {
     return (
       <div className="text-muted text-sm" style={{ textAlign: "center", padding: "12px 0" }}>
-        No logs yet — start Limor to see activity
+        אין לוגים — הפעל את לימור
       </div>
     );
   }

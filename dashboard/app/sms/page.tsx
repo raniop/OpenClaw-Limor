@@ -116,12 +116,12 @@ export default function SmsPage() {
         <>
           <h3 style={{ marginTop: "1.5rem" }}>📦 Pending Deliveries ({pendingDeliveries.length})</h3>
           {pendingDeliveries.map((d) => (
-            <div key={d.id} className="card" style={{ borderLeft: "3px solid var(--warning)" }}>
+            <div key={d.id} className="card" style={{ borderInlineStart: "3px solid var(--warning)" }}>
               <div className="card-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <strong>{d.carrier}</strong>
-                  {d.trackingNumber && <span style={{ marginLeft: "0.5rem", opacity: 0.7 }}>#{d.trackingNumber}</span>}
-                  <span className="badge" style={{ background: "rgba(245,158,11,0.15)", color: "var(--warning)", borderColor: "rgba(245,158,11,0.3)", marginLeft: "0.5rem" }}>Pending</span>
+                  {d.trackingNumber && <span style={{ marginInlineStart: "0.5rem", opacity: 0.7 }}>#{d.trackingNumber}</span>}
+                  <span className="badge" style={{ background: "rgba(245,158,11,0.15)", color: "var(--warning)", borderColor: "rgba(245,158,11,0.3)", marginInlineStart: "0.5rem" }}>Pending</span>
                 </div>
                 <MarkReceivedButton id={d.id} />
               </div>
@@ -139,7 +139,7 @@ export default function SmsPage() {
         <>
           <h3 style={{ marginTop: "1.5rem" }}>📦 Delivery Messages ({smsDeliveries.length})</h3>
           {smsDeliveries.map((m) => (
-            <div key={m.id} className="card" style={{ borderLeft: "3px solid var(--success)" }}>
+            <div key={m.id} className="card" style={{ borderInlineStart: "3px solid var(--success)" }}>
               <div className="card-row">
                 <strong>{m.sender}</strong>
                 <span className="badge badge-approved">Delivery</span>
@@ -155,7 +155,7 @@ export default function SmsPage() {
 
       {smsDeliveries.length === 0 && pendingDeliveries.length === 0 && (
         <div className="card" style={{ textAlign: "center", padding: "2rem" }}>
-          <p>No pending deliveries</p>
+          <p>אין משלוחים ממתינים</p>
         </div>
       )}
 
@@ -164,10 +164,10 @@ export default function SmsPage() {
         <>
           <h3 style={{ marginTop: "1.5rem" }}>✅ Recently Received ({receivedDeliveries.length})</h3>
           {receivedDeliveries.slice(0, 10).map((d) => (
-            <div key={d.id} className="card" style={{ borderLeft: "3px solid var(--success)", opacity: 0.7 }}>
+            <div key={d.id} className="card" style={{ borderInlineStart: "3px solid var(--success)", opacity: 0.7 }}>
               <div className="card-row">
                 <strong>{d.carrier}</strong>
-                {d.trackingNumber && <span style={{ marginLeft: "0.5rem", opacity: 0.7 }}>#{d.trackingNumber}</span>}
+                {d.trackingNumber && <span style={{ marginInlineStart: "0.5rem", opacity: 0.7 }}>#{d.trackingNumber}</span>}
                 <span className="badge badge-approved">Received</span>
               </div>
               <div className="card-meta">Received: {d.receivedAt ? new Date(d.receivedAt).toLocaleString("he-IL") : "—"}</div>

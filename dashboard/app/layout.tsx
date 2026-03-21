@@ -5,7 +5,7 @@ import { Sidebar } from "./components/sidebar";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata = {
-  title: "OpenClaw Dashboard",
+  title: "לימור — מרכז בקרה",
   description: "Limor Control Panel",
 };
 

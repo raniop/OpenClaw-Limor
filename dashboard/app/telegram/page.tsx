@@ -56,7 +56,7 @@ export default async function TelegramPage() {
             </div>
             <div className="card" style={{ padding: 0, overflow: "hidden" }}>
               <div style={{ padding: "10px 14px", fontSize: 12, color: "var(--text-secondary)", borderBottom: "1px solid var(--glass-border)" }}>
-                {ch.description} — polling every 15s
+                {ch.description} — מתעדכן כל 15 שניות
               </div>
               {ch.messages.length === 0 ? (
                 <div className="empty-state">No recent messages</div>

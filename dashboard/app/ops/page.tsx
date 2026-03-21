@@ -196,7 +196,7 @@ export default function OpsPage() {
       {/* Gating Metrics */}
       {data.passFail?.gatingMetrics && data.passFail.gatingMetrics.length > 0 && (
         <>
-          <div className="section-header mt-4">Gating Metrics (חייבים לעבור)</div>
+          <div className="section-header mt-4">מדדי סף (חייבים לעבור)</div>
           <div className="card" style={{ padding: "12px 20px", display: "flex", gap: 24, flexWrap: "wrap" }}>
             {data.passFail.gatingMetrics.map((g) => (
               <div key={g.name} style={{ display: "flex", alignItems: "center", gap: 8 }}>

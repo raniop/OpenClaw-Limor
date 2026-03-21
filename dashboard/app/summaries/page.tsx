@@ -104,11 +104,11 @@ export default function SummariesPage() {
       </div>
 
       {loading ? (
-        <div className="card empty-state">Loading...</div>
+        <div className="card empty-state">טוען...</div>
       ) : !data || data.summaries.length === 0 ? (
         <div className="card empty-state">
-          No summaries available{selectedDate ? ` for ${selectedDate}` : ""}.
-          Summaries are generated daily at 23:00 Israel time.
+          אין סיכומים זמינים{selectedDate ? ` עבור ${selectedDate}` : ""}.
+          סיכומים נוצרים מדי יום בשעה 23:00.
         </div>
       ) : (
         <>
