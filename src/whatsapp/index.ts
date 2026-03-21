@@ -279,8 +279,10 @@ async function handleMessage(msg: Message): Promise<void> {
   }
   let { body, imageData } = mediaResult.result;
 
-  // --- vCard (contact card) processing: auto-add contacts from owner ---
-  if (msg.type === "vcard" && (msg as any).vCards?.length > 0) {
+  // --- vCard (contact card) processing: ONLY from owner ---
+  const chatIdForVcard = msg.from;
+  const isOwnerVcard = !msg.from.includes("@g.us") && chatIdForVcard === config.ownerChatId;
+  if (isOwnerVcard && msg.type === "vcard" && (msg as any).vCards?.length > 0) {
     const vcards: string[] = (msg as any).vCards;
     const parsed = vcards.map(parseVCard).filter(Boolean) as Array<{ name: string; phone: string }>;
     if (parsed.length > 0) {
