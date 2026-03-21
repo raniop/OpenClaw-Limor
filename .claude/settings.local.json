@@ -229,7 +229,11 @@
       "Bash(node -e \"const p = require\\(''puppeteer''\\); console.log\\(''puppeteer version:'', p.default?.version?.\\(\\) || ''unknown''\\); console.log\\(''executablePath:'', p.executablePath\\(\\)\\)\")",
       "Bash(ln -sf mac_arm-146.0.7680.76 mac-146.0.7680.76)",
       "Bash(ln -sf chrome-mac-arm64 chrome-mac-x64)",
-      "Bash(launchctl load:*)"
+      "Bash(launchctl load:*)",
+      "Bash(curl -s http://localhost:3848/api/ops)",
+      "Bash(for api:*)",
+      "Bash(curl -s http://localhost:3848/api/$api)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(type\\(d\\).__name__, ''''— ok''''\\)\")"
     ]
   }
 }
