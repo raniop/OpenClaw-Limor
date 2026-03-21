@@ -4,6 +4,7 @@ import { BotControl } from "./components/bot-control";
 import { LiveLogs } from "./components/live-logs";
 import { SystemStatus } from "./components/system-status";
 import { StatusFeed } from "./components/status-feed";
+import { OpsStatus } from "./components/ops-status";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +60,10 @@ export default function DashboardHome() {
           <div className="stat-label">📦 Pending Deliveries</div>
           <div className="stat-value">{pendingDeliveries.length}</div>
         </Link>
+      </div>
+
+      <div className="grid grid-3 mt-3">
+        <OpsStatus />
       </div>
 
       <div className="grid grid-2 mt-4" style={{ alignItems: "stretch" }}>
