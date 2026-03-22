@@ -385,6 +385,19 @@ async function handleMessage(msg: Message): Promise<void> {
   if (isGroup) registerGroup(chat.name, chatId);
   const isOwner = !isGroup && chatId === config.ownerChatId;
 
+  // In groups, also track the individual sender (msg.author) as a contact
+  // This links group participants to their personal chatId so we recognize them everywhere
+  if (isGroup && msg.author) {
+    try {
+      const authorContact = await msg.getContact();
+      const authorPhone = authorContact.number || msg.author.replace(/@.*$/, "");
+      const authorName = authorContact.pushname || authorContact.name || authorPhone;
+      updateContact(msg.author, authorName, authorPhone);
+    } catch (err) {
+      // Silently ignore — author tracking is best-effort
+    }
+  }
+
   // --- Update relationship memory ---
   if (!isGroup) {
     try {
@@ -544,9 +557,11 @@ async function handleMessage(msg: Message): Promise<void> {
 
     log.aiRequestStart(trace);
     const aiTimer = startTimer();
-    const response = await sendMessage(history, (memoryContext || "") + extraContext, sender, { allowTools, allowedToolNames, modelRouting });
+    const sendResult = await sendMessage(history, (memoryContext || "") + extraContext, sender, { allowTools, allowedToolNames, modelRouting });
+    const response = sendResult.text;
+    const toolsUsedInMessage = sendResult.toolsUsed;
     const aiDurationMs = aiTimer.stop();
-    log.aiRequestEnd(aiDurationMs, 0, trace); // tool count is tracked inside send-message
+    log.aiRequestEnd(aiDurationMs, toolsUsedInMessage.length, trace);
 
     const responseTimer = startTimer();
     await handleResponse(chatId, contactName, response,
@@ -599,16 +614,16 @@ async function handleMessage(msg: Message): Promise<void> {
           userInput: body,
         });
 
-        // Fill execution results — sendMessage doesn't expose tool names,
-        // so we detect from the hallucination-guard regex pattern
+        // Fill execution results with actual tool usage data from sendMessage
+        opTrace.toolsUsed = toolsUsedInMessage;
         opTrace.responseLength = response.length;
         opTrace.aiDurationMs = aiDurationMs;
         opTrace.totalDurationMs = elapsed(trace);
         const actionClaimPattern = /שולחת בקשה|שלחתי בקשה|שולחת לרני|העברתי לרני|קבעתי|שלחתי זימון|שולחת זימון|שלחתי הודעה|שלחתי ל|העברתי ל|בדקתי את|מצאתי (מסעדה|טיסה|מלון)|הזמנתי|ביטלתי|יצרתי|נוצרה|הוספתי|מחקתי/;
-        opTrace.hadHallucination = actionClaimPattern.test(response) && opTrace.toolsUsed.length === 0;
+        opTrace.hadHallucination = actionClaimPattern.test(response) && toolsUsedInMessage.length === 0;
 
         // Run self-check
-        const selfCheckResult = runSelfCheck(opTrace, response, opTrace.toolsUsed);
+        const selfCheckResult = runSelfCheck(opTrace, response, toolsUsedInMessage);
         opTrace.selfCheck = selfCheckResult;
 
         // Save trace
@@ -640,8 +655,8 @@ async function handleMessage(msg: Message): Promise<void> {
       }
     }
 
-    // Background fact + preference extraction
-    extractFacts(history).then(({ name, facts, preferences }) => {
+    // Background fact + preference extraction (owner only to save API costs)
+    if (isOwner) extractFacts(history).then(({ name, facts, preferences }) => {
       if (name || facts.length > 0) saveExtractedFacts(chatId, facts, name || undefined);
       if (preferences && Object.keys(preferences).length > 0) {
         for (const [category, values] of Object.entries(preferences)) {
@@ -652,9 +667,9 @@ async function handleMessage(msg: Message): Promise<void> {
       }
     }).catch((err) => log.memorySaveError(String(err)));
 
-    // Background followup extraction (skip if create_reminder tool was already used)
+    // Background followup extraction (skip for owner chats and if create_reminder tool was already used)
     try {
-      if (!response.includes("תזכורת נוצרה")) {
+      if (!isOwner && !response.includes("תזכורת נוצרה")) {
         extractFollowups(response, chatId, contactName, body);
       }
     } catch (err) {

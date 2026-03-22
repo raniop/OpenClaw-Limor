@@ -11,6 +11,7 @@ interface ContactEntry {
   aliases?: string[];
   phone: string;
   lastSeen: string;
+  relationship_type?: string;
 }
 
 type ContactsStore = Record<string, ContactEntry>; // keyed by chatId
@@ -113,16 +114,68 @@ export function updateContact(chatId: string, name: string, phone: string): void
   // Don't create new contacts without a real phone number
   if (!existing && !isRealPhone) return;
 
-  // If existing contact already has a real phone, just update lastSeen + aliases
-  const existingHasRealPhone = existing?.phone && /^972\d{8,9}$/.test(existing.phone);
+  // Auto-merge: look for an existing entry (manual_ or other chatId) that matches by phone or name
+  // This prevents duplicates when the same person messages from private chat, group, or was added manually
+  const cleanPhone = isRealPhone ? phone : "";
+  const nameLower = name.toLowerCase();
+  const duplicateMatch = Object.entries(contacts).find(([key, c]) => {
+    if (key === chatId) return false; // Skip self
+    // Match by phone number
+    if (cleanPhone && c.phone && c.phone === cleanPhone) return true;
+    // Match by name (only if the other entry has no real chatId, i.e., manual_)
+    if (key.startsWith("manual_") && c.phone &&
+      [c.name, ...(c.aliases || [])].some(n => n.toLowerCase() === nameLower)) return true;
+    return false;
+  });
+
+  if (duplicateMatch) {
+    const [dupeKey, dupeContact] = duplicateMatch;
+    // Prefer the real chatId (not manual_) as the primary key
+    const primaryKey = chatId.startsWith("manual_") ? dupeKey : chatId;
+    const secondaryKey = primaryKey === chatId ? dupeKey : chatId;
+    const primaryContact = primaryKey === chatId ? (existing || {}) : dupeContact;
+    const secondaryContact = primaryKey === chatId ? dupeContact : (existing || {});
+
+    const mergedAliases = [...new Set([
+      ...(primaryContact.aliases || []),
+      ...(secondaryContact.aliases || []),
+      ...(primaryContact.name && secondaryContact.name && primaryContact.name !== secondaryContact.name
+        ? [secondaryContact.name] : []),
+      ...(name !== (primaryContact.name || secondaryContact.name) ? [name] : []),
+    ])].filter(a => a && a !== (primaryContact.name || secondaryContact.name));
+
+    contacts[primaryKey] = {
+      chatId: primaryKey,
+      name: primaryContact.name || secondaryContact.name || name,
+      aliases: mergedAliases.length > 0 ? mergedAliases : undefined,
+      phone: primaryContact.phone || secondaryContact.phone || cleanPhone,
+      relationship_type: primaryContact.relationship_type || secondaryContact.relationship_type,
+      lastSeen: new Date().toISOString(),
+    };
+    if (secondaryKey !== primaryKey) {
+      delete contacts[secondaryKey];
+    }
+    saveContacts(contacts);
+    console.log(`[contacts] Auto-merged: ${secondaryKey} → ${primaryKey} (${contacts[primaryKey].name})`);
+    return;
+  }
+
+  // No duplicate — handle phoneless contacts
+  if (existing && !existing.phone && !isRealPhone) {
+    // No phone anywhere — just update lastSeen
+    existing.lastSeen = new Date().toISOString();
+    saveContacts(contacts);
+    return;
+  }
 
   const aliases = existing?.aliases || [];
   if (existing && existing.name !== name && !aliases.includes(name)) {
     aliases.push(name);
   }
   contacts[chatId] = {
+    ...existing,
     chatId,
-    name,
+    name: existing?.name || name, // Keep existing name if already set (e.g., Hebrew name over pushname)
     aliases: aliases.length > 0 ? aliases : undefined,
     phone: isRealPhone ? phone : (existing?.phone || ""),
     lastSeen: new Date().toISOString(),

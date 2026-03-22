@@ -65,20 +65,33 @@ function saveSummariesFile(entries: DailySummaryFile[]): void {
 }
 
 function loadConversations(): ConversationStore {
-  const p = statePath("conversations.json");
-  if (!existsSync(p)) return {};
   try {
-    return JSON.parse(readFileSync(p, "utf-8"));
-  } catch {
+    const { SqliteConversationStore } = require("../stores/sqlite-conversation-store");
+    const store = new SqliteConversationStore();
+    const chatIds = store.getAllChatIds();
+    const result: ConversationStore = {};
+    for (const chatId of chatIds) {
+      const history = store.getHistory(chatId);
+      if (history.length > 0) {
+        result[chatId] = history.map((m: any) => ({ role: m.role, content: m.content }));
+      }
+    }
+    return result;
+  } catch (err) {
+    console.error("[daily-summaries] Failed to load conversations from SQLite:", err);
     return {};
   }
 }
 
 function loadContacts(): ContactsStore {
-  const p = statePath("contacts.json");
-  if (!existsSync(p)) return {};
   try {
-    return JSON.parse(readFileSync(p, "utf-8"));
+    const { listAllContacts, findContactByPhone } = require("../contacts");
+    // contacts.ts returns a formatted string — we need to parse the underlying data
+    const p = statePath("contacts.json");
+    if (existsSync(p)) {
+      return JSON.parse(readFileSync(p, "utf-8"));
+    }
+    return {};
   } catch {
     return {};
   }

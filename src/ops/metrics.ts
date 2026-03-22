@@ -77,9 +77,11 @@ export const METRIC_DEFINITIONS: MetricDefinition[] = [
       const withTools = traces.filter((t) => t.toolsUsed.length > 0);
       if (withTools.length === 0) return 1;
       // A tool is "unnecessary" when toolIntentType=none but tools were still used
+      // Exclude tools that are always OK to use (info-gathering, instructions, etc.)
+      const ALWAYS_OK_TOOLS = new Set(["learn_instruction", "forget_instruction", "list_instructions", "get_group_history", "summarize_group_activity", "get_contact_history", "list_contacts", "web_search", "list_events", "read_sms", "search_sms", "smart_home_status", "smart_home_list", "list_files", "read_file", "get_current_model"]);
       const totalToolUses = withTools.reduce((sum, t) => sum + t.toolsUsed.length, 0);
       const unnecessaryUses = withTools
-        .filter((t) => t.toolIntentType === "none" && !t.shouldUseTool)
+        .filter((t) => t.toolIntentType === "none" && !t.shouldUseTool && !t.toolsUsed.every((tool) => ALWAYS_OK_TOOLS.has(tool)))
         .reduce((sum, t) => sum + t.toolsUsed.length, 0);
       return safeRatio(totalToolUses - unnecessaryUses, totalToolUses);
     },

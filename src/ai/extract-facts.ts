@@ -49,9 +49,9 @@ export async function extractFacts(
       .join("\n");
 
     const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514", // Keep cheap model for fact extraction
+      model: "claude-sonnet-4-20250514",
       max_tokens: 256,
-      system: EXTRACT_PROMPT,
+      system: [{ type: "text", text: EXTRACT_PROMPT, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: conversation }],
     });
 

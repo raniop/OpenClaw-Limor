@@ -70,8 +70,13 @@ export function runSelfCheck(
   }
 
   // 3. unnecessary_tool_used — הופעל כלי כשלא היה intent
+  // Only flag if the tools used are truly irrelevant (e.g., not standard info-gathering tools)
+  const ALWAYS_OK_TOOLS = new Set(["learn_instruction", "forget_instruction", "list_instructions", "get_group_history", "summarize_group_activity", "get_contact_history", "list_contacts", "web_search", "list_events", "read_sms", "search_sms", "smart_home_status", "smart_home_list", "list_files", "read_file", "get_current_model"]);
   if (trace.toolIntentType === "none" && !trace.shouldUseTool && toolCallsMade.length > 0) {
-    flags.push("unnecessary_tool_used");
+    const allToolsOk = toolCallsMade.every((t) => ALWAYS_OK_TOOLS.has(t));
+    if (!allToolsOk) {
+      flags.push("unnecessary_tool_used");
+    }
   }
 
   // 4. open_loop_unaddressed — followup שעבר הזמן ולא הוזכר

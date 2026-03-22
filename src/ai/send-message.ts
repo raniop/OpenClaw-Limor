@@ -31,12 +31,17 @@ export interface SendMessageOptions {
   modelRouting?: ModelRouterParams;
 }
 
+export interface SendMessageResult {
+  text: string;
+  toolsUsed: string[];
+}
+
 export async function sendMessage(
   history: Message[],
   memoryContext?: string,
   sender?: SenderContext,
   options?: SendMessageOptions
-): Promise<string> {
+): Promise<SendMessageResult> {
   const timeoutPromise = new Promise<never>((_, reject) =>
     setTimeout(() => reject(new Error("__SEND_MESSAGE_TIMEOUT__")), SEND_MESSAGE_TIMEOUT_MS)
   );
@@ -100,11 +105,11 @@ export async function sendMessage(
     console.log(`[model-router] Selected: ${selection.model} (${selection.reason})`);
   }
 
-  // --- Initial API call ---
+  // --- Initial API call (with prompt caching) ---
   const apiParams: any = {
     model: selectedModel,
     max_tokens: config.maxTokens,
-    system: systemPrompt,
+    system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
     messages,
   };
   if (tools.length > 0) apiParams.tools = tools;
@@ -112,14 +117,16 @@ export async function sendMessage(
   let response = await withRetry(() => client.messages.create(apiParams));
 
   // --- Tool use loop ---
-  response = await runToolLoop(response, messages, systemPrompt, tools, selectedModel, sender);
+  const loopResult = await runToolLoop(response, messages, systemPrompt, tools, selectedModel, sender);
+  response = loopResult.response;
+  const toolsUsed = loopResult.toolsUsed;
 
   // --- Extract text ---
   const textBlock = response.content.find((block) => block.type === "text");
   let finalText = textBlock ? (textBlock as Anthropic.TextBlock).text : "אופס, לא הצלחתי לייצר תשובה 😅 נסה שוב?";
 
   // --- Hallucination guard ---
-  const hadToolCalls = response.content.some((b) => b.type === "tool_use") ||
+  const hadToolCalls = toolsUsed.length > 0 || response.content.some((b) => b.type === "tool_use") ||
     messages.some((m) => m.role === "user" && Array.isArray(m.content) && m.content.some((c: any) => c.type === "tool_result"));
 
   const hallCheck = checkHallucination(finalText, hadToolCalls, tools.length > 0);
@@ -137,18 +144,23 @@ export async function sendMessage(
     notifyHallucinationEvent(sender);
   }
 
-  return finalText;
+  return { text: finalText, toolsUsed };
     })()]);
   } catch (err: any) {
     if (err?.message === "__SEND_MESSAGE_TIMEOUT__") {
       console.error(`[send-message] ⏰ Timeout after ${SEND_MESSAGE_TIMEOUT_MS}ms`);
-      return "⏰ הפעולה לקחה יותר מדי זמן. נסה שוב עם בקשה פשוטה יותר?";
+      return { text: "⏰ הפעולה לקחה יותר מדי זמן. נסה שוב עם בקשה פשוטה יותר?", toolsUsed: [] };
     }
     throw err;
   }
 }
 
 // ─── Tool loop helper ────────────────────────────────────────────────
+
+interface ToolLoopResult {
+  response: Anthropic.Message;
+  toolsUsed: string[];
+}
 
 async function runToolLoop(
   response: Anthropic.Message,
@@ -157,8 +169,9 @@ async function runToolLoop(
   tools: Anthropic.Tool[],
   model: string,
   sender?: SenderContext
-): Promise<Anthropic.Message> {
+): Promise<ToolLoopResult> {
   const toolRetries = new Map<string, number>();
+  const toolsUsed: string[] = [];
   let iterations = 0;
 
   while (response.stop_reason === "tool_use") {
@@ -186,6 +199,7 @@ async function runToolLoop(
           sender
         );
         log.toolCall(toolBlock.name, result, timer.stop());
+        toolsUsed.push(toolBlock.name);
         return { id: toolBlock.id, name: toolBlock.name, result };
       })
     );
@@ -215,7 +229,7 @@ async function runToolLoop(
     const loopParams: any = {
       model,
       max_tokens: config.maxTokens,
-      system: systemPrompt,
+      system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
       messages,
     };
     if (tools.length > 0) loopParams.tools = tools;
@@ -223,5 +237,5 @@ async function runToolLoop(
     response = await withRetry(() => client.messages.create(loopParams));
   }
 
-  return response;
+  return { response, toolsUsed };
 }

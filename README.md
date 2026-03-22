@@ -25,7 +25,7 @@
 ### אוטומציות
 - ⏰ **תזכורות יזומות** — followup reminders, התראות לפני פגישות
 - 📊 **בריפינג יומי** — מה מחכה לך, מה פתוח, ימי הולדת
-- 📋 **סיכומי שיחות** — executive briefing פעמיים ביום (14:00 + 23:00)
+- 📋 **סיכומי שיחות** — executive briefing פעמיים ביום (14:00 + 23:00) עם prompt caching
 - 🔄 **מעקב אוטומטי** — יצירת followups מתוך שיחות
 
 ### אבטחה והרשאות
@@ -51,7 +51,7 @@
 ### אינטליגנציה
 - 🧠 **17-Layer Context Engine** — הבנת הקשר דטרמיניסטית
 - 😊 **Mood Detection** — 7 מצבי רוח, התאמת טון
-- 🔀 **Smart Model Router** — Opus למורכב, Sonnet לפשוט
+- 🔀 **Smart Model Router** — Sonnet כברירת מחדל, Opus רק ל-capability (אופטימיזציית עלויות)
 - 🔁 **Tool Retry** — ניסיון שני אוטומטי על כשל
 - 🚫 **Anti-Hallucination** — כללי ברזל + retry אוטומטי
 - 🔗 **Multi-step Planning** — תכנון וביצוע משימות מורכבות

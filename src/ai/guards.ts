@@ -65,7 +65,7 @@ export async function retryOnHallucination(
   const retryParams: any = {
     model,
     max_tokens: config.maxTokens,
-    system: systemPrompt,
+    system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
     messages,
   };
   if (tools.length > 0) retryParams.tools = tools;
@@ -119,7 +119,7 @@ export async function retryOnHallucination(
       const retryLoopParams: any = {
         model,
         max_tokens: config.maxTokens,
-        system: systemPrompt,
+        system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
         messages,
       };
       if (tools.length > 0) retryLoopParams.tools = tools;

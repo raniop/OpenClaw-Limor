@@ -58,21 +58,11 @@ export function selectModel(params: ModelRouterParams): ModelSelection {
 
   // --- Owner from here ---
 
-  // Rule 1a: multi_step_request or reminder_request → Opus
-  if (turnIntent === "multi_step_request" || turnIntent === "reminder_request") {
-    return { model: OPUS, reason: `owner + ${turnIntent}` };
-  }
-
-  // Rule 1b: action_request with a tool-heavy intent → Opus
-  if (turnIntent === "action_request" && TOOL_HEAVY_TYPES.has(toolIntentType)) {
-    return { model: OPUS, reason: `owner + action_request (${toolIntentType})` };
-  }
-
-  // Rule 1c: capability intent (e.g. "what can you do?") → Opus
+  // Cost optimization: use Sonnet for everything.
+  // Opus only for capability requests (rare, needs deep reasoning).
   if (toolIntentType === "capability") {
     return { model: OPUS, reason: "owner + capability" };
   }
 
-  // Rule 2: Owner + simple chat → Sonnet
-  return { model: SONNET, reason: `owner + simple (${turnIntent})` };
+  return { model: SONNET, reason: `owner (${turnIntent})` };
 }

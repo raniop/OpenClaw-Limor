@@ -20,6 +20,8 @@ const FILE_PATTERNS = /(קובץ|מסמך|לשמור|למחוק קובץ|file|do
 const CONTACT_PATTERNS = /(איש קשר|מספר של|טלפון של|contact|אנשי קשר|תוסיפי את|תוסיף את|vcard|vcf|BEGIN:VCARD)/i;
 const VCARD_PATTERN = /^[A-Za-zא-ת\s\-\.]+\n\+?9725\d{8}/;
 const CAPABILITY_PATTERNS = /(תלמדי|תלמד|capability|יכולת חדשה)/i;
+const INSTRUCTION_PATTERNS = /(צריך לזהות|צריכה לזהות|תזכרי ש|תזכור ש|תלמדי ש|תלמד ש|מעכשיו תמיד|מעכשיו כש|learn.*instruction|save.*instruction|תשמרי.*הוראה|הוראה חדשה|כלל חדש|תתייחסי ל.*כ|זה (ג'?אנק|ספאם|spam|junk)|תתעלמי מ|תפסיקי ל|אל ת.*יותר)/i;
+const GROUP_HISTORY_PATTERNS = /(תסכמי.*קבוצ|תסכם.*קבוצ|מה היה ב.*קבוצ|מה קורה ב.*קבוצ|מה פספסתי ב.*קבוצ|מה קרה ב.*קבוצ|סיכום.*קבוצ|summary.*group|what happened.*group|מה דיברו ב|מה אמרו ב|היסטורי.*קבוצ|group.*history)/i;
 const WHATSAPP_MGMT_PATTERNS = /(מי בקבוצ|חברי הקבוצ|רשימת.*קבוצ|group members|תמחקי.*הודע|תערכי.*הודע|edit message|delete message|תחפשי.*הודע|search messages|סקר|poll|תצמידי|pin|נקרא|read status|תבדקי.*מספר|check.*number|בוואטסאפ|label|תייגי|תוסיפי.*לקבוצ|תסירי.*מקבוצ|מי שם\??)/i;
 const SMS_PATTERNS = /(sms|הודעות טקסט|הודעות רגילות|הודעות באייפון|חבילה|חבילות|משלוח|משלוחים|deliveries?|packages?|מה הגיע|מה קיבלתי)/i;
 
@@ -94,6 +96,12 @@ function matchToolCategory(message: string): ToolMatch | null {
   }
   if (CONTACT_PATTERNS.test(message) || VCARD_PATTERN.test(message)) {
     return { type: "contact_lookup", label: "אנשי קשר", reason: "יש בקשת חיפוש או הוספת איש קשר", confidence: 0.9 };
+  }
+  if (INSTRUCTION_PATTERNS.test(message)) {
+    return { type: "file", label: "הוראה/למידה", reason: "הוראה או כלל חדש ללימור", confidence: 0.85 };
+  }
+  if (GROUP_HISTORY_PATTERNS.test(message)) {
+    return { type: "contact_lookup", label: "היסטוריית קבוצה", reason: "בקשת סיכום או היסטוריה של קבוצה", confidence: 0.9 };
   }
   if (CAPABILITY_PATTERNS.test(message)) {
     return { type: "capability", label: "יכולות", reason: "יש בקשת יכולת חדשה", confidence: 0.85 };

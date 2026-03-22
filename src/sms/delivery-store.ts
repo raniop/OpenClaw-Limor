@@ -65,13 +65,18 @@ export function addDelivery(
   const entries = readStore();
   // Dedup by smsId
   if (entries.some((e) => e.smsId === smsId)) return null;
-  // Dedup by tracking number — if same tracking already exists, skip (it's an update on same package)
-  if (trackingNumber && entries.some((e) => e.trackingNumber === trackingNumber && e.status === "pending")) return null;
+  // Dedup by tracking number — if same tracking already exists (any status), skip
+  if (trackingNumber && entries.some((e) => e.trackingNumber === trackingNumber)) {
+    // Update existing entry if the new one has more info (e.g., status change)
+    return null;
+  }
+  // Dedup: same carrier already has an entry with tracking — skip this one without tracking
+  if (!trackingNumber && entries.some((e) => e.carrier === carrier && e.trackingNumber)) return null;
   // Dedup by carrier + time window (30 min) — multiple SMS from same carrier about same delivery
   const DEDUP_WINDOW_MS = 30 * 60 * 1000;
   const tsMs = new Date(smsTimestamp).getTime();
   if (tsMs && entries.some((e) => {
-    if (e.carrier !== carrier || e.status !== "pending") return false;
+    if (e.carrier !== carrier) return false;
     const existingTs = new Date(e.smsTimestamp).getTime();
     return existingTs && Math.abs(tsMs - existingTs) < DEDUP_WINDOW_MS;
   })) return null;
