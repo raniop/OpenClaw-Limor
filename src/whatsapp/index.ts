@@ -24,6 +24,7 @@ import { handleResponse } from "./response-handler";
 import { classifyGroupMessage, recordGroupResponse, hasRecentGroupResponse } from "./group-classifier";
 import { getResolvedContext, formatCompressedContextForPrompt, formatDebugTrace, applyFollowupAutomation } from "../context";
 import type { ResolvedContext } from "../context";
+import { setPersistedState, clearState as clearConversationState } from "../context/conversation-state-store";
 import { extractFollowups } from "../followups";
 import { updateFromMessage } from "../relationship-memory";
 import { approvalStore } from "../stores";
@@ -452,6 +453,7 @@ async function handleMessage(msg: Message): Promise<void> {
     // --- Slash commands ---
     if (body === "/clear" || body === "/נקה") {
       conversationStore.clearHistory(chatId);
+      clearConversationState(chatId);
       await msg.reply("✨ ניקיתי הכל! יאללה מתחילים מחדש 😊");
       log.traceEnd(trace, "command_clear", elapsed(trace));
       return;
@@ -571,6 +573,20 @@ async function handleMessage(msg: Message): Promise<void> {
     // Track group response for conversation continuation
     if (isGroup && outcome !== "skip") {
       recordGroupResponse(chatId);
+    }
+
+    // --- Update persisted conversation state based on resolved context ---
+    if (resolvedCtx) {
+      const resolvedState = resolvedCtx.conversationState;
+      // After AI responds, if the response asks a clarification question, the next state
+      // should be "awaiting_user_detail". Otherwise, persist the resolved state.
+      const askingClarification = response.includes("?") && resolvedState.type === "awaiting_user_detail";
+      if (askingClarification) {
+        setPersistedState(chatId, "awaiting_user_detail", `AI asked clarification: ${response.substring(0, 80)}`);
+      } else {
+        setPersistedState(chatId, resolvedState.type, resolvedState.reason);
+      }
+      console.log(`[state] ${chatId}: resolved=${resolvedState.type} (${resolvedState.summary})`);
     }
 
     // --- Operational trace + self-check ---

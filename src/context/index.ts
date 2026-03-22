@@ -23,3 +23,7 @@ export { buildDebugTrace } from "./debug-trace";
 export { runReplayTurn, runReplayScenario } from "./replay-runner";
 export { resolveFollowupAutomationDecision, applyFollowupAutomation } from "./followup-automation";
 export { resolveDomainPolicy } from "./domain-policy-resolver";
+export { resolvePolicies } from "./policy-resolver";
+export type { PolicySource, ResolvedPolicies } from "./policy-resolver";
+export { getPersistedState, setPersistedState, clearState, getAllStates } from "./conversation-state-store";
+export type { PersistedConversationState } from "./conversation-state-store";

@@ -1,0 +1,136 @@
+/**
+ * Hallucination detection and retry logic.
+ * Detects when the AI claims it performed an action without actually calling a tool,
+ * then retries with explicit instructions to use tools.
+ */
+import Anthropic from "@anthropic-ai/sdk";
+import { client, withRetry } from "./client";
+import { config } from "../config";
+import { handleToolCall } from "./handle-tool-call";
+import { log } from "../logger";
+import { startTimer } from "../observability";
+import type { SenderContext } from "./types";
+
+export interface HallucinationCheckResult {
+  isHallucination: boolean;
+  claimedAction: string | null;
+}
+
+const HALLUCINATION_PATTERN = /שולחת בקשה|שלחתי בקשה|שולחת לרני|העברתי לרני|קבעתי|שלחתי זימון|שולחת זימון|שלחתי הודעה|שלחתי ל|העברתי ל|בדקתי את|מצאתי (מסעדה|טיסה|מלון)|הזמנתי|ביטלתי|יצרתי|נוצרה|הוספתי|מחקתי|החלפתי|עברתי ל|שיניתי|עדכנתי|בוצע|הופעל|הוגדר|נשמר|הועבר/;
+
+/**
+ * Check whether the AI response is a hallucination — claiming an action without
+ * having called any tool.
+ */
+export function checkHallucination(
+  response: string,
+  hadToolCalls: boolean,
+  toolsAvailable: boolean
+): HallucinationCheckResult {
+  if (hadToolCalls || !toolsAvailable) {
+    return { isHallucination: false, claimedAction: null };
+  }
+
+  const match = HALLUCINATION_PATTERN.exec(response);
+  if (!match) {
+    return { isHallucination: false, claimedAction: null };
+  }
+
+  return { isHallucination: true, claimedAction: match[0] };
+}
+
+/**
+ * Retry the AI call after detecting a hallucination.
+ * Appends a correction message and runs a full tool loop on the retry.
+ * Returns the new response text, or null if the retry fails.
+ */
+export async function retryOnHallucination(
+  messages: Anthropic.MessageParam[],
+  systemPrompt: string,
+  tools: Anthropic.Tool[],
+  model: string,
+  originalResponse: Anthropic.ContentBlock[],
+  sender?: SenderContext
+): Promise<string | null> {
+  // Append the hallucinated response + correction instruction
+  messages.push({ role: "assistant", content: originalResponse });
+  messages.push({
+    role: "user",
+    content: "[SYSTEM] שגיאה: טענת שביצעת פעולה בלי להפעיל כלי. אנא נסי שוב — הפעם חובה להשתמש בכלי המתאים. אם אין כלי מתאים, אמרי בכנות שאין לך יכולת.",
+  });
+
+  const retryParams: any = {
+    model,
+    max_tokens: config.maxTokens,
+    system: systemPrompt,
+    messages,
+  };
+  if (tools.length > 0) retryParams.tools = tools;
+
+  try {
+    let retryResponse = await withRetry(() => client.messages.create(retryParams));
+
+    // Run tool loop on the retry too (AI might now actually call a tool)
+    while (retryResponse.stop_reason === "tool_use") {
+      const retryToolBlocks = retryResponse.content.filter(
+        (b) => b.type === "tool_use"
+      ) as Anthropic.ToolUseBlock[];
+      if (retryToolBlocks.length === 0) break;
+
+      const retryToolResults = await Promise.all(
+        retryToolBlocks.map(async (toolBlock) => {
+          const timer = startTimer();
+          const result = await handleToolCall(
+            toolBlock.name,
+            toolBlock.input as Record<string, any>,
+            sender
+          );
+          log.toolCall(toolBlock.name, result, timer.stop());
+          return { id: toolBlock.id, name: toolBlock.name, result };
+        })
+      );
+
+      messages.push({ role: "assistant", content: retryResponse.content });
+      messages.push({
+        role: "user",
+        content: retryToolResults.map((tr) => ({
+          type: "tool_result" as const,
+          tool_use_id: tr.id,
+          content: tr.result,
+        })),
+      });
+
+      const retryLoopParams: any = {
+        model,
+        max_tokens: config.maxTokens,
+        system: systemPrompt,
+        messages,
+      };
+      if (tools.length > 0) retryLoopParams.tools = tools;
+
+      retryResponse = await withRetry(() => client.messages.create(retryLoopParams));
+    }
+
+    const textBlock = retryResponse.content.find((block) => block.type === "text");
+    const newText = textBlock ? (textBlock as Anthropic.TextBlock).text : null;
+    console.log(`[hallucination-guard] Retry completed. New text: ${newText?.substring(0, 200)}`);
+    return newText;
+  } catch (retryErr) {
+    console.error("[hallucination-guard] Retry failed:", retryErr);
+    return null;
+  }
+}
+
+/**
+ * Notify the owner about a hallucination event (best-effort, never throws).
+ */
+export function notifyHallucinationEvent(sender?: SenderContext): void {
+  try {
+    const { getNotifyOwnerCallback } = require("./callbacks");
+    const notify = getNotifyOwnerCallback();
+    if (notify) {
+      const who = sender?.isOwner ? "בשיחה איתך" : `צ'אט: ${sender?.name || "unknown"}`;
+      notify(`⚠️ [hallucination] לימור טענה שביצעה פעולה בלי tool! (retry triggered)\n${who}`).catch(() => {});
+    }
+  } catch {}
+}
