@@ -1,176 +1,223 @@
-# Limor - WhatsApp AI Assistant
+# לימור 🐾 — WhatsApp AI Personal Assistant
 
-A personal AI assistant bot for WhatsApp, powered by Claude Sonnet 4.6.
+עוזרת אישית חכמה לוואטסאפ, מבוססת Claude (Anthropic). מבינה עברית ואנגלית, מנהלת יומן, מזמינה מסעדות, מחפשת טיסות, שולחת הודעות, זוכרת הכל — ויודעת ללמוד מטעויות.
 
-## Features
+## ✨ יכולות
 
-- **WhatsApp Integration** - Text, voice messages, images, and documents
-- **Vision** - Understands images sent via WhatsApp
-- **Restaurant Booking** - Search & book via Ontopo and Tabit
-- **Calendar Management** - Google Calendar integration
-- **Flight & Hotel Search** - Real-time search via RapidAPI
-- **CRM Integration** - Insurance policy management
-- **Learning System** - Teach the bot new rules via WhatsApp
-- **File Management** - Read, write, and list files
-- **Memory** - Remembers facts about contacts across conversations
-- **Contact Pairing** - Owner approval required before new contacts can chat
+### שיחה ותקשורת
+- 💬 **שיחה טבעית** — עברית, אנגלית, כל שפה
+- 🎤 **הודעות קוליות** — מקבלת ומשיבה בקול (edge-tts)
+- 📷 **ראייה** — מבינה תמונות שנשלחות
+- 🧠 **זיכרון עמוק** — עובדות, העדפות, דפוסים, מצב רוח
+- 📝 **למידה מתיקונים** — כשמתקנים אותה, היא שומרת את הלקח
 
-## Prerequisites
+### כלים ואינטגרציות
+- 📅 **יומן** — Google Calendar (יצירה, מחיקה, צפייה)
+- 🍽️ **מסעדות** — חיפוש והזמנה דרך Ontopo ו-Tabit
+- ✈️ **טיסות ומלונות** — חיפוש בזמן אמת
+- 🌐 **חיפוש אינטרנט** — Brave Search / DuckDuckGo
+- 📊 **CRM** — ניהול פוליסות ביטוח
+- 🏠 **בית חכם** — Control4
+- 🚕 **מונית** — הזמנת Gett
+- 📱 **SMS** — קריאת הודעות ומעקב משלוחים
+- 📡 **טלגרם** — ניטור ערוצים (התרעות + חדשות) עם תמונות
 
-- **Node.js** 18+ (tested on 22)
-- **Chromium/Chrome** (used by Puppeteer for WhatsApp Web and restaurant booking)
-- **Anthropic API key** with access to Claude Sonnet 4.6
+### אוטומציות
+- ⏰ **תזכורות יזומות** — followup reminders, התראות לפני פגישות
+- 📊 **בריפינג יומי** — מה מחכה לך, מה פתוח, ימי הולדת
+- 📋 **סיכומי שיחות** — executive briefing פעמיים ביום (14:00 + 23:00)
+- 🔄 **מעקב אוטומטי** — יצירת followups מתוך שיחות
 
-## Installation
+### אבטחה והרשאות
+- 🔒 **אישור אנשי קשר** — רק מי שהבעלים אישר יכול לדבר
+- 🛡️ **הפרדת הרשאות** — יומן, CRM, קבצים = רק בעלים
+- 📅 **State Machine לפגישות** — בקשה → אישור → יצירה (אטומי בקוד)
+- ⚠️ **Social engineering protection** — התראה כשמישהו טוען "רני ביקש"
+
+### QA ומוניטורינג
+- 🔬 **Operational Trace** — 25+ שדות לכל הודעה
+- ✅ **Self-Check** — 12 בדיקות בוליאניות אחרי כל תגובה
+- 📈 **Metrics** — tool precision, hallucination rate, task completion
+- 🧪 **Benchmark Suite** — 24 תרחישים, 9 קטגוריות (87.5% pass rate)
+- 🚦 **Pass/Fail Framework** — gating metrics + warnings
+- 📊 **Dashboard** — מרכז בקרה עם לוגים, metrics, alerts
+
+### אינטליגנציה
+- 🧠 **17-Layer Context Engine** — הבנת הקשר דטרמיניסטית
+- 😊 **Mood Detection** — 7 מצבי רוח, התאמת טון
+- 🔀 **Smart Model Router** — Opus למורכב, Sonnet לפשוט
+- 🔁 **Tool Retry** — ניסיון שני אוטומטי על כשל
+- 🚫 **Anti-Hallucination** — כללי ברזל + retry אוטומטי
+- 🔗 **Multi-step Planning** — תכנון וביצוע משימות מורכבות
+
+## 🚀 התקנה
 
 ```bash
-# 1. Clone the repo
+# Clone
 git clone https://github.com/raniop/OpenClaw-Limor.git
 cd OpenClaw-Limor
 
-# 2. Install dependencies
+# Dependencies
 npm install
 
-# 3. Run the setup wizard
+# Setup wizard (שם, טלפון, API key)
 npm run setup
-# The wizard asks for: assistant name, your name, phone, email, and Anthropic API key
-# It generates a soul file, .env, and workspace identity files
 
-# 4. Build
+# Build
 npm run build
 
-# 5. Run
+# Run
 npm start
 ```
 
-**Manual setup** (alternative): `cp .env.example .env` and edit manually.
+### Quick Start (macOS)
+דאבל-קליק על **`Start Limor.command`** — בונה, מפעיל עם PM2, מעלה dashboard, פותח דפדפן.
 
-On first run:
-- A QR code will appear in the terminal — scan it with WhatsApp to link the bot
-- `workspace/state/` and `workspace/memory/users/` directories are created automatically
-- State files (conversations, contacts, approvals) are initialized on first use
+## ⚙️ הגדרות
 
-## Configuration
+| משתנה | חובה | תיאור |
+|-------|------|--------|
+| `ANTHROPIC_API_KEY` | ✅ | Anthropic API key |
+| `OWNER_CHAT_ID` | מומלץ | WhatsApp chat ID שלך |
+| `OWNER_NAME` | מומלץ | השם שלך |
+| `OWNER_PHONE` | מומלץ | טלפון (למילוי אוטומטי) |
+| `GOOGLE_CLIENT_ID` | אופציונלי | Google Calendar |
+| `GOOGLE_CLIENT_SECRET` | אופציונלי | Google Calendar |
+| `GOOGLE_REFRESH_TOKEN` | אופציונלי | Google Calendar |
+| `BRAVE_SEARCH_API_KEY` | אופציונלי | חיפוש אינטרנט (fallback: DuckDuckGo) |
+| `RAPIDAPI_KEY` | אופציונלי | טיסות ומלונות |
+| `CRM_API_URL` | אופציונלי | CRM server |
 
-Edit `.env` with your values. Only `ANTHROPIC_API_KEY` is required - everything else is optional.
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `ANTHROPIC_API_KEY` | Yes | Your Anthropic API key |
-| `OWNER_CHAT_ID` | Recommended | Your WhatsApp chat ID (see below) |
-| `OWNER_NAME` | Recommended | Your name (auto-filled in bookings) |
-| `OWNER_PHONE` | Recommended | Your phone (auto-filled in bookings) |
-| `OWNER_EMAIL` | Recommended | Your email (auto-filled in bookings) |
-| `GOOGLE_CLIENT_ID` | Optional | For Google Calendar |
-| `GOOGLE_CLIENT_SECRET` | Optional | For Google Calendar |
-| `GOOGLE_REFRESH_TOKEN` | Optional | For Google Calendar (use `scripts/get-google-token.ts`) |
-| `SMTP_EMAIL` | Optional | Gmail address for sending calendar invites |
-| `SMTP_PASSWORD` | Optional | Gmail app password |
-| `RAPIDAPI_KEY` | Optional | For flight & hotel search |
-| `CRM_API_URL` | Optional | CRM server URL |
-| `CRM_USERNAME` | Optional | CRM login |
-| `CRM_PASSWORD` | Optional | CRM password |
-| `SOUL_NAME` | Optional | Bot personality (default: `limor`) |
-| `MAX_HISTORY` | Optional | Messages to keep per chat (default: `20`) |
-
-### Finding your OWNER_CHAT_ID
-
-1. Start the bot without `OWNER_CHAT_ID` set
-2. Send a message to the bot from your WhatsApp
-3. Check the terminal logs - you'll see: `Message from: XXXXX@lid (Your Name, +phone)`
-4. Copy the `XXXXX@lid` value into your `.env` as `OWNER_CHAT_ID`
-5. Restart the bot
-
-## Google Calendar Setup
-
-1. Create a project in [Google Cloud Console](https://console.cloud.google.com)
-2. Enable the Google Calendar API
-3. Create OAuth 2.0 credentials (Desktop app)
-4. Add `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` to `.env`
-5. Run the token script:
-   ```bash
-   npx ts-node scripts/get-google-token.ts
-   ```
-6. A browser window opens - authorize with your Google account
-7. Copy the refresh token into `GOOGLE_REFRESH_TOKEN` in `.env`
-
-## Project Structure
+## 🏗️ ארכיטקטורה
 
 ```
 src/
-  index.ts          # Entry point
-  whatsapp.ts       # WhatsApp client & message handling
-  ai.ts             # Claude API, tools, and message processing
-  config.ts         # Environment configuration
-  soul-loader.ts    # Bot personality system prompt builder
-  ontopo.ts         # Ontopo restaurant search & booking
-  tabit.ts          # Tabit restaurant search & booking
-  booking-utils.ts  # Shared Puppeteer utilities
-  calendar.ts       # Google Calendar integration
-  email.ts          # SMTP email sending
-  ics.ts            # Calendar invite (ICS) generation
-  flights.ts        # Flight search
-  hotels.ts         # Hotel search
-  crm.ts            # CRM integration
-  contacts.ts       # Contact management with fuzzy matching
-  conversation.ts   # Chat history persistence
-  memory.ts         # Long-term fact memory
-  instructions.ts   # Owner-taught behavioral rules
-  files.ts          # File system access
-  pairing.ts        # Contact approval system
-  meeting-requests.ts # Meeting request tracking
-  muted-groups.ts   # Group mute management
-  transcribe.ts     # Voice message transcription
+├── ai/                    # Claude API, tools, model router
+│   ├── send-message.ts    # Core message loop + hallucination guard
+│   ├── model-router.ts    # Smart Opus/Sonnet routing
+│   ├── tools/             # 75+ tool definitions
+│   └── extract-facts.ts   # Background memory extraction
+├── context/               # 17-layer context engine
+│   ├── mood-detector.ts   # Emotional state detection
+│   ├── turn-intent.ts     # Intent classification
+│   ├── response-mode.ts   # Tone/brevity adaptation
+│   ├── correction-learner.ts # Learn from user corrections
+│   └── ...                # 14 more resolver layers
+├── whatsapp/              # WhatsApp client + handlers
+│   ├── index.ts           # Message routing + PM2
+│   ├── voice-response.ts  # TTS voice replies
+│   └── response-handler.ts # Response dispatch
+├── meetings/              # Meeting state machine
+│   ├── meeting-state.ts   # Full lifecycle management
+│   └── time-parser.ts     # Hebrew time expression parser
+├── ops/                   # Operational QA
+│   ├── operational-trace.ts # Per-message trace
+│   ├── self-check.ts      # 12 boolean post-checks
+│   ├── metrics.ts         # System health metrics
+│   └── pass-fail.ts       # Release gate framework
+├── proactive/             # Proactive messaging
+│   ├── proactive-engine.ts # Followup/calendar/morning checks
+│   └── rate-limiter.ts    # Anti-spam protection
+├── digest/                # Daily briefings
+│   ├── digest-service.ts  # Morning briefing
+│   └── daily-summaries.ts # Executive briefings
+├── telegram/              # Channel monitoring
+│   └── alert-poller.ts    # Scraping + images + circuit breaker
+├── memory.ts              # Deep memory (facts, preferences, patterns, emotional log)
+├── conversation.ts        # History + rolling summary + rotation
+├── web-search.ts          # Internet search
+└── calendar.ts            # Google Calendar API
+
+workspace/
+├── identity/              # Bot personality
+│   ├── SOUL.md            # Who is Limor
+│   ├── VOICE.md           # How she talks
+│   ├── OPERATING_PRINCIPLES.md # Iron rules
+│   └── CAPABILITIES_MAP.md # What she knows she can do
+├── policies/              # Behavioral policies
+│   ├── calendar.md        # Meeting flow rules
+│   ├── messaging.md       # Message sending rules
+│   ├── multi_step.md      # Complex task planning
+│   └── ...                # 6 more policies
+└── state/                 # Runtime state (auto-created)
+
+dashboard/                 # Next.js control panel
+├── app/
+│   ├── page.tsx           # Main dashboard
+│   ├── ops/               # Operations & QA
+│   ├── summaries/         # Daily conversation summaries
+│   ├── followups/         # Task tracking
+│   ├── contacts/          # Contact management
+│   └── telegram/          # Monitored channels
+
+tests/
+├── scenarios/             # 24 benchmark scenarios (9 categories)
+├── benchmark/             # Automated benchmark runner
+└── context.test.ts        # Context engine tests
 
 souls/
-  limor.json        # Bot personality configuration
-
-memory/
-  conversations.json  # Chat histories
-  memories.json       # Per-user facts
-  contacts.json       # Known contacts
-  instructions.json   # Owner-defined rules (created at runtime)
-  approved.json       # Approved contacts
-  pending.json        # Pending contact approvals
-
-files/              # Shared file storage (created at runtime)
+└── limor.json             # Personality + model config
 ```
 
-## Usage
+## 📊 Dashboard
 
-### As Owner
-- **Book a restaurant**: "תזמיני לי מקום למסעדת אסתר מחר ב-21:00 ל-4 אנשים"
-- **Check calendar**: "מה יש לי היום ביומן?"
-- **Send messages**: "תשלחי לעמית שאני אגיע ב-5"
-- **Teach rules**: "לימור תזכרי שכשמזמינים מסעדה תמיד לבקש מרפסת"
-- **Search flights**: "חפשי לי טיסה ללונדון ב-15 לאפריל"
-- **Send image**: Send any image and Limor will describe/analyze it
-- **Send document**: Documents are automatically saved to the `files/` directory
+מרכז בקרה בעברית: `http://localhost:3848`
 
-### As Contact (after owner approval)
-- **Request meeting**: "רני פנוי לשיחה?"
-- **Ask questions**: Any general question
-- **Book restaurants**: Search and book restaurants
+- **לוח בקרה** — סטטוס, אישורים, מעקבים, פעילות
+- **תפעול ובקרה** — metrics, pass/fail, alerts, traces
+- **סיכומים** — executive briefings יומיים
+- **מעקבים** — followups ומשימות
+- **אנשי קשר** — רשימה + מערכות יחסים
+- **טלגרם** — ערוצים מנוטרים
+- **לוגים** — real-time system logs
 
-## Development
+## 🧪 בדיקות
 
 ```bash
-# Dev mode (compile + run)
-npm run dev
+# Run benchmark suite (24 scenarios)
+npm run benchmark
 
-# Build only
-npm run build
-
-# Run (after build)
-npm start
+# Run unit tests
+npm test
 ```
 
-## Customization
+### Benchmark Results
+```
+context_understanding:    2/3  ✅
+conversation_state:       3/3  ✅
+response_strategy:        3/3  ✅
+tool_usage:              3/3  ✅
+missing_info:            3/3  ✅
+mood_detection:          3/3  ✅
+open_loops:              2/2  ✅
+contradiction_detection:  1/2  ✅
+multi_turn:              1/2  ✅
+Total:                   21/24 (87.5%)
+```
 
-### Creating a New Personality
+## 🔧 פיתוח
 
-Copy `souls/limor.json` and modify the personality traits, speech style, and capabilities. Set `SOUL_NAME` in `.env` to use your new soul.
+```bash
+# Dev mode
+npm run dev
 
-## License
+# Build
+npm run build
+
+# Start with PM2 (auto-restart)
+npx pm2 start dist/index.js --name limor
+
+# View logs
+npx pm2 logs limor
+
+# Restart
+npx pm2 restart limor
+```
+
+### CI/CD
+- GitHub Actions: benchmarks רצים אוטומטית על כל push ל-main
+- Pre-push script: `scripts/pre-push-benchmark.sh`
+
+## 📝 License
 
 MIT
