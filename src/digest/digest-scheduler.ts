@@ -9,10 +9,16 @@ import { generateDailySummaries, DailySummary } from "./daily-summaries";
 import { getNotifyOwnerCallback } from "../ai/callbacks";
 import { logAudit } from "../audit/audit-log";
 import { listEvents } from "../calendar";
+import { rotateConversations } from "../conversation";
 
 let digestTask: ScheduledTask | null = null;
 let summariesTask1: ScheduledTask | null = null;
 let summariesTask2: ScheduledTask | null = null;
+
+// Dedup guards — prevent double-fires within 60 seconds
+let lastDigestTime = 0;
+let lastSummary1Time = 0;
+let lastSummary2Time = 0;
 
 function formatBriefingMessage(
   label: string,
@@ -164,6 +170,20 @@ export function startDigestScheduler(): void {
   digestTask = schedule(
     "0 8 * * *",
     async () => {
+      const now = Date.now();
+      if (now - lastDigestTime < 60000) {
+        console.log("[digest] Skipping duplicate fire");
+        return;
+      }
+      lastDigestTime = now;
+
+      // Rotate conversations daily
+      try {
+        rotateConversations();
+      } catch (err: any) {
+        console.error("[digest] Conversation rotation failed:", err.message);
+      }
+
       console.log("[digest] Running daily digest...");
       try {
         const digest = await generateDailyDigest();
@@ -199,6 +219,12 @@ export function startDigestScheduler(): void {
   summariesTask1 = schedule(
     "0 14 * * *",
     () => {
+      const now = Date.now();
+      if (now - lastSummary1Time < 60000) {
+        console.log("[daily-summaries] Skipping duplicate midday fire");
+        return;
+      }
+      lastSummary1Time = now;
       runAndSendSummaries("צהריים", false);
     },
     {
@@ -210,6 +236,12 @@ export function startDigestScheduler(): void {
   summariesTask2 = schedule(
     "0 23 * * *",
     () => {
+      const now = Date.now();
+      if (now - lastSummary2Time < 60000) {
+        console.log("[daily-summaries] Skipping duplicate evening fire");
+        return;
+      }
+      lastSummary2Time = now;
       runAndSendSummaries("ערב", true);
     },
     {

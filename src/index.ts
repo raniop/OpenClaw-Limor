@@ -5,9 +5,6 @@ import { existsSync, readdirSync } from "fs";
 import { resolve } from "path";
 import { startDigestScheduler } from "./digest";
 
-// Allow self-signed certificates (Control4 Director uses self-signed SSL)
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-
 log.systemStarting();
 
 // Check if this is a restart after self-update

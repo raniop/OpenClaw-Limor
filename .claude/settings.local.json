@@ -233,7 +233,9 @@
       "Bash(curl -s http://localhost:3848/api/ops)",
       "Bash(for api:*)",
       "Bash(curl -s http://localhost:3848/api/$api)",
-      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(type\\(d\\).__name__, ''''— ok''''\\)\")"
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(type\\(d\\).__name__, ''''— ok''''\\)\")",
+      "Bash(curl -s http://localhost:3848 -w \"\\\\nHTTP Status: %{http_code}\\\\n\")",
+      "Bash(wc -l \"/Users/raniophir/Open Claude Bot AI/workspace/state/\"*.json)"
     ]
   }
 }

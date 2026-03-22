@@ -67,6 +67,8 @@ const CHANNELS: ChannelConfig[] = [
 
 interface ChannelState {
   lastSeenId: number;
+  consecutiveFailures: number;
+  pausedUntil: number; // timestamp — 0 means not paused
 }
 
 const channelState = new Map<string, ChannelState>();
@@ -179,11 +181,47 @@ function shouldForward(text: string, config: ChannelConfig): boolean {
 
 // --- Poll single channel ---
 
+/**
+ * Fetch with timeout and single retry.
+ * On first failure, waits 30s and retries once.
+ */
+async function fetchWithRetry(url: string, headers: Record<string, string>): Promise<Response> {
+  const doFetch = async (): Promise<Response> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    try {
+      const response = await fetch(url, { headers, signal: controller.signal });
+      return response;
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+
+  try {
+    return await doFetch();
+  } catch (_firstErr) {
+    // Wait 30 seconds and retry once
+    await new Promise((resolve) => setTimeout(resolve, 30_000));
+    return await doFetch();
+  }
+}
+
 async function checkChannel(config: ChannelConfig): Promise<void> {
+  let state = channelState.get(config.name);
+  if (!state) {
+    state = { lastSeenId: 0, consecutiveFailures: 0, pausedUntil: 0 };
+    channelState.set(config.name, state);
+  }
+
+  // Circuit breaker — skip if paused
+  if (state.pausedUntil && Date.now() < state.pausedUntil) {
+    return;
+  }
+
   try {
     const url = `https://t.me/s/${config.name}`;
-    const response = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; alert-monitor/1.0)" },
+    const response = await fetchWithRetry(url, {
+      "User-Agent": "Mozilla/5.0 (compatible; alert-monitor/1.0)",
     });
 
     if (!response.ok) {
@@ -191,14 +229,16 @@ async function checkChannel(config: ChannelConfig): Promise<void> {
       return;
     }
 
+    // Reset failures on success
+    state.consecutiveFailures = 0;
+    state.pausedUntil = 0;
+
     const html = await response.text();
     const messages = parseMessages(html, config.name);
     if (messages.length === 0) return;
 
-    let state = channelState.get(config.name);
-    if (!state) {
-      state = { lastSeenId: Math.max(...messages.map((m) => m.id)) };
-      channelState.set(config.name, state);
+    if (state.lastSeenId === 0) {
+      state.lastSeenId = Math.max(...messages.map((m) => m.id));
       console.log(`[telegram] ${config.name} initialized, latest ID: ${state.lastSeenId}`);
       return;
     }
@@ -224,18 +264,27 @@ async function checkChannel(config: ChannelConfig): Promise<void> {
 
       try {
         if (msg.imageUrl && notifyWithImageCallback) {
-          // Send with image
           await notifyWithImageCallback(msg.imageUrl, caption);
         } else if (notifyCallback) {
-          // Text only
           await notifyCallback(caption);
         }
       } catch (err) {
         console.error(`[telegram] Failed to forward from ${config.name}:`, err);
       }
     }
-  } catch (err) {
-    console.error(`[telegram] Poll error for ${config.name}:`, err);
+  } catch (err: unknown) {
+    state.consecutiveFailures = (state.consecutiveFailures || 0) + 1;
+
+    if (state.consecutiveFailures >= 5) {
+      state.pausedUntil = Date.now() + 5 * 60 * 1000;
+      console.error(
+        `[telegram] ${config.name} paused for 5 minutes after ${state.consecutiveFailures} consecutive failures`
+      );
+    } else if (state.consecutiveFailures === 1) {
+      // Only log the first failure, not every 15 seconds
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[telegram] ${config.name} fetch failed: ${message}`);
+    }
   }
 }
 

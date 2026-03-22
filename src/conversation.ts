@@ -1,8 +1,8 @@
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from "fs";
+import { writeFileSync, readFileSync, existsSync, mkdirSync, statSync } from "fs";
 import { resolve, join } from "path";
 import { config } from "./config";
 import { loadWithFallback } from "./state-migration";
-import { statePath } from "./state-dir";
+import { statePath, getStateDir } from "./state-dir";
 
 interface Message {
   role: "user" | "assistant";
@@ -239,4 +239,91 @@ export function clearHistory(chatId: string): void {
   const store = loadStore();
   delete store[chatId];
   saveStore(store);
+}
+
+// ─── Conversation rotation ─────────────────────────────────────
+
+const MAX_CONVERSATIONS_SIZE = 500 * 1024; // 500KB
+const RETENTION_DAYS = 7;
+
+/**
+ * Rotate conversations.json: archive conversations with no activity in the
+ * last 7 days when the file exceeds 500KB. Archived conversations are stored
+ * in workspace/state/conversations-archive-YYYY-MM.json.
+ *
+ * Call this from the daily digest scheduler.
+ */
+export function rotateConversations(): void {
+  const mainPath = statePath("conversations.json");
+  if (!existsSync(mainPath)) return;
+
+  let fileSize: number;
+  try {
+    fileSize = statSync(mainPath).size;
+  } catch {
+    return;
+  }
+
+  if (fileSize < MAX_CONVERSATIONS_SIZE) {
+    console.log(`[conversation] Rotation skipped — file ${(fileSize / 1024).toFixed(0)}KB < 500KB`);
+    return;
+  }
+
+  const store = loadStore();
+  const cutoff = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
+  const now = new Date();
+  const archiveKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const archivePath = statePath(`conversations-archive-${archiveKey}.json`);
+
+  // Load existing archive (if any)
+  let archive: ConversationStore = {};
+  try {
+    if (existsSync(archivePath)) {
+      archive = JSON.parse(readFileSync(archivePath, "utf-8"));
+    }
+  } catch {}
+
+  let archivedCount = 0;
+
+  for (const chatId of Object.keys(store)) {
+    const messages = store[chatId];
+    if (!messages || messages.length === 0) {
+      delete store[chatId];
+      continue;
+    }
+
+    // Check if last message is older than retention period by looking at
+    // the conversation summary timestamp or using a heuristic: if the
+    // conversation has no recent messages, we consider it stale.
+    // Since messages don't have timestamps, we use the summary file mtime.
+    const summaryPath = join(SUMMARIES_DIR, `${sanitize(chatId)}.txt`);
+    let lastActivity = 0;
+    try {
+      if (existsSync(summaryPath)) {
+        lastActivity = statSync(summaryPath).mtimeMs;
+      }
+    } catch {}
+
+    // If no summary file or it's old, check the main conversations file mtime as fallback
+    if (lastActivity === 0) {
+      // No summary — treat as potentially stale; archive if file is big
+      // Use a conservative approach: only archive if we have many conversations
+      if (Object.keys(store).length <= 10) continue;
+    }
+
+    if (lastActivity > 0 && lastActivity >= cutoff) continue; // Recent — keep
+
+    // Archive this conversation
+    archive[chatId] = messages;
+    delete store[chatId];
+    archivedCount++;
+  }
+
+  if (archivedCount > 0) {
+    writeFileSync(archivePath, JSON.stringify(archive, null, 2), "utf-8");
+    saveStore(store);
+    console.log(`[conversation] Rotated ${archivedCount} conversations to ${archivePath}`);
+  } else {
+    console.log("[conversation] Rotation: nothing to archive");
+  }
 }
