@@ -158,11 +158,17 @@ export function createWhatsAppClient(): Client {
             await whatsappClient.sendMessage(config.ownerChatId, text);
           }
         },
-        // Image + caption callback
+        // Image + caption callback — uses fetch() instead of MessageMedia.fromUrl()
+        // to avoid Puppeteer "detached Frame" errors
         async (imageUrl: string, caption: string) => {
           if (config.ownerChatId && whatsappClient) {
             try {
-              const media = await MessageMedia.fromUrl(imageUrl, { unsafeMime: true });
+              const imageResponse = await fetch(imageUrl);
+              if (!imageResponse.ok) throw new Error(`HTTP ${imageResponse.status}`);
+              const buffer = Buffer.from(await imageResponse.arrayBuffer());
+              const base64 = buffer.toString("base64");
+              const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
+              const media = new MessageMedia(contentType, base64, "telegram-image.jpg");
               await whatsappClient.sendMessage(config.ownerChatId, media, { caption });
             } catch (imgErr) {
               // Fallback to text if image download fails

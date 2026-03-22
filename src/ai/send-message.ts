@@ -134,6 +134,9 @@ export async function sendMessage(
     console.log(`[model-router] Selected: ${selection.model} (${selection.reason})`);
   }
 
+  // Anti-hallucination enforcement — MUST be the last instruction in the system prompt
+  systemPrompt += `\n\n⛔ ENFORCEMENT: You MUST use tools for ANY action. If your response contains ANY of these words: שלחתי, קבעתי, הזמנתי, ביטלתי, מחקתי, יצרתי, הוספתי, העברתי, החלפתי, שמרתי — then you MUST have called a tool in this turn. If you didn't call a tool, rewrite your response to say what you WILL do, not what you DID.`;
+
   const apiParams: any = {
     model: selectedModel,
     max_tokens: config.maxTokens,
@@ -202,27 +205,92 @@ export async function sendMessage(
     response = await withRetry(() => client.messages.create(loopParams));
   }
 
-  const textBlock = response.content.find((block) => block.type === "text");
-  const finalText = textBlock ? textBlock.text : "אופס, לא הצלחתי לייצר תשובה 😅 נסה שוב?";
+  let textBlock = response.content.find((block) => block.type === "text");
+  let finalText = textBlock ? textBlock.text : "אופס, לא הצלחתי לייצר תשובה 😅 נסה שוב?";
 
   // Hallucination guard: if AI claims it did something but no tool was called
   const hadToolCalls = response.content.some((b) => b.type === "tool_use") ||
     messages.some((m) => m.role === "user" && Array.isArray(m.content) && m.content.some((c: any) => c.type === "tool_result"));
 
-  if (!hadToolCalls && tools.length > 0) {
-    const claimsAction = /שולחת בקשה|שלחתי בקשה|שולחת לרני|העברתי לרני|קבעתי|שלחתי זימון|שולחת זימון|שלחתי הודעה|שלחתי ל|העברתי ל|בדקתי את|מצאתי (מסעדה|טיסה|מלון)|הזמנתי|ביטלתי|יצרתי|נוצרה|הוספתי|מחקתי|החלפתי|עברתי ל|שיניתי|עדכנתי|בוצע|הופעל|הוגדר|נשמר|הועבר/.test(finalText);
-    if (claimsAction) {
-      console.error(`[hallucination-guard] ⚠️ AI claimed action but no tool was called! Text: ${finalText.substring(0, 200)}`);
-      // Don't block — but ALWAYS notify owner (even when owner is the sender)
-      try {
-        const { getNotifyOwnerCallback } = require("./callbacks");
-        const notify = getNotifyOwnerCallback();
-        if (notify) {
-          const who = sender?.isOwner ? "בשיחה איתך" : `צ'אט: ${sender?.name || "unknown"}`;
-          notify(`⚠️ [hallucination] לימור טענה שביצעה פעולה בלי tool!\n${who}\nטקסט: ${finalText.substring(0, 120)}`).catch(() => {});
-        }
-      } catch {}
+  const hallucinationPattern = /שולחת בקשה|שלחתי בקשה|שולחת לרני|העברתי לרני|קבעתי|שלחתי זימון|שולחת זימון|שלחתי הודעה|שלחתי ל|העברתי ל|בדקתי את|מצאתי (מסעדה|טיסה|מלון)|הזמנתי|ביטלתי|יצרתי|נוצרה|הוספתי|מחקתי|החלפתי|עברתי ל|שיניתי|עדכנתי|בוצע|הופעל|הוגדר|נשמר|הועבר/;
+
+  if (!hadToolCalls && tools.length > 0 && hallucinationPattern.test(finalText)) {
+    console.error(`[hallucination-guard] ⚠️ AI claimed action but no tool was called! Retrying once. Text: ${finalText.substring(0, 200)}`);
+
+    // Retry once: tell the AI it hallucinated and must use a tool
+    messages.push({ role: "assistant", content: response.content });
+    messages.push({
+      role: "user",
+      content: "[SYSTEM] שגיאה: טענת שביצעת פעולה בלי להפעיל כלי. אנא נסי שוב — הפעם חובה להשתמש בכלי המתאים. אם אין כלי מתאים, אמרי בכנות שאין לך יכולת.",
+    });
+
+    const retryParams: any = {
+      model: selectedModel,
+      max_tokens: config.maxTokens,
+      system: systemPrompt,
+      messages,
+    };
+    if (tools.length > 0) retryParams.tools = tools;
+
+    try {
+      let retryResponse = await withRetry(() => client.messages.create(retryParams));
+
+      // Run tool loop on the retry too (AI might now actually call a tool)
+      while (retryResponse.stop_reason === "tool_use") {
+        const retryToolBlocks = retryResponse.content.filter((b) => b.type === "tool_use") as Anthropic.ToolUseBlock[];
+        if (retryToolBlocks.length === 0) break;
+
+        const retryToolResults = await Promise.all(
+          retryToolBlocks.map(async (toolBlock) => {
+            const timer = startTimer();
+            const result = await handleToolCall(
+              toolBlock.name,
+              toolBlock.input as Record<string, any>,
+              sender
+            );
+            log.toolCall(toolBlock.name, result, timer.stop());
+            return { id: toolBlock.id, name: toolBlock.name, result };
+          })
+        );
+
+        messages.push({ role: "assistant", content: retryResponse.content });
+        messages.push({
+          role: "user",
+          content: retryToolResults.map((tr) => ({
+            type: "tool_result" as const,
+            tool_use_id: tr.id,
+            content: tr.result,
+          })),
+        });
+
+        const retryLoopParams: any = {
+          model: selectedModel,
+          max_tokens: config.maxTokens,
+          system: systemPrompt,
+          messages,
+        };
+        if (tools.length > 0) retryLoopParams.tools = tools;
+
+        retryResponse = await withRetry(() => client.messages.create(retryLoopParams));
+      }
+
+      textBlock = retryResponse.content.find((block) => block.type === "text");
+      finalText = textBlock ? textBlock.text : finalText;
+      console.log(`[hallucination-guard] Retry completed. New text: ${finalText.substring(0, 200)}`);
+    } catch (retryErr) {
+      console.error("[hallucination-guard] Retry failed:", retryErr);
+      // Fall through with original finalText
     }
+
+    // Still notify owner about the hallucination (even if retry fixed it)
+    try {
+      const { getNotifyOwnerCallback } = require("./callbacks");
+      const notify = getNotifyOwnerCallback();
+      if (notify) {
+        const who = sender?.isOwner ? "בשיחה איתך" : `צ'אט: ${sender?.name || "unknown"}`;
+        notify(`⚠️ [hallucination] לימור טענה שביצעה פעולה בלי tool! (retry triggered)\n${who}`).catch(() => {});
+      }
+    } catch {}
   }
 
   return finalText;
