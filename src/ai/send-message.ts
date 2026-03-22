@@ -123,7 +123,25 @@ export async function sendMessage(
 
   // --- Extract text ---
   const textBlock = response.content.find((block) => block.type === "text");
-  let finalText = textBlock ? (textBlock as Anthropic.TextBlock).text : "אופס, לא הצלחתי לייצר תשובה 😅 נסה שוב?";
+  let finalText = textBlock ? (textBlock as Anthropic.TextBlock).text : "";
+
+  // If no text but we had a delegate_to_agent call, use the agent's response as the final text
+  if (!finalText && toolsUsed.includes("delegate_to_agent")) {
+    const lastUserMsg = messages[messages.length - 1];
+    if (lastUserMsg && Array.isArray(lastUserMsg.content)) {
+      const agentResult = (lastUserMsg.content as any[]).find(
+        (c: any) => c.type === "tool_result" && typeof c.content === "string" && c.content.includes("*")
+      );
+      if (agentResult) {
+        // Strip the pass-through instruction prefix
+        finalText = agentResult.content.replace(/\[תשובת .+ — .+\]\n\n/, "");
+      }
+    }
+  }
+
+  if (!finalText) {
+    finalText = "אופס, לא הצלחתי לייצר תשובה 😅 נסה שוב?";
+  }
 
   // --- Hallucination guard ---
   const hadToolCalls = toolsUsed.length > 0 || response.content.some((b) => b.type === "tool_use") ||

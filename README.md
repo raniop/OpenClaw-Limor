@@ -48,12 +48,32 @@
 - 🚦 **Pass/Fail Framework** — gating metrics + warnings
 - 📊 **Dashboard** — מרכז בקרה עם לוגים, metrics, alerts
 
+### 🏢 מערכת סוכנים — "המשרד של לימור"
+לימור מנהלת צוות של 10 סוכנים מתמחים, כל אחד עם אישיות וכלים ייחודיים:
+
+| סוכן/ת | תפקיד | כלים |
+|---------|--------|------|
+| מיכל 👁️ | סיכום קבוצות WhatsApp | `get_group_history`, `summarize_group_activity` |
+| רונית 🔍 | מחקר אינטרנט עם מקורות | `web_search` |
+| נועה 📊 | ניתוח נתונים וסטטיסטיקות | `list_events`, `read_sms`, `list_contacts` |
+| יעל ⚡ | אוטומציות ותזכורות | `create_reminder`, `learn_instruction` |
+| טל 🛡️ | אבטחה — ספאם ו-phishing | `web_search` |
+| מאיה 🏠 | בית חכם — Control4 | `smart_home_control`, `smart_home_status`, `smart_home_list` |
+| עדי 📅 | ניהול יומן ופגישות | `create_event`, `delete_event`, `list_events` |
+| הילה 🍽️ | מסעדות ובילויים | `book_tabit`, `book_ontopo`, `web_search` |
+| דנה 🛒 | קניות והשוואת מחירים | `web_search` |
+| בוריס 🔧 | DevOps ובקרת מערכת | `system_health_check`, `get_error_logs`, `get_agent_stats` |
+
+- **Delegation אוטומטי** — לימור מזהה את הבקשה ומעבירה לסוכן המתאים
+- **הודעת ביניים** — "הילה 🍽️ מחפשת לך משהו טוב..." בזמן שהסוכן עובד
+- **Anti-hallucination** — סוכנים לא יכולים להמציא, רק לדווח מה הכלים החזירו
+
 ### אינטליגנציה
 - 🧠 **17-Layer Context Engine** — הבנת הקשר דטרמיניסטית
 - 😊 **Mood Detection** — 7 מצבי רוח, התאמת טון
 - 🔀 **Smart Model Router** — Sonnet כברירת מחדל, Opus רק ל-capability (אופטימיזציית עלויות)
 - 🔁 **Tool Retry** — ניסיון שני אוטומטי על כשל
-- 🚫 **Anti-Hallucination** — כללי ברזל + retry אוטומטי
+- 🚫 **Anti-Hallucination** — כללי ברזל + retry אוטומטי על סוכנים וכלים
 - 🔗 **Multi-step Planning** — תכנון וביצוע משימות מורכבות
 
 ## 🚀 התקנה

@@ -97,53 +97,31 @@ async function duckDuckGoSearch(
 function parseDuckDuckGoHTML(html: string): SearchResult[] {
   const results: SearchResult[] = [];
 
-  // Match result blocks: each has a link and snippet
-  const resultBlockRegex =
-    /<a[^>]+class="result__a"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a[^>]+class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
-
-  let match: RegExpExecArray | null;
-  while ((match = resultBlockRegex.exec(html)) !== null && results.length < 5) {
-    const rawUrl = match[1];
-    const title = stripHtml(match[2]).trim();
-    const snippet = stripHtml(match[3]).trim();
-
-    // DuckDuckGo wraps URLs in a redirect — extract the real URL
-    const realUrl = extractDDGUrl(rawUrl);
-
-    if (title && realUrl) {
-      results.push({ title, snippet, url: realUrl });
-    }
+  // Extract titles+URLs from result__a links
+  const linkRegex = /<a[^>]+class="result__a"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g;
+  const links: { url: string; title: string }[] = [];
+  let linkMatch: RegExpExecArray | null;
+  while ((linkMatch = linkRegex.exec(html)) !== null && links.length < 5) {
+    const realUrl = extractDDGUrl(linkMatch[1]);
+    const title = stripHtml(linkMatch[2]).trim();
+    if (title && realUrl) links.push({ url: realUrl, title });
   }
 
-  // Fallback: try a simpler pattern if the above didn't match
-  if (results.length === 0) {
-    const simpleLinkRegex =
-      /<a[^>]+class="result__url"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g;
-    const snippetRegex =
-      /<a[^>]+class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+  // Extract snippets separately
+  const snippetRegex = /<a[^>]+class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+  const snippets: string[] = [];
+  let snippetMatch: RegExpExecArray | null;
+  while ((snippetMatch = snippetRegex.exec(html)) !== null && snippets.length < 5) {
+    snippets.push(stripHtml(snippetMatch[1]).trim());
+  }
 
-    const links: { url: string; title: string }[] = [];
-    let linkMatch: RegExpExecArray | null;
-    while ((linkMatch = simpleLinkRegex.exec(html)) !== null && links.length < 5) {
-      links.push({
-        url: extractDDGUrl(linkMatch[1]),
-        title: stripHtml(linkMatch[2]).trim(),
-      });
-    }
-
-    const snippets: string[] = [];
-    let snippetMatch: RegExpExecArray | null;
-    while ((snippetMatch = snippetRegex.exec(html)) !== null && snippets.length < 5) {
-      snippets.push(stripHtml(snippetMatch[1]).trim());
-    }
-
-    for (let i = 0; i < links.length; i++) {
-      results.push({
-        title: links[i].title || `תוצאה ${i + 1}`,
-        snippet: snippets[i] || "",
-        url: links[i].url,
-      });
-    }
+  // Combine: pair each link with its snippet
+  for (let i = 0; i < links.length; i++) {
+    results.push({
+      title: links[i].title,
+      snippet: snippets[i] || "",
+      url: links[i].url,
+    });
   }
 
   return results;
