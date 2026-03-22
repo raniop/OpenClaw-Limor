@@ -14,6 +14,8 @@ import { whatsappExtrasHandlers } from "./whatsapp-extras";
 import { groupsHandlers } from "./groups";
 import { smsHandlers } from "./sms";
 import { webSearchHandlers } from "./web-search";
+import { agentHandlers } from "./agents";
+import { monitoringHandlers } from "./monitoring";
 
 export type { ToolHandler } from "./types";
 
@@ -33,4 +35,6 @@ export const allHandlers: Record<string, ToolHandler> = {
   ...groupsHandlers,
   ...smsHandlers,
   ...webSearchHandlers,
+  ...agentHandlers,
+  ...monitoringHandlers,
 };

@@ -20,6 +20,8 @@ export interface HallucinationCheckResult {
 }
 
 const HALLUCINATION_PATTERN = /שולחת בקשה|שלחתי בקשה|שולחת לרני|העברתי לרני|קבעתי|שלחתי זימון|שולחת זימון|שלחתי הודעה|שלחתי ל|העברתי ל|בדקתי את|מצאתי (מסעדה|טיסה|מלון)|הזמנתי|ביטלתי|יצרתי|נוצרה|הוספתי|מחקתי|החלפתי|עברתי ל|שיניתי|עדכנתי|בוצע|הופעל|הוגדר|נשמר|הועבר/;
+// Detect when Limor mentions an agent by name without actually delegating
+const AGENT_REFERENCE_PATTERN = /בוריס (בדק|מצא|דיווח|זיהה|החזיר)|מיכל (סיכמה|מצאה|החזירה)|רונית (חיפשה|מצאה|בדקה)|נועה (ניתחה|בדקה|מצאה)|יעל (יצרה|הגדירה)|טל (בדקה|זיהתה|מצאה)|מאיה (הפעילה|כיבתה|הדליקה)|עדי (קבעה|מחקה|בדקה)|הילה (מצאה|הזמינה|חיפשה)|דנה (מצאה|השוותה|חיפשה)/;
 
 /**
  * Check whether the AI response is a hallucination — claiming an action without
@@ -32,6 +34,12 @@ export function checkHallucination(
 ): HallucinationCheckResult {
   if (hadToolCalls || !toolsAvailable) {
     return { isHallucination: false, claimedAction: null };
+  }
+
+  // Check for agent name references without delegation
+  const agentMatch = AGENT_REFERENCE_PATTERN.exec(response);
+  if (agentMatch) {
+    return { isHallucination: true, claimedAction: agentMatch[0] };
   }
 
   const match = HALLUCINATION_PATTERN.exec(response);
