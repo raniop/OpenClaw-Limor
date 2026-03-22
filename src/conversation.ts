@@ -1,8 +1,8 @@
-import { writeFileSync, readFileSync, existsSync, mkdirSync, statSync } from "fs";
-import { resolve, join } from "path";
+import { writeFileSync, readFileSync, existsSync } from "fs";
 import { config } from "./config";
-import { loadWithFallback } from "./state-migration";
-import { statePath, getStateDir } from "./state-dir";
+import { statePath } from "./state-dir";
+import { client as aiClient } from "./ai/client";
+import { getDb } from "./stores/sqlite-init";
 
 interface Message {
   role: "user" | "assistant";
@@ -11,22 +11,6 @@ interface Message {
     base64: string;
     mediaType: string;
   };
-}
-
-const OLD_HISTORY_PATH = resolve(__dirname, "..", "memory", "conversations.json");
-const SUMMARIES_DIR = statePath("conversation-summaries");
-
-// Ensure summaries dir exists
-try { if (!existsSync(SUMMARIES_DIR)) mkdirSync(SUMMARIES_DIR, { recursive: true }); } catch {}
-
-type ConversationStore = Record<string, Message[]>;
-
-function loadStore(): ConversationStore {
-  return loadWithFallback<ConversationStore>(statePath("conversations.json"), OLD_HISTORY_PATH, {});
-}
-
-function saveStore(store: ConversationStore): void {
-  writeFileSync(statePath("conversations.json"), JSON.stringify(store, null, 2), "utf-8");
 }
 
 // ─── AI-powered rolling summary ─────────────────────────────────────
@@ -40,8 +24,6 @@ async function aiSummarizeDropped(chatId: string, messages: Message[]): Promise<
   if (messages.length < 3) return; // Not worth summarizing < 3 messages
 
   try {
-    const { client } = require("./ai/client");
-
     const conversation = messages
       .map((m) => `${m.role === "user" ? "משתמש" : "לימור"}: ${m.content.substring(0, 200)}`)
       .join("\n");
@@ -63,16 +45,16 @@ ${conversation}
 
 כתוב בעברית, בצורה תמציתית. החזר רק את הסיכום, בלי הקדמות.`;
 
-    const response = await client.messages.create({
+    const response = await aiClient.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 512,
       messages: [{ role: "user", content: prompt }],
     });
 
-    const text = response.content.find((b: any) => b.type === "text")?.text || "";
+    const text = (response.content.find((b) => b.type === "text") as any)?.text || "";
     if (text.length > 10) {
       saveSummary(chatId, text);
-      console.log(`[conversation] AI summary updated for ${sanitize(chatId)} (${messages.length} messages → ${text.length} chars)`);
+      console.log(`[conversation] AI summary updated for ${chatId.replace(/[^a-zA-Z0-9_-]/g, "_")} (${messages.length} messages → ${text.length} chars)`);
     }
   } catch (err) {
     // Fallback to deterministic summary
@@ -187,143 +169,114 @@ export function getGroupPeopleContext(chatId: string): string {
   return lines.join("\n");
 }
 
-// ─── Core store functions ─────────────────────────────────────
-
-function sanitize(chatId: string): string {
-  return chatId.replace(/[^a-zA-Z0-9_-]/g, "_");
-}
+// ─── Core store functions (SQLite-backed) ─────────────────────────────
 
 function saveSummary(chatId: string, summary: string): void {
-  try {
-    writeFileSync(join(SUMMARIES_DIR, `${sanitize(chatId)}.txt`), summary, "utf-8");
-  } catch {}
+  const db = getDb();
+  db.prepare(`
+    INSERT INTO conversation_summaries (chat_id, summary, updated_at)
+    VALUES (?, ?, datetime('now'))
+    ON CONFLICT(chat_id) DO UPDATE SET summary = excluded.summary, updated_at = excluded.updated_at
+  `).run(chatId, summary);
 }
 
 export function getSummary(chatId: string): string {
-  try {
-    const path = join(SUMMARIES_DIR, `${sanitize(chatId)}.txt`);
-    if (existsSync(path)) return readFileSync(path, "utf-8");
-  } catch {}
-  return "";
+  const db = getDb();
+  const row = db.prepare("SELECT summary FROM conversation_summaries WHERE chat_id = ?").get(chatId) as { summary: string } | undefined;
+  return row?.summary || "";
 }
 
 export function addMessage(chatId: string, role: "user" | "assistant", content: string): void {
-  const store = loadStore();
-  if (!store[chatId]) {
-    store[chatId] = [];
-  }
-
-  store[chatId].push({ role, content });
+  const db = getDb();
+  db.prepare("INSERT INTO conversations (chat_id, role, content) VALUES (?, ?, ?)").run(chatId, role, content);
 
   // Trim to max history — AI-summarize dropped messages
   const maxMessages = config.maxHistory * 2;
-  if (store[chatId].length > maxMessages) {
-    const overflow = store[chatId].length - maxMessages;
-    const dropped = store[chatId].slice(0, overflow);
+  const count = (db.prepare("SELECT COUNT(*) as cnt FROM conversations WHERE chat_id = ?").get(chatId) as any).cnt;
+  if (count > maxMessages) {
+    const overflow = count - maxMessages;
+    // Get the messages that will be dropped for summarization
+    const dropped = db.prepare(
+      "SELECT role, content FROM conversations WHERE chat_id = ? ORDER BY id ASC LIMIT ?"
+    ).all(chatId, overflow) as Array<{ role: string; content: string }>;
 
     // AI summary in background (non-blocking)
-    aiSummarizeDropped(chatId, dropped).catch(() => {});
+    const droppedMsgs: Message[] = dropped.map((d) => ({ role: d.role as "user" | "assistant", content: d.content }));
+    aiSummarizeDropped(chatId, droppedMsgs).catch(() => {});
 
-    store[chatId] = store[chatId].slice(overflow);
+    // Delete the oldest messages
+    db.prepare(`
+      DELETE FROM conversations WHERE id IN (
+        SELECT id FROM conversations WHERE chat_id = ? ORDER BY id ASC LIMIT ?
+      )
+    `).run(chatId, overflow);
   }
-
-  saveStore(store);
 }
 
 export function getHistory(chatId: string): Message[] {
-  const store = loadStore();
-  return store[chatId] || [];
+  const db = getDb();
+  const rows = db.prepare(
+    "SELECT role, content, image_data FROM conversations WHERE chat_id = ? ORDER BY id ASC"
+  ).all(chatId) as Array<{ role: string; content: string; image_data: string | null }>;
+
+  return rows.map((row) => {
+    const msg: Message = {
+      role: row.role as "user" | "assistant",
+      content: row.content,
+    };
+    if (row.image_data) {
+      try {
+        msg.imageData = JSON.parse(row.image_data);
+      } catch {}
+    }
+    return msg;
+  });
 }
 
 export function clearHistory(chatId: string): void {
-  const store = loadStore();
-  delete store[chatId];
-  saveStore(store);
+  const db = getDb();
+  db.prepare("DELETE FROM conversations WHERE chat_id = ?").run(chatId);
 }
 
 // ─── Conversation rotation ─────────────────────────────────────
 
-const MAX_CONVERSATIONS_SIZE = 500 * 1024; // 500KB
-const RETENTION_DAYS = 7;
-
 /**
- * Rotate conversations.json: archive conversations with no activity in the
- * last 7 days when the file exceeds 500KB. Archived conversations are stored
- * in workspace/state/conversations-archive-YYYY-MM.json.
+ * Rotate old conversations: remove conversations with no recent activity.
+ * With SQLite, we can use timestamps directly instead of file mtimes.
  *
  * Call this from the daily digest scheduler.
  */
 export function rotateConversations(): void {
-  const mainPath = statePath("conversations.json");
-  if (!existsSync(mainPath)) return;
+  const db = getDb();
+  const RETENTION_DAYS = 7;
 
-  let fileSize: number;
-  try {
-    fileSize = statSync(mainPath).size;
-  } catch {
+  // Get total message count
+  const totalRow = db.prepare("SELECT COUNT(*) as cnt FROM conversations").get() as any;
+  if (totalRow.cnt < 1000) {
+    console.log(`[conversation] Rotation skipped — only ${totalRow.cnt} messages in DB`);
     return;
   }
 
-  if (fileSize < MAX_CONVERSATIONS_SIZE) {
-    console.log(`[conversation] Rotation skipped — file ${(fileSize / 1024).toFixed(0)}KB < 500KB`);
-    return;
-  }
+  // Find chat_ids where the newest message is older than retention period
+  const cutoffDate = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const staleChatIds = db.prepare(`
+    SELECT chat_id FROM conversations
+    GROUP BY chat_id
+    HAVING MAX(created_at) < ?
+  `).all(cutoffDate) as Array<{ chat_id: string }>;
 
-  const store = loadStore();
-  const cutoff = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
-  const now = new Date();
-  const archiveKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const archivePath = statePath(`conversations-archive-${archiveKey}.json`);
-
-  // Load existing archive (if any)
-  let archive: ConversationStore = {};
-  try {
-    if (existsSync(archivePath)) {
-      archive = JSON.parse(readFileSync(archivePath, "utf-8"));
-    }
-  } catch {}
-
-  let archivedCount = 0;
-
-  for (const chatId of Object.keys(store)) {
-    const messages = store[chatId];
-    if (!messages || messages.length === 0) {
-      delete store[chatId];
-      continue;
-    }
-
-    // Check if last message is older than retention period by looking at
-    // the conversation summary timestamp or using a heuristic: if the
-    // conversation has no recent messages, we consider it stale.
-    // Since messages don't have timestamps, we use the summary file mtime.
-    const summaryPath = join(SUMMARIES_DIR, `${sanitize(chatId)}.txt`);
-    let lastActivity = 0;
-    try {
-      if (existsSync(summaryPath)) {
-        lastActivity = statSync(summaryPath).mtimeMs;
-      }
-    } catch {}
-
-    // If no summary file or it's old, check the main conversations file mtime as fallback
-    if (lastActivity === 0) {
-      // No summary — treat as potentially stale; archive if file is big
-      // Use a conservative approach: only archive if we have many conversations
-      if (Object.keys(store).length <= 10) continue;
-    }
-
-    if (lastActivity > 0 && lastActivity >= cutoff) continue; // Recent — keep
-
-    // Archive this conversation
-    archive[chatId] = messages;
-    delete store[chatId];
-    archivedCount++;
-  }
-
-  if (archivedCount > 0) {
-    writeFileSync(archivePath, JSON.stringify(archive, null, 2), "utf-8");
-    saveStore(store);
-    console.log(`[conversation] Rotated ${archivedCount} conversations to ${archivePath}`);
-  } else {
+  if (staleChatIds.length === 0) {
     console.log("[conversation] Rotation: nothing to archive");
+    return;
   }
+
+  const deleteStmt = db.prepare("DELETE FROM conversations WHERE chat_id = ?");
+  const tx = db.transaction(() => {
+    for (const row of staleChatIds) {
+      deleteStmt.run(row.chat_id);
+    }
+  });
+  tx();
+
+  console.log(`[conversation] Rotated ${staleChatIds.length} stale conversations`);
 }

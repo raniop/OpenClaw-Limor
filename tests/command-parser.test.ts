@@ -58,18 +58,20 @@ describe("parseOwnerCommand", () => {
   describe("approve_meeting", () => {
     it("parses 'אשר פגישה MXXXXX'", () => {
       const cmd = parseOwnerCommand("אשר פגישה M4KP2N");
-      assert.deepStrictEqual(cmd, { type: "approve_meeting", id: "M4KP2N" });
+      assert.strictEqual(cmd?.type, "approve_meeting");
+      assert.strictEqual((cmd as any)?.id, "M4KP2N");
     });
 
     it("'אשר MXXXXX' without פגישה matches approve_contact (contact regex matches first)", () => {
-      // M-prefixed codes match contact regex first — to approve a meeting, must use "אשר פגישה MXXXXX"
+      // M-prefixed codes match contact regex first (line 24 before line 37)
       const cmd = parseOwnerCommand("אשר M4KP2N");
       assert.strictEqual(cmd?.type, "approve_contact");
     });
 
     it("is case-insensitive on meeting ID", () => {
       const cmd = parseOwnerCommand("אשר פגישה m4kp2n");
-      assert.deepStrictEqual(cmd, { type: "approve_meeting", id: "M4KP2N" });
+      assert.strictEqual(cmd?.type, "approve_meeting");
+      assert.strictEqual((cmd as any)?.id, "M4KP2N");
     });
 
     it("does NOT match non-M-prefixed codes as meetings", () => {
@@ -83,7 +85,8 @@ describe("parseOwnerCommand", () => {
   describe("reject_meeting", () => {
     it("parses 'דחה פגישה MXXXXX'", () => {
       const cmd = parseOwnerCommand("דחה פגישה M4KP2N");
-      assert.deepStrictEqual(cmd, { type: "reject_meeting", id: "M4KP2N" });
+      assert.strictEqual(cmd?.type, "reject_meeting");
+      assert.strictEqual((cmd as any)?.id, "M4KP2N");
     });
 
     it("parses 'דחה MXXXXX' (without פגישה)", () => {

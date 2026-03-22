@@ -1,7 +1,7 @@
 /**
  * Capability spec storage — read/write structured specs as markdown.
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from "fs";
 import { resolve, join } from "path";
 import type { CapabilitySpec } from "./types";
 
@@ -159,7 +159,6 @@ function moveSpec(id: string, fromDir: string, toDir: string, newStatus: string)
   writeFileSync(toPath, specToMarkdown(spec), "utf-8");
 
   // Remove from source (safe: we already wrote to destination)
-  const { unlinkSync } = require("fs");
   unlinkSync(fromPath);
 
   return spec;

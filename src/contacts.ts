@@ -104,10 +104,19 @@ export function updateContact(chatId: string, name: string, phone: string): void
   // Don't add group chats to contacts — only personal chats
   if (chatId.endsWith("@g.us")) return;
 
+  // A real phone is Israeli format 972XXXXXXXXX (9-10 digits after 972)
+  const isRealPhone = !!phone && /^972\d{8,9}$/.test(phone);
+
   const contacts = loadContacts();
   const existing = contacts[chatId];
+
+  // Don't create new contacts without a real phone number
+  if (!existing && !isRealPhone) return;
+
+  // If existing contact already has a real phone, just update lastSeen + aliases
+  const existingHasRealPhone = existing?.phone && /^972\d{8,9}$/.test(existing.phone);
+
   const aliases = existing?.aliases || [];
-  // Keep existing aliases + add new name variant if different
   if (existing && existing.name !== name && !aliases.includes(name)) {
     aliases.push(name);
   }
@@ -115,7 +124,7 @@ export function updateContact(chatId: string, name: string, phone: string): void
     chatId,
     name,
     aliases: aliases.length > 0 ? aliases : undefined,
-    phone,
+    phone: isRealPhone ? phone : (existing?.phone || ""),
     lastSeen: new Date().toISOString(),
   };
   saveContacts(contacts);

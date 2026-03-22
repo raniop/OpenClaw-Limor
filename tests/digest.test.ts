@@ -10,15 +10,15 @@ describe("generateDailyDigest", () => {
     // This will work even without calendar credentials — it catches errors gracefully
     const digest = await generateDailyDigest();
     assert.ok(typeof digest === "string");
-    assert.ok(digest.includes("תקציר יומי"));
+    assert.ok(digest.includes("בוקר טוב"), "should include morning greeting header");
   });
 
   it("includes quiet message when nothing pending", async () => {
     // With empty stores, should show the quiet message
     const digest = await generateDailyDigest();
-    // It should either have urgent items or the quiet message
+    // It should either have action items or the quiet message
     assert.ok(
-      digest.includes("דחוף") || digest.includes("ממתין") || digest.includes("הכל שקט")
+      digest.includes("מחכה לך") || digest.includes("הכל שקט") || digest.includes("דחופים")
     );
   });
 });

@@ -1,7 +1,8 @@
 import { validateConfig } from "./config";
 import { createWhatsAppClient } from "./whatsapp";
 import { log } from "./logger";
-import { existsSync, readdirSync } from "fs";
+import { existsSync, readdirSync, unlinkSync, rmSync } from "fs";
+import { execSync } from "child_process";
 import { resolve } from "path";
 import { startDigestScheduler } from "./digest";
 
@@ -50,7 +51,7 @@ async function initWithRetry(maxRetries = 2) {
         console.log("[init] Cleaning corrupted session...");
         const sessionDir = resolve(__dirname, "..", ".wwebjs_auth", "session");
         const lockFile = resolve(sessionDir, "SingletonLock");
-        try { require("fs").unlinkSync(lockFile); } catch {}
+        try { unlinkSync(lockFile); } catch {}
 
         if (attempt < maxRetries) {
           console.log("[init] Retrying in 3 seconds...");
@@ -60,7 +61,7 @@ async function initWithRetry(maxRetries = 2) {
 
         // Last resort: delete session entirely
         console.log("[init] Deleting session for fresh QR scan...");
-        try { require("fs").rmSync(sessionDir, { recursive: true, force: true }); } catch {}
+        try { rmSync(sessionDir, { recursive: true, force: true }); } catch {}
         await new Promise(r => setTimeout(r, 2000));
         try {
           await client.initialize();
@@ -101,7 +102,6 @@ function gracefulShutdown(signal: string) {
     .finally(() => {
       // Kill any leftover Chromium processes spawned by puppeteer
       try {
-        const { execSync } = require("child_process");
         execSync("pkill -f '.wwebjs_auth.*chrome' 2>/dev/null || true", { timeout: 3000 });
       } catch {}
       console.log("[shutdown] Done, exiting.");

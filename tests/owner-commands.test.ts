@@ -1,15 +1,17 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
-import { resolve } from "path";
+import { statePath, getStateDir } from "../src/state-dir";
+import { getDb } from "../src/stores/sqlite-init";
 
-const STATE_DIR = resolve(__dirname, "..", "workspace", "state");
-if (!existsSync(STATE_DIR)) mkdirSync(STATE_DIR, { recursive: true });
+const stateDir = getStateDir();
+if (!existsSync(stateDir)) mkdirSync(stateDir, { recursive: true });
 
 function resetState() {
-  writeFileSync(resolve(STATE_DIR, "approved.json"), "[]", "utf-8");
-  writeFileSync(resolve(STATE_DIR, "pending.json"), "{}", "utf-8");
-  writeFileSync(resolve(STATE_DIR, "active_tasks.json"), "{}", "utf-8");
+  const db = getDb();
+  db.exec("DELETE FROM approved_contacts");
+  db.exec("DELETE FROM pending_contacts");
+  writeFileSync(statePath("active_tasks.json"), "{}", "utf-8");
 }
 
 // Note: handleOwnerCommand calls sendMessage which requires the full AI stack.

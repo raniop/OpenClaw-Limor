@@ -1,4 +1,4 @@
-import { writeFileSync } from "fs";
+import { writeFileSync, readFileSync } from "fs";
 import { resolve } from "path";
 import { loadWithFallback } from "./state-migration";
 import { statePath } from "./state-dir";
@@ -100,7 +100,7 @@ interface ApprovedMeeting {
 
 function loadApproved(): Record<string, ApprovedMeeting> {
   try {
-    const raw = require("fs").readFileSync(statePath("approved-meetings.json"), "utf-8");
+    const raw = readFileSync(statePath("approved-meetings.json"), "utf-8");
     return JSON.parse(raw);
   } catch {
     return {};

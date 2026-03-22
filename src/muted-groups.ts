@@ -1,4 +1,4 @@
-import { writeFileSync } from "fs";
+import { writeFileSync, readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import { loadWithFallback } from "./state-migration";
 import { statePath } from "./state-dir";
@@ -20,7 +20,6 @@ interface GroupRegistry {
 
 function loadRegistry(): GroupRegistry {
   try {
-    const { readFileSync, existsSync } = require("fs");
     if (existsSync(statePath("group_registry.json"))) {
       return JSON.parse(readFileSync(statePath("group_registry.json"), "utf-8"));
     }

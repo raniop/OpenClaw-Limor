@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { resolve, join } from "path";
+import { client as aiClient } from "./ai/client";
 
 const USERS_DIR = resolve(__dirname, "..", "workspace", "memory", "users");
 // Fallback: old path for migration
@@ -355,10 +356,9 @@ async function cleanupFactsWithAI(chatId: string, mem: UserMemory): Promise<void
   if (mem.facts.length < 5) return;
 
   try {
-    const { client } = require("./ai/client");
     const factsText = mem.facts.map(f => `- ${f.text}`).join("\n");
 
-    const response = await client.messages.create({
+    const response = await aiClient.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 512,
       system: `אתה עוזר לנקות רשימת עובדות על אדם. מחק כפילויות, אחד עובדות דומות, ושמור רק מידע חשוב ורלוונטי.
@@ -371,7 +371,7 @@ async function cleanupFactsWithAI(chatId: string, mem: UserMemory): Promise<void
       messages: [{ role: "user", content: `נקה את רשימת העובדות הזו:\n${factsText}` }],
     });
 
-    const text = response.content.find((b: any) => b.type === "text")?.text || "";
+    const text = (response.content.find((b) => b.type === "text") as any)?.text || "";
     const parsed = JSON.parse(text);
     if (Array.isArray(parsed.facts) && parsed.facts.length > 0) {
       const cleaned: Fact[] = parsed.facts.map((f: string) => ({

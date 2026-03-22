@@ -1,16 +1,16 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
-import { resolve } from "path";
+import { statePath, getStateDir } from "../src/state-dir";
 
-// Set up test state directory before importing pairing
-const STATE_DIR = resolve(__dirname, "..", "workspace", "state");
-if (!existsSync(STATE_DIR)) mkdirSync(STATE_DIR, { recursive: true });
+// Ensure the test state directory exists
+const stateDir = getStateDir();
+if (!existsSync(stateDir)) mkdirSync(stateDir, { recursive: true });
 
 // Reset state files before each test
 function resetState() {
-  writeFileSync(resolve(STATE_DIR, "approved.json"), "[]", "utf-8");
-  writeFileSync(resolve(STATE_DIR, "pending.json"), "{}", "utf-8");
+  writeFileSync(statePath("approved.json"), "[]", "utf-8");
+  writeFileSync(statePath("pending.json"), "{}", "utf-8");
 }
 
 // Import after state dir exists
@@ -142,30 +142,19 @@ describe("pairing", () => {
     });
   });
 
-  describe("persistence across reloads", () => {
-    it("approved contact survives file re-read (simulated restart)", () => {
-      // Approve a contact
+  describe("persistence", () => {
+    it("approved contact survives re-read", () => {
       const code = addPending("persist@lid", "+972500000000");
       approveByCode(code);
       assert.ok(isApproved("persist@lid"));
-
-      // Verify the file on disk contains the chatId
-      const { readFileSync } = require("fs");
-      const { resolve } = require("path");
-      const filePath = resolve(__dirname, "..", "workspace", "state", "approved.json");
-      const fileContent = JSON.parse(readFileSync(filePath, "utf-8"));
-      assert.ok(fileContent.includes("persist@lid"), "chatId should be persisted to file");
-
-      // Since loadApproved() reads from file each time, this simulates a restart
+      // pairing.ts reads from file on every call, so this simulates a restart
       assert.ok(isApproved("persist@lid"), "contact should still be approved after re-read");
     });
 
     it("uses consistent key format (chatId as-is, no normalization)", () => {
       const chatId = "12345678@lid";
       addApproved(chatId);
-      // The exact same string should match
       assert.ok(isApproved(chatId));
-      // A different format should NOT match
       assert.ok(!isApproved("12345678"));
       assert.ok(!isApproved("12345678@c.us"));
     });

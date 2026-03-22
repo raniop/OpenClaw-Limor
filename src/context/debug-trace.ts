@@ -163,9 +163,9 @@ function buildTraceSummary(resolved: Omit<ResolvedContext, "debugTrace" | "follo
   const needsClarification = resolved.actionPlan.needsClarification;
   const toolType = resolved.toolIntent.type;
 
-  // Blocked execution with clarification needed
+  // Clarification suggested but tools still available
   if (exec === "clarify_before_execution" || needsClarification) {
-    return "בקשת פעולה עם פרט חסר, לכן נחסמה הפעלת כלים ונבחרה הבהרה.";
+    return "ייתכן שחסר פרט — מומלץ לשאול אם צריך, אבל כל הכלים זמינים. אם יש מספיק מידע — פעלי.";
   }
 
   // Tool execution allowed

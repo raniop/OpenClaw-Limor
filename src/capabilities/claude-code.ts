@@ -2,8 +2,8 @@
  * Claude Code integration — uses the Claude CLI to implement capability specs.
  * Runs Claude Code in a git worktree with the spec as the prompt.
  */
-import { spawn } from "child_process";
-import { existsSync, readFileSync } from "fs";
+import { spawn, execSync } from "child_process";
+import { existsSync, readFileSync, readdirSync } from "fs";
 import { resolve, join } from "path";
 import { createWorktree, getDiff, applyWorktree, cleanupWorktree } from "./sandbox";
 import { getSpec } from "./spec-store";
@@ -21,7 +21,6 @@ function findClaudeCli(): string {
     "Library/Application Support/Claude/claude-code"
   );
   try {
-    const { readdirSync } = require("fs");
     const versions = readdirSync(baseDir)
       .filter((d: string) => /^\d+\.\d+\.\d+$/.test(d))
       .sort((a: string, b: string) => {
@@ -39,7 +38,6 @@ function findClaudeCli(): string {
   } catch {}
   // Fallback: try PATH
   try {
-    const { execSync } = require("child_process");
     return execSync("which claude", { encoding: "utf-8" }).trim();
   } catch {}
   return join(baseDir, "2.1.76", "claude"); // last known good

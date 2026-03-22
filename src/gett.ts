@@ -2,6 +2,7 @@
  * Gett Business API integration — taxi booking.
  */
 import { config } from "./config";
+import { withCircuitBreaker } from "./utils/circuit-breaker";
 
 const GETT_TOKEN_URL = "https://business-api.gett.com/oauth/token";
 const GETT_API_BASE = "https://business-api.gett.com/v1";
@@ -79,7 +80,7 @@ async function gettPost(path: string, body: any): Promise<any> {
 /**
  * Book a taxi ride.
  */
-export async function bookRide(params: {
+async function _bookRide(params: {
   pickupAddress: string;
   pickupLat?: number;
   pickupLng?: number;
@@ -142,7 +143,7 @@ export async function bookRide(params: {
 /**
  * Get ride status by order ID.
  */
-export async function getRideStatus(orderId: string): Promise<string> {
+async function _getRideStatus(orderId: string): Promise<string> {
   if (!config.gettClientId) return "Gett לא מוגדר.";
 
   try {
@@ -160,7 +161,7 @@ export async function getRideStatus(orderId: string): Promise<string> {
 /**
  * Cancel a ride.
  */
-export async function cancelRide(orderId: string): Promise<string> {
+async function _cancelRide(orderId: string): Promise<string> {
   if (!config.gettClientId) return "Gett לא מוגדר.";
 
   try {
@@ -170,4 +171,22 @@ export async function cancelRide(orderId: string): Promise<string> {
   } catch (err: any) {
     return `❌ ביטול נכשל: ${err.message}`;
   }
+}
+
+// --- Circuit breaker wrappers ---
+const gettBreaker = { name: "gett", failureThreshold: 3, cooldownMs: 300_000 };
+const GETT_FALLBACK = "❌ שירות Gett לא זמין כרגע.";
+
+export function bookRide(params: {
+  pickupAddress: string; pickupLat?: number; pickupLng?: number;
+  dropoffAddress: string; dropoffLat?: number; dropoffLng?: number;
+  passengerName?: string; passengerPhone?: string; scheduledAt?: string; note?: string;
+}): Promise<string> {
+  return withCircuitBreaker(gettBreaker, () => _bookRide(params), GETT_FALLBACK);
+}
+export function getRideStatus(orderId: string): Promise<string> {
+  return withCircuitBreaker(gettBreaker, () => _getRideStatus(orderId), GETT_FALLBACK);
+}
+export function cancelRide(orderId: string): Promise<string> {
+  return withCircuitBreaker(gettBreaker, () => _cancelRide(orderId), GETT_FALLBACK);
 }

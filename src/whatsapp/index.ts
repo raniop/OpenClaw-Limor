@@ -31,6 +31,13 @@ import { approvalStore } from "../stores";
 import { learnFromCorrection } from "../context/correction-learner";
 import { startProactiveScheduler, recordOwnerResponse } from "../proactive";
 import { buildOperationalTrace, saveOperationalTrace, formatTraceSummary, runSelfCheck } from "../ops";
+import { startDeliveryPoller } from "../sms";
+import { startAlertPoller } from "../telegram/alert-poller";
+import { statePath } from "../state-dir";
+import { readFileSync, writeFileSync, existsSync } from "fs";
+import { addManualContact } from "../contacts";
+import { trackGroupPerson, getGroupPeopleContext } from "../conversation";
+import { syncContacts } from "../sync-contacts";
 
 let latestQR: string | null = null;
 let qrServer: http.Server | null = null;
@@ -139,7 +146,6 @@ export function createWhatsAppClient(): Client {
 
     // Poll for delivery SMS alerts
     try {
-      const { startDeliveryPoller } = require("../sms");
       startDeliveryPoller(async (text: string) => {
         if (config.ownerChatId && whatsappClient) {
           await whatsappClient.sendMessage(config.ownerChatId, text);
@@ -151,7 +157,6 @@ export function createWhatsAppClient(): Client {
 
     // Poll Telegram alert channel for rocket/missile alerts
     try {
-      const { startAlertPoller } = require("../telegram/alert-poller");
       startAlertPoller(
         // Text-only callback
         async (text: string) => {
@@ -248,9 +253,7 @@ export function createWhatsAppClient(): Client {
  * Poll for pending notifications from the dashboard (e.g., followup completed → notify requester).
  */
 function startNotificationPoller(client: Client): void {
-  const { statePath } = require("../state-dir");
   const notifyPath = statePath("pending-notifications.json");
-  const { readFileSync, writeFileSync, existsSync } = require("fs");
 
   setInterval(() => {
     try {
@@ -344,13 +347,11 @@ async function handleMessage(msg: Message): Promise<void> {
     const vcards: string[] = (msg as any).vCards;
     const parsed = vcards.map(parseVCard).filter(Boolean) as Array<{ name: string; phone: string }>;
     if (parsed.length > 0) {
-      const { addManualContact } = require("../contacts");
-      const { approvalStore: aStore } = require("../stores");
       const results: string[] = [];
       for (const c of parsed) {
         const result = addManualContact(c.name, c.phone);
         const cleanPhone = c.phone.replace(/\D/g, "");
-        if (cleanPhone) aStore.addApproved(`manual_${cleanPhone}`);
+        if (cleanPhone) approvalStore.addApproved(`manual_${cleanPhone}`);
         results.push(`${c.name} (${c.phone}): ${result}`);
         console.log(`[vcard] Auto-added: ${c.name} ${c.phone} → ${result}`);
       }
@@ -411,7 +412,6 @@ async function handleMessage(msg: Message): Promise<void> {
       const messageForHistory = `[${contactName}]: ${body}`;
       conversationStore.addMessage(chatId, "user", messageForHistory);
       try {
-        const { trackGroupPerson } = require("../conversation");
         trackGroupPerson(chatId, contactName, body);
       } catch {}
       log.traceEnd(trace, "muted_group", elapsed(trace));
@@ -482,7 +482,6 @@ async function handleMessage(msg: Message): Promise<void> {
     // Track per-person activity in groups
     if (isGroup) {
       try {
-        const { trackGroupPerson } = require("../conversation");
         trackGroupPerson(chatId, contactName, body);
       } catch {}
     }
@@ -526,7 +525,6 @@ async function handleMessage(msg: Message): Promise<void> {
     if (isGroup) {
       // Add per-person group memory
       try {
-        const { getGroupPeopleContext } = require("../conversation");
         const groupPeopleCtx = getGroupPeopleContext(chatId);
         if (groupPeopleCtx) extraContext += "\n\n" + groupPeopleCtx;
       } catch {}
@@ -688,7 +686,6 @@ async function handleMessage(msg: Message): Promise<void> {
 
     // Background contact sync (keeps contacts.json in sync with relationships)
     try {
-      const { syncContacts } = require("../sync-contacts");
       syncContacts();
     } catch (err) {
       console.error("[sync] Contact sync error:", err);

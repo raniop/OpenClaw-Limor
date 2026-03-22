@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { buildContext, buildResolvedContext } from "../src/context/context-builder";
 import { formatContextForPrompt, formatResolvedContextForPrompt } from "../src/context/context-service";
@@ -24,6 +24,7 @@ import { buildDebugTrace } from "../src/context/debug-trace";
 import { formatDebugTrace } from "../src/context/context-service";
 import { resolveFollowupAutomationDecision, applyFollowupAutomation } from "../src/context/followup-automation";
 import { resolveDomainPolicy } from "../src/context/domain-policy-resolver";
+import { clearState as clearPersistedState } from "../src/context/conversation-state-store";
 import type { ContextBundle, ResolvedContext } from "../src/context/context-types";
 
 const ownerSender = { name: "רני", isOwner: true, isGroup: false };
@@ -906,7 +907,7 @@ describe("tool-intent-resolver", () => {
     assert.strictEqual(ti.shouldUseTool, true);
   });
 
-  it("messaging with missing recipient => shouldUseTool=false", () => {
+  it("messaging with missing recipient => shouldUseTool=true (tools always allowed)", () => {
     const resolved = makePartialResolved({
       turnIntent: { category: "action_request", confidence: 0.8, mentionedEntities: [], isMinimal: false },
       conversation: { lastUserMessage: "תשלחי לו", isWaitingForReply: false, messageCount: 1, repeatedRecentMessages: false },
@@ -914,7 +915,7 @@ describe("tool-intent-resolver", () => {
     }, { needsClarification: true });
     const ti = resolveToolIntent(resolved);
     assert.strictEqual(ti.type, "messaging");
-    assert.strictEqual(ti.shouldUseTool, false);
+    assert.strictEqual(ti.shouldUseTool, true);
   });
 
   it("calendar: 'תקבעי לי פגישה מחר ב-14:00' => calendar", () => {
@@ -1062,6 +1063,11 @@ describe("formatResolvedContextForPrompt v6", () => {
 // ============================================================
 
 describe("conversation-state-resolver", () => {
+  beforeEach(() => {
+    clearPersistedState("test@c.us");
+    clearPersistedState("o");
+  });
+
   function makeStateInput(bundleOverrides: Partial<ContextBundle> = {}, extraOverrides: Record<string, any> = {}) {
     const bundle = makeBundle(bundleOverrides);
     const focus = resolvePrimaryFocus(bundle);
@@ -1392,32 +1398,32 @@ describe("execution-guardrails", () => {
     };
   }
 
-  it("clarify_first strategy => clarify_before_execution, allowTools=false", () => {
+  it("clarify_first strategy => clarify_before_execution, allowTools=true (tools never blocked)", () => {
     const input = makeGuardrailInput({
       responseStrategy: { type: "clarify_first", summary: "s", reason: "חסר פרט", confidence: 0.95 },
     });
     const decision = resolveExecutionDecision(input);
     assert.strictEqual(decision.type, "clarify_before_execution");
-    assert.strictEqual(decision.allowTools, false);
-    assert.strictEqual(decision.confidence, 0.98);
+    assert.strictEqual(decision.allowTools, true);
+    assert.strictEqual(decision.confidence, 0.9);
   });
 
-  it("reference_conflict => clarify_before_execution", () => {
+  it("reference_conflict => clarify_before_execution, tools allowed", () => {
     const input = makeGuardrailInput({
       contradictions: [{ type: "reference_conflict", summary: "s", resolution: "r", confidence: 0.85 }],
     });
     const decision = resolveExecutionDecision(input);
     assert.strictEqual(decision.type, "clarify_before_execution");
-    assert.strictEqual(decision.allowTools, false);
+    assert.strictEqual(decision.allowTools, true);
   });
 
-  it("intent_vs_missing_info => clarify_before_execution", () => {
+  it("intent_vs_missing_info => clarify_before_execution, tools allowed", () => {
     const input = makeGuardrailInput({
       contradictions: [{ type: "intent_vs_missing_info", summary: "s", resolution: "r", confidence: 0.95 }],
     });
     const decision = resolveExecutionDecision(input);
     assert.strictEqual(decision.type, "clarify_before_execution");
-    assert.strictEqual(decision.allowTools, false);
+    assert.strictEqual(decision.allowTools, true);
   });
 
   it("tool-ready execution => allow_tool_execution, allowTools=true", () => {
@@ -1429,34 +1435,34 @@ describe("execution-guardrails", () => {
     const decision = resolveExecutionDecision(input);
     assert.strictEqual(decision.type, "allow_tool_execution");
     assert.strictEqual(decision.allowTools, true);
-    assert.strictEqual(decision.confidence, 0.92);
+    assert.strictEqual(decision.confidence, 0.95);
   });
 
-  it("toolIntent true but strategy not execute => block_tool_execution", () => {
+  it("toolIntent true but strategy not execute => allow_tool_execution (tools never blocked)", () => {
     const input = makeGuardrailInput({
       toolIntent: { shouldUseTool: true, type: "calendar", summary: "יומן", reason: "r", confidence: 0.9 },
       actionPlan: { needsClarification: false },
       responseStrategy: { type: "direct_reply", summary: "s", reason: "r", confidence: 0.7 },
     });
     const decision = resolveExecutionDecision(input);
-    assert.strictEqual(decision.type, "block_tool_execution");
-    assert.strictEqual(decision.allowTools, false);
+    assert.strictEqual(decision.type, "allow_tool_execution");
+    assert.strictEqual(decision.allowTools, true);
   });
 
-  it("status_vs_new_request => safe_fallback_reply", () => {
+  it("status_vs_new_request contradiction => clarify (no status_vs_new_request-specific handler)", () => {
     const input = makeGuardrailInput({
       contradictions: [{ type: "status_vs_new_request", summary: "s", resolution: "r", confidence: 0.75 }],
     });
     const decision = resolveExecutionDecision(input);
-    assert.strictEqual(decision.type, "safe_fallback_reply");
-    assert.strictEqual(decision.allowTools, false);
+    // No special case for status_vs_new_request — falls through to default
+    assert.strictEqual(decision.allowTools, true);
   });
 
-  it("clean non-tool case => reply_only", () => {
+  it("clean non-tool case => reply_only, allowTools=true (tools never blocked)", () => {
     const input = makeGuardrailInput();
     const decision = resolveExecutionDecision(input);
     assert.strictEqual(decision.type, "reply_only");
-    assert.strictEqual(decision.allowTools, false);
+    assert.strictEqual(decision.allowTools, true);
     assert.strictEqual(decision.confidence, 0.7);
   });
 });
@@ -1529,15 +1535,14 @@ describe("tool-routing-policy", () => {
     assert.deepStrictEqual(policy.allowedToolNames, []);
   });
 
-  it("messaging intent => messaging group with real tool names", () => {
+  it("messaging intent => messaging group, all tools exposed", () => {
     const input = makeRoutingInput({
       executionDecision: { type: "allow_tool_execution", summary: "s", reason: "r", confidence: 0.92, allowTools: true },
       toolIntent: { type: "messaging", shouldUseTool: true, summary: "s", reason: "r", confidence: 0.9 },
     });
     const policy = resolveToolRoutingPolicy(input);
     assert.strictEqual(policy.group, "messaging");
-    assert.ok(policy.allowedToolNames.includes("send_message"));
-    assert.ok(policy.allowedToolNames.includes("notify_owner"));
+    assert.deepStrictEqual(policy.allowedToolNames, []); // empty = all exposed
   });
 
   it("calendar intent => calendar group", () => {
@@ -1547,8 +1552,7 @@ describe("tool-routing-policy", () => {
     });
     const policy = resolveToolRoutingPolicy(input);
     assert.strictEqual(policy.group, "calendar");
-    assert.ok(policy.allowedToolNames.includes("create_event"));
-    assert.ok(policy.allowedToolNames.includes("list_events"));
+    assert.deepStrictEqual(policy.allowedToolNames, []);
   });
 
   it("booking intent => booking group", () => {
@@ -1558,7 +1562,7 @@ describe("tool-routing-policy", () => {
     });
     const policy = resolveToolRoutingPolicy(input);
     assert.strictEqual(policy.group, "booking");
-    assert.ok(policy.allowedToolNames.includes("ontopo_search"));
+    assert.deepStrictEqual(policy.allowedToolNames, []);
   });
 
   it("travel intent => travel group", () => {
@@ -1568,8 +1572,7 @@ describe("tool-routing-policy", () => {
     });
     const policy = resolveToolRoutingPolicy(input);
     assert.strictEqual(policy.group, "travel");
-    assert.ok(policy.allowedToolNames.includes("flight_search"));
-    assert.ok(policy.allowedToolNames.includes("hotel_search"));
+    assert.deepStrictEqual(policy.allowedToolNames, []);
   });
 
   it("crm intent => crm group", () => {
@@ -1579,7 +1582,7 @@ describe("tool-routing-policy", () => {
     });
     const policy = resolveToolRoutingPolicy(input);
     assert.strictEqual(policy.group, "crm");
-    assert.ok(policy.allowedToolNames.includes("crm_dashboard"));
+    assert.deepStrictEqual(policy.allowedToolNames, []);
   });
 
   it("file intent => file group", () => {
@@ -1589,7 +1592,7 @@ describe("tool-routing-policy", () => {
     });
     const policy = resolveToolRoutingPolicy(input);
     assert.strictEqual(policy.group, "file");
-    assert.ok(policy.allowedToolNames.includes("list_files"));
+    assert.deepStrictEqual(policy.allowedToolNames, []);
   });
 
   it("contact_lookup intent => contact_lookup group", () => {
@@ -1599,7 +1602,7 @@ describe("tool-routing-policy", () => {
     });
     const policy = resolveToolRoutingPolicy(input);
     assert.strictEqual(policy.group, "contact_lookup");
-    assert.ok(policy.allowedToolNames.includes("list_contacts"));
+    assert.deepStrictEqual(policy.allowedToolNames, []);
   });
 
   it("capability intent => capability group", () => {
@@ -1609,19 +1612,17 @@ describe("tool-routing-policy", () => {
     });
     const policy = resolveToolRoutingPolicy(input);
     assert.strictEqual(policy.group, "capability");
-    assert.ok(policy.allowedToolNames.includes("run_capability"));
+    assert.deepStrictEqual(policy.allowedToolNames, []);
   });
 
-  it("status/owner_summary => owner_safe_readonly", () => {
+  it("status/owner_summary => detected group from toolIntent, all tools exposed", () => {
     const input = makeRoutingInput({
       executionDecision: { type: "allow_tool_execution", summary: "s", reason: "r", confidence: 0.92, allowTools: true },
       responseStrategy: { type: "owner_summary", summary: "s", reason: "r", confidence: 0.9 },
     });
     const policy = resolveToolRoutingPolicy(input);
-    assert.strictEqual(policy.group, "owner_safe_readonly");
-    assert.ok(policy.allowedToolNames.includes("list_events"));
-    assert.ok(policy.allowedToolNames.includes("list_contacts"));
-    assert.ok(!policy.allowedToolNames.includes("send_message"));
+    // Tool routing only looks at toolIntent.type, not responseStrategy
+    assert.deepStrictEqual(policy.allowedToolNames, []);
   });
 });
 

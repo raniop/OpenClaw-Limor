@@ -1,4 +1,5 @@
 import { config } from "./config";
+import { withCircuitBreaker } from "./utils/circuit-breaker";
 
 let token: string | null = null;
 
@@ -73,7 +74,7 @@ async function apiCall(path: string, options?: RequestInit): Promise<any> {
   }
 }
 
-export async function searchPolicyByPersonId(personId: string): Promise<string> {
+async function _searchPolicyByPersonId(personId: string): Promise<string> {
   try {
     // GetById returns policies for a person ID
     const data = await apiCall(`/api/Policy/GetById?id=${encodeURIComponent(personId)}`);
@@ -86,7 +87,7 @@ export async function searchPolicyByPersonId(personId: string): Promise<string> 
   }
 }
 
-export async function getPolicyDetails(policyIndex: number): Promise<string> {
+async function _getPolicyDetails(policyIndex: number): Promise<string> {
   try {
     const data = await apiCall(`/api/Policy/GetPolicyDetailsById?policyIndex=${policyIndex}`);
     if (!data) return "לא נמצאו פרטים לפוליסה זו";
@@ -96,7 +97,7 @@ export async function getPolicyDetails(policyIndex: number): Promise<string> {
   }
 }
 
-export async function getPolicyCustomers(policyIndex: number): Promise<string> {
+async function _getPolicyCustomers(policyIndex: number): Promise<string> {
   try {
     const data = await apiCall(`/api/Policy/GetPolicyCustomersDetailsByIndex?policyIndex=${policyIndex}`);
     if (!data) return "לא נמצאו פרטי לקוחות";
@@ -106,7 +107,7 @@ export async function getPolicyCustomers(policyIndex: number): Promise<string> {
   }
 }
 
-export async function getTopPolicies(top: number = 10): Promise<string> {
+async function _getTopPolicies(top: number = 10): Promise<string> {
   try {
     const data = await apiCall(`/api/Policy/GetTopPolicies?top=${top}`);
     if (!data) return "אין פוליסות";
@@ -116,7 +117,7 @@ export async function getTopPolicies(top: number = 10): Promise<string> {
   }
 }
 
-export async function getDashboard(month?: number, year?: number): Promise<string> {
+async function _getDashboard(month?: number, year?: number): Promise<string> {
   try {
     let data;
     if (month && year) {
@@ -131,7 +132,7 @@ export async function getDashboard(month?: number, year?: number): Promise<strin
   }
 }
 
-export async function getAgentsReport(page: number = 1, pageSize: number = 50): Promise<string> {
+async function _getAgentsReport(page: number = 1, pageSize: number = 50): Promise<string> {
   try {
     const data = await apiCall(`/api/Policy/GetAgentsReport?page=${page}&pageSize=${pageSize}`);
     if (!data) return "אין נתוני דוח סוכנים";
@@ -141,7 +142,7 @@ export async function getAgentsReport(page: number = 1, pageSize: number = 50): 
   }
 }
 
-export async function sendSms(mobile: string, message: string): Promise<string> {
+async function _sendSms(mobile: string, message: string): Promise<string> {
   try {
     await apiCall(`/api/Message/sendsmsmessage?mobile=${encodeURIComponent(mobile)}&message=${encodeURIComponent(message)}`);
     return `SMS נשלח בהצלחה ל-${mobile}`;
@@ -150,7 +151,7 @@ export async function sendSms(mobile: string, message: string): Promise<string> 
   }
 }
 
-export async function getBitulRiderPolicies(date: string, riderCode: number): Promise<string> {
+async function _getBitulRiderPolicies(date: string, riderCode: number): Promise<string> {
   try {
     const data = await apiCall(`/api/Policy/getBitulRiderPolicies?date=${encodeURIComponent(date)}&riderCode=${riderCode}`);
     if (!data) return "אין נתונים";
@@ -160,7 +161,7 @@ export async function getBitulRiderPolicies(date: string, riderCode: number): Pr
   }
 }
 
-export async function getDailyReportRiderList(): Promise<string> {
+async function _getDailyReportRiderList(): Promise<string> {
   try {
     const data = await apiCall("/api/Policy/getDailyReportRiderList");
     if (!data) return "אין נתונים";
@@ -168,4 +169,36 @@ export async function getDailyReportRiderList(): Promise<string> {
   } catch (error: any) {
     return `שגיאה: ${error.message}`;
   }
+}
+
+// --- Circuit breaker wrappers ---
+const crmBreaker = { name: "crm", failureThreshold: 3, cooldownMs: 300_000 };
+const CRM_FALLBACK = "❌ שרת ה-CRM לא זמין כרגע.";
+
+export function searchPolicyByPersonId(personId: string): Promise<string> {
+  return withCircuitBreaker(crmBreaker, () => _searchPolicyByPersonId(personId), CRM_FALLBACK);
+}
+export function getPolicyDetails(policyIndex: number): Promise<string> {
+  return withCircuitBreaker(crmBreaker, () => _getPolicyDetails(policyIndex), CRM_FALLBACK);
+}
+export function getPolicyCustomers(policyIndex: number): Promise<string> {
+  return withCircuitBreaker(crmBreaker, () => _getPolicyCustomers(policyIndex), CRM_FALLBACK);
+}
+export function getTopPolicies(top: number = 10): Promise<string> {
+  return withCircuitBreaker(crmBreaker, () => _getTopPolicies(top), CRM_FALLBACK);
+}
+export function getDashboard(month?: number, year?: number): Promise<string> {
+  return withCircuitBreaker(crmBreaker, () => _getDashboard(month, year), CRM_FALLBACK);
+}
+export function getAgentsReport(page: number = 1, pageSize: number = 50): Promise<string> {
+  return withCircuitBreaker(crmBreaker, () => _getAgentsReport(page, pageSize), CRM_FALLBACK);
+}
+export function sendSms(mobile: string, message: string): Promise<string> {
+  return withCircuitBreaker(crmBreaker, () => _sendSms(mobile, message), CRM_FALLBACK);
+}
+export function getBitulRiderPolicies(date: string, riderCode: number): Promise<string> {
+  return withCircuitBreaker(crmBreaker, () => _getBitulRiderPolicies(date, riderCode), CRM_FALLBACK);
+}
+export function getDailyReportRiderList(): Promise<string> {
+  return withCircuitBreaker(crmBreaker, () => _getDailyReportRiderList(), CRM_FALLBACK);
 }

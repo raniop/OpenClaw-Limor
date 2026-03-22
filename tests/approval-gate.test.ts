@@ -1,18 +1,18 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { writeFileSync, mkdirSync, existsSync } from "fs";
-import { resolve } from "path";
 
-const STATE_DIR = resolve(__dirname, "..", "workspace", "state");
-if (!existsSync(STATE_DIR)) mkdirSync(STATE_DIR, { recursive: true });
-
-function resetState() {
-  writeFileSync(resolve(STATE_DIR, "approved.json"), "[]", "utf-8");
-  writeFileSync(resolve(STATE_DIR, "pending.json"), "{}", "utf-8");
-}
+// Set owner chat ID for tests (needed by approval-gate sendToChat logic)
+process.env.OWNER_CHAT_ID = "owner@c.us";
 
 import { checkApprovalGate } from "../src/whatsapp/approval-gate";
 import { approvalStore } from "../src/stores";
+import { getDb } from "../src/stores/sqlite-init";
+
+function resetState() {
+  const db = getDb();
+  db.exec("DELETE FROM approved_contacts");
+  db.exec("DELETE FROM pending_contacts");
+}
 
 describe("approval-gate", () => {
   beforeEach(() => resetState());
@@ -63,9 +63,8 @@ describe("approval-gate", () => {
   });
 
   it("after approval, contact passes through", async () => {
-    // First: blocked
+    // First: add as pending then approve
     const code = approvalStore.addPending("new@lid", "+972509999999");
-    // Then: owner approves
     approvalStore.approveByCode(code);
     // Now: should pass
     const blocked = await checkApprovalGate({

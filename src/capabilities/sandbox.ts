@@ -4,7 +4,7 @@
  * Nothing touches production until explicitly applied with owner approval.
  */
 import { execSync } from "child_process";
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from "fs";
 import { resolve, join } from "path";
 
 const PROJECT_ROOT = resolve(__dirname, "..", "..");
@@ -244,7 +244,6 @@ export function applyWorktree(capId: string): string {
     // Restart via pm2 (graceful) — if pm2 is not available, fallback to process.exit
     setTimeout(() => {
       try {
-        const { execSync } = require("child_process");
         execSync("npx pm2 restart limor", { cwd: PROJECT_ROOT, timeout: 10_000 });
       } catch {
         process.exit(0); // Fallback: pm2 will auto-restart
@@ -286,7 +285,6 @@ export function checkRestartFlag(): { capId: string; appliedAt: string } | null 
   if (existsSync(RESTART_FLAG)) {
     try {
       const data = JSON.parse(readFileSync(RESTART_FLAG, "utf-8"));
-      const { unlinkSync } = require("fs");
       unlinkSync(RESTART_FLAG);
       return data;
     } catch {}

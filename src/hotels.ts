@@ -1,4 +1,5 @@
 import { config } from "./config";
+import { withCircuitBreaker } from "./utils/circuit-breaker";
 
 const API_HOST = "booking-com15.p.rapidapi.com";
 const BASE_URL = `https://${API_HOST}`;
@@ -31,7 +32,7 @@ async function searchDestination(query: string): Promise<DestResult | null> {
   };
 }
 
-export async function searchHotels(
+async function _searchHotels(
   destination: string,
   checkinDate: string,
   checkoutDate: string,
@@ -88,4 +89,14 @@ export async function searchHotels(
   }
 
   return lines.join("\n");
+}
+
+// --- Circuit breaker wrapper ---
+const hotelsBreaker = { name: "hotels", failureThreshold: 3, cooldownMs: 300_000 };
+
+export async function searchHotels(
+  destination: string, checkinDate: string, checkoutDate: string,
+  adults: number = 2, rooms: number = 1
+): Promise<string> {
+  return withCircuitBreaker(hotelsBreaker, () => _searchHotels(destination, checkinDate, checkoutDate, adults, rooms), "❌ שירות חיפוש מלונות לא זמין כרגע.");
 }

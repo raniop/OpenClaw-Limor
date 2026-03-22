@@ -17,6 +17,10 @@ import { log } from "../logger";
 import { startTimer } from "../observability";
 import { buildSystemPrompt } from "./prompt-builder";
 import { checkHallucination, retryOnHallucination, notifyHallucinationEvent } from "./guards";
+import { getNotifyOwnerCallback } from "./callbacks";
+
+const MAX_TOOL_ITERATIONS = 15;
+const SEND_MESSAGE_TIMEOUT_MS = 90_000;
 
 export interface SendMessageOptions {
   /** When false, tools are stripped from the API call to prevent execution. Default: true. */
@@ -33,6 +37,12 @@ export async function sendMessage(
   sender?: SenderContext,
   options?: SendMessageOptions
 ): Promise<string> {
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error("__SEND_MESSAGE_TIMEOUT__")), SEND_MESSAGE_TIMEOUT_MS)
+  );
+
+  try {
+    return await Promise.race([timeoutPromise, (async () => {
   // --- Build system prompt ---
   const lastUserMsg = history.filter((m) => m.role === "user").pop()?.content || "";
   const isGroup = !!(sender && !sender.isOwner && sender.chatId.endsWith("@g.us"));
@@ -128,6 +138,14 @@ export async function sendMessage(
   }
 
   return finalText;
+    })()]);
+  } catch (err: any) {
+    if (err?.message === "__SEND_MESSAGE_TIMEOUT__") {
+      console.error(`[send-message] ⏰ Timeout after ${SEND_MESSAGE_TIMEOUT_MS}ms`);
+      return "⏰ הפעולה לקחה יותר מדי זמן. נסה שוב עם בקשה פשוטה יותר?";
+    }
+    throw err;
+  }
 }
 
 // ─── Tool loop helper ────────────────────────────────────────────────
@@ -141,8 +159,21 @@ async function runToolLoop(
   sender?: SenderContext
 ): Promise<Anthropic.Message> {
   const toolRetries = new Map<string, number>();
+  let iterations = 0;
 
   while (response.stop_reason === "tool_use") {
+    iterations++;
+    if (iterations > MAX_TOOL_ITERATIONS) {
+      console.warn(`[send-message] ⚠️ Tool loop hit max iterations (${MAX_TOOL_ITERATIONS}), forcing stop.`);
+      try {
+        const notify = getNotifyOwnerCallback();
+        if (notify) {
+          const who = sender?.isOwner ? "בשיחה איתך" : `צ'אט: ${sender?.name || "unknown"}`;
+          notify(`⚠️ [tool-loop] הגעתי למגבלת iterations (${iterations}/${MAX_TOOL_ITERATIONS})\n${who}`).catch(() => {});
+        }
+      } catch {}
+      break;
+    }
     const toolBlocks = response.content.filter((b) => b.type === "tool_use") as Anthropic.ToolUseBlock[];
     if (toolBlocks.length === 0) break;
 

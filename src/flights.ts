@@ -1,4 +1,5 @@
 import { config } from "./config";
+import { withCircuitBreaker } from "./utils/circuit-breaker";
 
 const API_HOST = "sky-scrapper.p.rapidapi.com";
 const BASE_URL = `https://${API_HOST}`;
@@ -31,7 +32,7 @@ async function searchAirport(query: string): Promise<AirportResult | null> {
   };
 }
 
-export async function searchFlights(
+async function _searchFlights(
   origin: string,
   destination: string,
   date: string,
@@ -94,4 +95,14 @@ export async function searchFlights(
   }
 
   return lines.join("\n");
+}
+
+// --- Circuit breaker wrapper ---
+const flightsBreaker = { name: "flights", failureThreshold: 3, cooldownMs: 300_000 };
+
+export async function searchFlights(
+  origin: string, destination: string, date: string,
+  returnDate?: string, adults: number = 1, cabinClass: string = "economy"
+): Promise<string> {
+  return withCircuitBreaker(flightsBreaker, () => _searchFlights(origin, destination, date, returnDate, adults, cabinClass), "❌ שירות חיפוש טיסות לא זמין כרגע.");
 }

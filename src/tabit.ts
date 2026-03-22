@@ -3,6 +3,7 @@ import {
   safeScreenshot,
   buildFallbackMessage,
 } from "./booking-utils";
+import { withCircuitBreaker } from "./utils/circuit-breaker";
 import type { Page } from "puppeteer";
 
 const TABIT_API = "https://bridge.tabit.cloud/organizations/search";
@@ -42,7 +43,7 @@ const KNOWN_LOCATIONS: Record<string, { lat: number; lng: number }> = {
 // Default to Tel Aviv center
 const DEFAULT_LOCATION = { lat: 32.0853, lng: 34.7818 };
 
-export async function searchTabit(
+async function _searchTabit(
   restaurantName: string,
   date: string, // YYYYMMDD
   time: string, // HHMM
@@ -195,7 +196,7 @@ async function selectAngularDropdown(
   await delay(300);
 }
 
-export async function bookTabit(params: {
+async function _bookTabit(params: {
   publicUrlLabel: string;
   date: string; // YYYYMMDD
   time: string; // HH:MM
@@ -349,4 +350,21 @@ export async function bookTabit(params: {
   } finally {
     if (browser) await browser.close();
   }
+}
+
+// --- Circuit breaker wrappers ---
+const tabitBreaker = { name: "tabit", failureThreshold: 3, cooldownMs: 300_000 };
+const TABIT_FALLBACK = "❌ שירות טאביט לא זמין כרגע.";
+
+export async function searchTabit(
+  restaurantName: string, date: string, time: string, partySize: number, city?: string
+): Promise<string> {
+  return withCircuitBreaker(tabitBreaker, () => _searchTabit(restaurantName, date, time, partySize, city), TABIT_FALLBACK);
+}
+
+export async function bookTabit(params: {
+  publicUrlLabel: string; date: string; time: string; partySize: number;
+  firstName: string; lastName: string; phone: string; email?: string;
+}): Promise<string> {
+  return withCircuitBreaker(tabitBreaker, () => _bookTabit(params), TABIT_FALLBACK);
 }

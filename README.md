@@ -34,11 +34,17 @@
 - 📅 **State Machine לפגישות** — בקשה → אישור → יצירה (אטומי בקוד)
 - ⚠️ **Social engineering protection** — התראה כשמישהו טוען "רני ביקש"
 
+### אמינות ועמידות
+- 🔌 **Circuit Breaker** — כל API חיצוני מוגן (3 כשלונות → 5 דקות cooldown)
+- 🔄 **Tool Loop Safety** — מקסימום 15 iterations + timeout 90 שניות
+- 💾 **SQLite Storage** — conversations + approvals ב-SQLite עם WAL mode
+- 🔀 **Auto-migration** — מעבר חלק מ-JSON ל-SQLite בעלייה ראשונה
+
 ### QA ומוניטורינג
 - 🔬 **Operational Trace** — 25+ שדות לכל הודעה
 - ✅ **Self-Check** — 12 בדיקות בוליאניות אחרי כל תגובה
 - 📈 **Metrics** — tool precision, hallucination rate, task completion
-- 🧪 **Benchmark Suite** — 24 תרחישים, 9 קטגוריות (87.5% pass rate)
+- 🧪 **460 Unit Tests** — send-message, tool dispatch, circuit breaker, model router, context engine
 - 🚦 **Pass/Fail Framework** — gating metrics + warnings
 - 📊 **Dashboard** — מרכז בקרה עם לוגים, metrics, alerts
 
@@ -93,10 +99,19 @@ npm start
 ```
 src/
 ├── ai/                    # Claude API, tools, model router
-│   ├── send-message.ts    # Core message loop + hallucination guard
+│   ├── send-message.ts    # Core message loop + hallucination guard + safety limits
+│   ├── handle-tool-call.ts # Dispatch map (was 858-line if/else, now 33 lines)
+│   ├── handlers/          # Tool handlers by domain (calendar, booking, crm, etc.)
 │   ├── model-router.ts    # Smart Opus/Sonnet routing
 │   ├── tools/             # 75+ tool definitions
 │   └── extract-facts.ts   # Background memory extraction
+├── stores/                # Storage layer (SQLite + migration)
+│   ├── sqlite-init.ts     # Database init, WAL mode, schema
+│   ├── sqlite-approval-store.ts  # Approved contacts (SQLite)
+│   ├── sqlite-conversation-store.ts # Conversations (SQLite)
+│   └── index.ts           # Store provider + JSON→SQLite migration
+├── utils/                 # Shared utilities
+│   └── circuit-breaker.ts # Generic circuit breaker for external APIs
 ├── context/               # 17-layer context engine
 │   ├── mood-detector.ts   # Emotional state detection
 │   ├── turn-intent.ts     # Intent classification
@@ -124,9 +139,13 @@ src/
 ├── telegram/              # Channel monitoring
 │   └── alert-poller.ts    # Scraping + images + circuit breaker
 ├── memory.ts              # Deep memory (facts, preferences, patterns, emotional log)
-├── conversation.ts        # History + rolling summary + rotation
-├── web-search.ts          # Internet search
-└── calendar.ts            # Google Calendar API
+├── conversation.ts        # History + rolling summary + rotation (SQLite-backed)
+├── web-search.ts          # Internet search (circuit breaker protected)
+├── calendar.ts            # Google Calendar API (circuit breaker protected)
+├── ontopo.ts / tabit.ts   # Restaurant booking (circuit breaker protected)
+├── flights.ts / hotels.ts # Travel search (circuit breaker protected)
+├── crm.ts                 # CRM API (circuit breaker protected)
+└── gett.ts                # Taxi booking (circuit breaker protected)
 
 workspace/
 ├── identity/              # Bot personality
@@ -140,6 +159,7 @@ workspace/
 │   ├── multi_step.md      # Complex task planning
 │   └── ...                # 6 more policies
 └── state/                 # Runtime state (auto-created)
+    └── limor.db           # SQLite database (conversations, approvals)
 
 dashboard/                 # Next.js control panel
 ├── app/
@@ -150,10 +170,14 @@ dashboard/                 # Next.js control panel
 │   ├── contacts/          # Contact management
 │   └── telegram/          # Monitored channels
 
-tests/
+tests/                     # 460 tests, 0 failures
+├── send-message.test.ts   # Tool loop, hallucination guard, timeout
+├── handle-tool-call.test.ts # Dispatch, permissions, error handling
+├── circuit-breaker.test.ts # Circuit breaker state machine
+├── model-router.test.ts   # Opus/Sonnet routing rules
+├── context.test.ts        # 17-layer context engine tests
 ├── scenarios/             # 24 benchmark scenarios (9 categories)
-├── benchmark/             # Automated benchmark runner
-└── context.test.ts        # Context engine tests
+└── benchmark/             # Automated benchmark runner
 
 souls/
 └── limor.json             # Personality + model config

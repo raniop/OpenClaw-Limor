@@ -10,6 +10,9 @@ import { handleToolCall } from "./handle-tool-call";
 import { log } from "../logger";
 import { startTimer } from "../observability";
 import type { SenderContext } from "./types";
+import { getNotifyOwnerCallback } from "./callbacks";
+
+const MAX_TOOL_ITERATIONS = 15;
 
 export interface HallucinationCheckResult {
   isHallucination: boolean;
@@ -71,7 +74,20 @@ export async function retryOnHallucination(
     let retryResponse = await withRetry(() => client.messages.create(retryParams));
 
     // Run tool loop on the retry too (AI might now actually call a tool)
+    let iterations = 0;
     while (retryResponse.stop_reason === "tool_use") {
+      iterations++;
+      if (iterations > MAX_TOOL_ITERATIONS) {
+        console.warn(`[send-message] ⚠️ Tool loop hit max iterations (${MAX_TOOL_ITERATIONS}), forcing stop.`);
+        try {
+          const notify = getNotifyOwnerCallback();
+          if (notify) {
+            const who = sender?.isOwner ? "בשיחה איתך" : `צ'אט: ${sender?.name || "unknown"}`;
+            notify(`⚠️ [tool-loop] הגעתי למגבלת iterations (${iterations}/${MAX_TOOL_ITERATIONS})\n${who}`).catch(() => {});
+          }
+        } catch {}
+        break;
+      }
       const retryToolBlocks = retryResponse.content.filter(
         (b) => b.type === "tool_use"
       ) as Anthropic.ToolUseBlock[];
@@ -126,7 +142,6 @@ export async function retryOnHallucination(
  */
 export function notifyHallucinationEvent(sender?: SenderContext): void {
   try {
-    const { getNotifyOwnerCallback } = require("./callbacks");
     const notify = getNotifyOwnerCallback();
     if (notify) {
       const who = sender?.isOwner ? "בשיחה איתך" : `צ'אט: ${sender?.name || "unknown"}`;

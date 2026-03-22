@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
+import { withCircuitBreaker } from "./utils/circuit-breaker";
 import {
   launchBookingBrowser,
   safeScreenshot,
@@ -112,7 +113,7 @@ async function resolveNumericSlug(textSlug: string): Promise<{ numericSlug: stri
   return null;
 }
 
-export async function searchAvailability(
+async function _searchAvailability(
   restaurantSlug: string,
   date: string, // YYYYMMDD
   time: string, // HHMM
@@ -221,7 +222,7 @@ function delay(ms: number): Promise<void> {
 }
 
 
-export async function bookOntopo(params: {
+async function _bookOntopo(params: {
   restaurantSlug: string;
   date: string; // YYYYMMDD
   time: string; // HH:MM
@@ -702,4 +703,21 @@ export async function bookOntopo(params: {
   } finally {
     if (browser) await browser.close();
   }
+}
+
+// --- Circuit breaker wrappers ---
+const ontopoBreaker = { name: "ontopo", failureThreshold: 3, cooldownMs: 300_000 };
+const ONTOPO_FALLBACK = "❌ שירות אונטופו לא זמין כרגע. נסה שוב בעוד כמה דקות.";
+
+export async function searchAvailability(
+  restaurantSlug: string, date: string, time: string, partySize: number
+): Promise<string> {
+  return withCircuitBreaker(ontopoBreaker, () => _searchAvailability(restaurantSlug, date, time, partySize), ONTOPO_FALLBACK);
+}
+
+export async function bookOntopo(params: {
+  restaurantSlug: string; date: string; time: string; partySize: number;
+  firstName: string; lastName: string; phone: string; email: string;
+}): Promise<string> {
+  return withCircuitBreaker(ontopoBreaker, () => _bookOntopo(params), ONTOPO_FALLBACK);
 }

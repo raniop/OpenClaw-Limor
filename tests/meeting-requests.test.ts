@@ -1,14 +1,14 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
-import { resolve } from "path";
+import { statePath, getStateDir } from "../src/state-dir";
 
 // Ensure state directory exists
-const STATE_DIR = resolve(__dirname, "..", "workspace", "state");
-if (!existsSync(STATE_DIR)) mkdirSync(STATE_DIR, { recursive: true });
+const stateDir = getStateDir();
+if (!existsSync(stateDir)) mkdirSync(stateDir, { recursive: true });
 
 function resetState() {
-  writeFileSync(resolve(STATE_DIR, "active_tasks.json"), "{}", "utf-8");
+  writeFileSync(statePath("active_tasks.json"), "{}", "utf-8");
 }
 
 import {

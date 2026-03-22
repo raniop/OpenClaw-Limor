@@ -5,6 +5,7 @@
  */
 
 import { config } from "./config";
+import { withCircuitBreaker } from "./utils/circuit-breaker";
 
 export interface SearchResult {
   title: string;
@@ -15,7 +16,7 @@ export interface SearchResult {
 /**
  * Search the web and return top results.
  */
-export async function webSearch(
+async function _webSearch(
   query: string,
   language: string = "he"
 ): Promise<SearchResult[]> {
@@ -169,4 +170,11 @@ function extractDDGUrl(rawUrl: string): string {
   if (rawUrl.startsWith("http")) return rawUrl;
   if (rawUrl.startsWith("//")) return "https:" + rawUrl;
   return rawUrl;
+}
+
+// --- Circuit breaker wrapper ---
+const webSearchBreaker = { name: "web-search", failureThreshold: 3, cooldownMs: 300_000 };
+
+export function webSearch(query: string, language: string = "he"): Promise<SearchResult[]> {
+  return withCircuitBreaker(webSearchBreaker, () => _webSearch(query, language), "❌ חיפוש אינטרנט לא זמין כרגע." as any);
 }

@@ -10,6 +10,7 @@ import { approveSpec, rejectSpec } from "../capabilities";
 import { generateDailyDigest } from "../digest";
 import { getMeetingById, approveMeeting, rejectMeeting } from "../meetings";
 import { parseHebrewTime } from "../meetings";
+import { runCapabilityImplementation } from "../capabilities/capability-runner";
 
 interface OwnerCommandContext {
   chatId: string;
@@ -151,7 +152,6 @@ export async function handleOwnerCommand(ctx: OwnerCommandContext): Promise<bool
 
       // Auto-run implementation after approval
       try {
-        const { runCapabilityImplementation } = require("../capabilities/capability-runner");
         const result = await runCapabilityImplementation(spec.id);
         await ctx.reply(result);
       } catch (err: any) {

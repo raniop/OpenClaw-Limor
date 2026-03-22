@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import { config } from "./config";
+import { withCircuitBreaker } from "./utils/circuit-breaker";
 
 function getCalendarClient() {
   const oauth2Client = new google.auth.OAuth2(
@@ -17,7 +18,7 @@ export interface CreateEventResult {
   summary: string;
 }
 
-export async function createEvent(
+async function _createEvent(
   title: string,
   startDate: Date,
   endDate: Date
@@ -43,7 +44,7 @@ export async function createEvent(
   };
 }
 
-export async function deleteEvent(eventId: string): Promise<string> {
+async function _deleteEvent(eventId: string): Promise<string> {
   const calendar = getCalendarClient();
   try {
     await calendar.events.delete({
@@ -56,7 +57,7 @@ export async function deleteEvent(eventId: string): Promise<string> {
   }
 }
 
-export async function findAndDeleteEvent(date: Date, titleQuery: string): Promise<string> {
+async function _findAndDeleteEvent(date: Date, titleQuery: string): Promise<string> {
   const calendar = getCalendarClient();
   const startOfDay = new Date(date);
   startOfDay.setHours(0, 0, 0, 0);
@@ -102,7 +103,7 @@ export async function findAndDeleteEvent(date: Date, titleQuery: string): Promis
   return results.join("\n");
 }
 
-export async function deleteAllEventsOnDate(date: Date): Promise<string> {
+async function _deleteAllEventsOnDate(date: Date): Promise<string> {
   const calendar = getCalendarClient();
   const startOfDay = new Date(date);
   startOfDay.setHours(0, 0, 0, 0);
@@ -132,7 +133,7 @@ export async function deleteAllEventsOnDate(date: Date): Promise<string> {
   return results.join("\n");
 }
 
-export async function listEvents(
+async function _listEvents(
   date: Date
 ): Promise<string> {
   const calendar = getCalendarClient();
@@ -166,4 +167,24 @@ export async function listEvents(
       return `• ${start} - ${e.summary}`;
     })
     .join("\n");
+}
+
+// --- Circuit breaker wrappers ---
+const calendarBreaker = { name: "google-calendar", failureThreshold: 3, cooldownMs: 300_000 };
+const CALENDAR_FALLBACK = "❌ Google Calendar לא זמין כרגע. נסה שוב.";
+
+export async function createEvent(title: string, startDate: Date, endDate: Date): Promise<CreateEventResult> {
+  return withCircuitBreaker(calendarBreaker, () => _createEvent(title, startDate, endDate), CALENDAR_FALLBACK as any);
+}
+export function deleteEvent(eventId: string): Promise<string> {
+  return withCircuitBreaker(calendarBreaker, () => _deleteEvent(eventId), CALENDAR_FALLBACK);
+}
+export function findAndDeleteEvent(date: Date, titleQuery: string): Promise<string> {
+  return withCircuitBreaker(calendarBreaker, () => _findAndDeleteEvent(date, titleQuery), CALENDAR_FALLBACK);
+}
+export function deleteAllEventsOnDate(date: Date): Promise<string> {
+  return withCircuitBreaker(calendarBreaker, () => _deleteAllEventsOnDate(date), CALENDAR_FALLBACK);
+}
+export function listEvents(date: Date): Promise<string> {
+  return withCircuitBreaker(calendarBreaker, () => _listEvents(date), CALENDAR_FALLBACK);
 }

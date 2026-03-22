@@ -1,12 +1,11 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, unlinkSync } from "fs";
-import { resolve } from "path";
-
-const STORE_PATH = resolve(__dirname, "..", "workspace", "state", "decisions.json");
+import { statePath } from "../src/state-dir";
 
 function cleanStore(): void {
-  if (existsSync(STORE_PATH)) unlinkSync(STORE_PATH);
+  const p = statePath("decisions.json");
+  if (existsSync(p)) unlinkSync(p);
 }
 
 import { recordDecision, getRecentDecisions, getDecisionsByCategory, getDecisionsByTarget } from "../src/explain/decision-store";
@@ -51,5 +50,13 @@ describe("decision-store", () => {
     const d1 = recordDecision({ actor: "x", category: "tool", summary: "a", outcome: "ok" });
     const d2 = recordDecision({ actor: "x", category: "tool", summary: "b", outcome: "ok" });
     assert.notStrictEqual(d1.id, d2.id);
+  });
+
+  it("finds by exact ID", () => {
+    const d1 = recordDecision({ actor: "x", category: "tool", summary: "a", outcome: "ok" });
+    const { getDecisionById } = require("../src/explain/decision-store");
+    const found = getDecisionById(d1.id);
+    assert.ok(found);
+    assert.strictEqual(found.id, d1.id);
   });
 });

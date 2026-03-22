@@ -44,8 +44,10 @@ describe("canUseTool", () => {
   });
 
   it("non-owner can use universal tools", () => {
-    assert.strictEqual(canUseTool("create_event", approved), true);
-    assert.strictEqual(canUseTool("list_events", approved), true);
+    // create_event and list_events are now owner-only
+    assert.strictEqual(canUseTool("create_event", approved), false);
+    assert.strictEqual(canUseTool("list_events", approved), false);
+    // Travel and booking are universal (not in TOOL_PERMISSIONS)
     assert.strictEqual(canUseTool("flight_search", approved), true);
     assert.strictEqual(canUseTool("hotel_search", approved), true);
     assert.strictEqual(canUseTool("ontopo_search", approved), true);

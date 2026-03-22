@@ -1,0 +1,36 @@
+import type { ToolHandler } from "./types";
+import { calendarHandlers } from "./calendar";
+import { bookingHandlers } from "./booking";
+import { travelHandlers } from "./travel";
+import { crmHandlers } from "./crm";
+import { contactsHandlers } from "./contacts";
+import { filesHandlers } from "./files";
+import { instructionsHandlers } from "./instructions";
+import { smarthomeHandlers } from "./smarthome";
+import { modelHandlers } from "./model";
+import { capabilitiesHandlers } from "./capabilities";
+import { gettHandlers } from "./gett";
+import { whatsappExtrasHandlers } from "./whatsapp-extras";
+import { groupsHandlers } from "./groups";
+import { smsHandlers } from "./sms";
+import { webSearchHandlers } from "./web-search";
+
+export type { ToolHandler } from "./types";
+
+export const allHandlers: Record<string, ToolHandler> = {
+  ...calendarHandlers,
+  ...bookingHandlers,
+  ...travelHandlers,
+  ...crmHandlers,
+  ...contactsHandlers,
+  ...filesHandlers,
+  ...instructionsHandlers,
+  ...smarthomeHandlers,
+  ...modelHandlers,
+  ...capabilitiesHandlers,
+  ...gettHandlers,
+  ...whatsappExtrasHandlers,
+  ...groupsHandlers,
+  ...smsHandlers,
+  ...webSearchHandlers,
+};
