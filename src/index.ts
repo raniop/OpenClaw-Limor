@@ -27,9 +27,10 @@ console.log(`[workspace] identity=${identityOk ? "OK" : "MISSING"} state=${state
 
 validateConfig();
 
-// Sync contacts with relationships on startup
-import { syncContacts } from "./sync-contacts";
-const syncResult = syncContacts();
+// Contacts are now in SQLite — syncContacts disabled (was writing orphans to JSON)
+// import { syncContacts } from "./sync-contacts";
+// const syncResult = syncContacts();
+const syncResult = { added: 0, updated: 0 };
 if (syncResult.added > 0 || syncResult.updated > 0) {
   console.log(`[sync] Contacts synced: ${syncResult.added} added, ${syncResult.updated} updated`);
 }

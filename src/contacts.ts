@@ -141,6 +141,10 @@ function loadContacts(): ContactsStore {
       relationship_type: row.relationship_type || undefined,
     };
   }
+  // Sync JSON file on first load (overwrite with SQLite truth)
+  try {
+    writeFileSync(statePath("contacts.json"), JSON.stringify(store, null, 2), "utf-8");
+  } catch {}
   return store;
 }
 
@@ -178,7 +182,7 @@ export function updateContact(chatId: string, name: string, phone: string): void
   // Don't create new contacts without a real phone number
   if (!existing && !isRealPhone) return;
 
-  // Auto-merge: look for an existing entry (manual_ or other chatId) that matches by phone or name
+  // Auto-merge: look for an existing entry that matches by phone or name
   // This prevents duplicates when the same person messages from private chat, group, or was added manually
   const cleanPhone = isRealPhone ? phone : "";
   const nameLower = name.toLowerCase();
@@ -186,16 +190,30 @@ export function updateContact(chatId: string, name: string, phone: string): void
     if (key === chatId) return false; // Skip self
     // Match by phone number
     if (cleanPhone && c.phone && c.phone === cleanPhone) return true;
-    // Match by name (only if the other entry has no real chatId, i.e., manual_)
-    if (key.startsWith("manual_") && c.phone &&
-      [c.name, ...(c.aliases || [])].some(n => n.toLowerCase() === nameLower)) return true;
+    // Match by name — if existing entry has a phone, it's the authoritative record
+    if (c.phone && [c.name, ...(c.aliases || [])].some(n => n.toLowerCase() === nameLower)) return true;
+    // Match by first name — "Doron" matches "Doron Erel" if the existing has phone
+    if (c.phone && c.name.toLowerCase().split(/\s+/)[0] === nameLower) return true;
     return false;
   });
 
   if (duplicateMatch) {
     const [dupeKey, dupeContact] = duplicateMatch;
-    // Prefer the real chatId (not manual_) as the primary key
-    const primaryKey = chatId.startsWith("manual_") ? dupeKey : chatId;
+    // If the existing entry has phone and we don't — just update lastSeen, don't create duplicate
+    if (dupeContact.phone && !isRealPhone) {
+      dupeContact.lastSeen = new Date().toISOString();
+      if (name && !dupeContact.aliases?.includes(name) && dupeContact.name !== name) {
+        dupeContact.aliases = [...(dupeContact.aliases || []), name];
+      }
+      saveContacts(contacts);
+      return;
+    }
+    // Prefer the entry that has a phone number as primary
+    const dupeHasPhone = !!dupeContact.phone;
+    const newHasPhone = isRealPhone;
+    const primaryKey = dupeHasPhone && !newHasPhone ? dupeKey :
+      !dupeHasPhone && newHasPhone ? chatId :
+      chatId.startsWith("manual_") ? dupeKey : chatId;
     const secondaryKey = primaryKey === chatId ? dupeKey : chatId;
     const primaryContact = primaryKey === chatId ? (existing || {}) : dupeContact;
     const secondaryContact = primaryKey === chatId ? dupeContact : (existing || {});

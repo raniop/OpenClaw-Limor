@@ -766,9 +766,9 @@ async function handleMessage(msg: Message): Promise<void> {
       }
     }
 
-    // Background contact sync (keeps contacts.json in sync with relationships)
+    // Background contact sync disabled — contacts now in SQLite
     try {
-      syncContacts();
+      // syncContacts();
     } catch (err) {
       console.error("[sync] Contact sync error:", err);
     }
