@@ -278,9 +278,15 @@ export const monitoringHandlers: Record<string, ToolHandler> = {
         return `❌ Build failed:\n${buildSummary}`;
       }
 
-      execSync("npx pm2 restart limor", { cwd: projectDir, encoding: "utf-8", timeout: 15000 });
+      // Schedule restart AFTER response is sent (3 second delay)
+      // This gives the agent time to return the success message before dying
+      setTimeout(() => {
+        try {
+          execSync("npx pm2 restart limor", { cwd: projectDir, encoding: "utf-8", timeout: 15000 });
+        } catch {}
+      }, 3000);
 
-      return `✅ בנייה ופריסה הושלמו!\n\nBuild:\n${buildSummary}\n\n🔄 PM2 restarted`;
+      return `✅ בנייה הושלמה בהצלחה! 🔄 לימור תעשה restart עצמי בעוד 3 שניות.\n\nBuild:\n${buildSummary}`;
     } catch (err: any) {
       return `❌ שגיאה:\n${err.stderr || err.message}`;
     }
