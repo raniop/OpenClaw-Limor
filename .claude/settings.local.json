@@ -264,7 +264,20 @@
       "Bash(do grep:*)",
       "Bash(rm -f \"/Users/raniophir/Open Claude Bot AI/.git/index.lock\")",
       "Bash(do sed:*)",
-      "Bash(grep \"claude-\" souls/*.json)"
+      "Bash(grep \"claude-\" souls/*.json)",
+      "Bash(ls \"/Users/raniophir/Library/Application Support/Claude/claude-code/\"*/claude)",
+      "Read(//opt/homebrew/**)",
+      "Bash(gh run:*)",
+      "Bash(grep '\"\"benchmark\"\"' package.json)",
+      "Bash(source .env)",
+      "Bash(ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY node -e \":*)",
+      "Bash(xargs -I{} ps -p {} -o pid,command)",
+      "Bash(kill 94097)",
+      "Bash(kill -9 94097)",
+      "Bash(pkill -f \"claude.*cap-mn\")",
+      "Bash(pkill -f \"claude.*print.*HAREL\")",
+      "Bash(rm -rf \"/Users/raniophir/Open Claude Bot AI/.worktrees/cap-mn\"*)",
+      "Bash(\"/Users/raniophir/Open Claude Bot AI/workspace/state/capabilities.json\")"
     ]
   }
 }

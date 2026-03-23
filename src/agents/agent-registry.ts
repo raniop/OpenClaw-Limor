@@ -83,6 +83,9 @@ agents.set("dana", buildAgent("dana.json", webSearchTools));
 // בוריס — system monitoring & DevOps
 agents.set("boris", buildAgent("boris.json", monitoringTools));
 
+// יורי — developer (has ALL monitoring/DevOps tools for coding)
+agents.set("yuri", buildAgent("yuri.json", monitoringTools));
+
 export function getAgent(id: string): AgentConfig | undefined {
   return agents.get(id);
 }
