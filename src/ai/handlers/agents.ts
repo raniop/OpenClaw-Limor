@@ -19,6 +19,7 @@ const INTERIM_MESSAGES: Record<string, string> = {
   hila: "הילה 🍽️ מחפשת לך משהו טוב...",
   dana: "דנה 🛒 משווה מחירים...",
   boris: "בוריס 🔧 בודק את המערכת...",
+  yuri: "יורי 💻 עובד על זה...",
 };
 
 export const agentHandlers: Record<string, ToolHandler> = {
@@ -34,7 +35,7 @@ export const agentHandlers: Record<string, ToolHandler> = {
     try {
       const sendMsg = getSendMessageCallback();
       if (sendMsg && sender?.chatId) {
-        const interim = INTERIM_MESSAGES[agent_id] || `${agent.emoji} ${agent.name} עובדת על זה...`;
+        const interim = INTERIM_MESSAGES[agent_id] || `${agent.emoji} ${agent.name} עובד/ת על זה...`;
         await sendMsg(sender.chatId, interim);
       }
     } catch {}

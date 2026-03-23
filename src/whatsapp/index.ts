@@ -32,7 +32,7 @@ import { approvalStore } from "../stores";
 import { learnFromCorrection } from "../context/correction-learner";
 import { startProactiveScheduler, recordOwnerResponse } from "../proactive";
 import { buildOperationalTrace, saveOperationalTrace, formatTraceSummary, runSelfCheck } from "../ops";
-import { startDeliveryPoller } from "../sms";
+import { startDeliveryPoller, startSmsWatcher } from "../sms";
 import { startAlertPoller } from "../telegram/alert-poller";
 import { statePath } from "../state-dir";
 import { readFileSync, writeFileSync, existsSync } from "fs";
@@ -154,6 +154,18 @@ export function createWhatsAppClient(): Client {
       });
     } catch (err) {
       console.error("[sms] Failed to start delivery poller:", err);
+    }
+
+    // SMS Sender Watcher — forwards SMS from specific senders (e.g. HAREL) to owner via WhatsApp
+    try {
+      startSmsWatcher(async (text: string) => {
+        if (config.ownerChatId && whatsappClient) {
+          await whatsappClient.sendMessage(config.ownerChatId, text);
+          conversationStore.addMessage(config.ownerChatId, "assistant", text);
+        }
+      });
+    } catch (err) {
+      console.error("[sms-watcher] Failed to start SMS watcher:", err);
     }
 
     // Poll Telegram alert channel for rocket/missile alerts

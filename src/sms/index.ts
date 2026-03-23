@@ -5,3 +5,5 @@ export type { DeliveryAlert } from "./delivery-detector";
 export { startDeliveryPoller } from "./delivery-poller";
 export { addDelivery, markReceived, markReceivedByMatch, getDeliveries, getPendingDeliveryCount } from "./delivery-store";
 export type { DeliveryEntry } from "./delivery-store";
+export { startSmsWatcher, stopSmsWatcher, getSmsWatcherStatus } from "./sms-watcher";
+export type { SmsWatcherConfig } from "./sms-watcher";

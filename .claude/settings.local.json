@@ -277,7 +277,9 @@
       "Bash(pkill -f \"claude.*cap-mn\")",
       "Bash(pkill -f \"claude.*print.*HAREL\")",
       "Bash(rm -rf \"/Users/raniophir/Open Claude Bot AI/.worktrees/cap-mn\"*)",
-      "Bash(\"/Users/raniophir/Open Claude Bot AI/workspace/state/capabilities.json\")"
+      "Bash(\"/Users/raniophir/Open Claude Bot AI/workspace/state/capabilities.json\")",
+      "Bash(node -e \"const { isAvailable } = require\\(''./dist/sms/sms-reader''\\); console.log\\(''SMS DB available:'', isAvailable\\(\\)\\);\")",
+      "Bash(pkill -f claude.*print)"
     ]
   }
 }
