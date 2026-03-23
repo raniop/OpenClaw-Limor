@@ -426,6 +426,14 @@ async function handleMessage(msg: Message): Promise<void> {
   }
 
   try {
+    // --- Skip messages from other bots in groups ---
+    if (isGroup && /\b(ai|bot|Bot)\b/i.test(contactName)) {
+      const messageForHistory = `[${contactName}]: ${body}`;
+      conversationStore.addMessage(chatId, "user", messageForHistory);
+      log.traceEnd(trace, "skip_other_bot", elapsed(trace));
+      return;
+    }
+
     // --- Muted groups ---
     if (isGroup && isGroupMuted(chatId)) {
       // Still save to history so owner can ask "what happened in the group" later
