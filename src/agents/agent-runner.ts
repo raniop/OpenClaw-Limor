@@ -7,8 +7,8 @@ import { client, withRetry } from "../ai/client";
 import { handleToolCall } from "../ai/handle-tool-call";
 import type { AgentConfig, AgentResult } from "./agent-types";
 
-const AGENT_TIMEOUT_MS = 60_000;
-const MAX_AGENT_TOOL_ITERATIONS = 5;
+const AGENT_TIMEOUT_MS = 180_000; // 3 minutes for coding tasks
+const MAX_AGENT_TOOL_ITERATIONS = 20;
 
 export async function runAgent(
   agent: AgentConfig,
