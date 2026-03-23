@@ -93,6 +93,18 @@ function shouldForward(msg: SmsMessage, config: SmsWatcherConfig): boolean {
   if (msg.isFromMe) return false;
   if (!isSenderMatch(msg, config.sender)) return false;
 
+  // iOS stores some SMS as binary NSObject metadata — extract auth code if present
+  if (/Z\$classname|X\$classes|NSObject|DDScanner|bplist/i.test(msg.text)) {
+    const authMatch = msg.text.match(/T(\d{4,6})XAuthCode/);
+    if (authMatch) {
+      // Replace binary text with extracted auth code
+      msg.text = `קוד האימות הוא ${authMatch[1]}`;
+    } else {
+      return false; // No auth code found in binary — skip
+    }
+  }
+  if (msg.text.length < 3) return false;
+
   const textLower = msg.text.toLowerCase();
 
   // Exclude keywords
@@ -119,7 +131,7 @@ function formatMessage(msg: SmsMessage, config: SmsWatcherConfig): string {
 
 // ─── Core poller ──────────────────────────────────────────────────────────────
 
-const POLL_INTERVAL_MS = 60 * 1000; // 1 minute
+const POLL_INTERVAL_MS = 10 * 1000; // 10 seconds — near real-time
 
 let notifyOwner: ((text: string) => Promise<void>) | null = null;
 let pollTimer: ReturnType<typeof setInterval> | null = null;

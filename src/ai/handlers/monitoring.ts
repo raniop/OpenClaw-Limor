@@ -278,13 +278,13 @@ export const monitoringHandlers: Record<string, ToolHandler> = {
         return `❌ Build failed:\n${buildSummary}`;
       }
 
-      // Schedule restart AFTER response is sent (3 second delay)
-      // This gives the agent time to return the success message before dying
+      // Schedule restart AFTER response is sent (20 second delay)
+      // Agent needs to finish tool loop → Limor processes → sends WhatsApp → then restart
       setTimeout(() => {
         try {
           execSync("npx pm2 restart limor", { cwd: projectDir, encoding: "utf-8", timeout: 15000 });
         } catch {}
-      }, 3000);
+      }, 20000);
 
       return `✅ בנייה הושלמה בהצלחה! 🔄 לימור תעשה restart עצמי בעוד 3 שניות.\n\nBuild:\n${buildSummary}`;
     } catch (err: any) {
