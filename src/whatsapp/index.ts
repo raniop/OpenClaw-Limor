@@ -367,7 +367,14 @@ async function handleMessage(msg: Message): Promise<void> {
     try {
       const quotedMsg = await msg.getQuotedMessage();
       const quotedText = quotedMsg.body || "(מדיה)";
-      body = `[בתגובה ל: ${quotedText}]\n${body}`;
+      // Include quoted message sender name so AI knows who the reply is directed at
+      let quotedSender = "";
+      try {
+        const quotedContact = await quotedMsg.getContact();
+        quotedSender = quotedContact.pushname || quotedContact.name || "";
+      } catch {}
+      const senderPrefix = quotedSender ? `${quotedSender}: ` : "";
+      body = `[בתגובה ל: ${senderPrefix}${quotedText}]\n${body}`;
     } catch (err) {
       console.error("[quoted] Failed to get quoted message:", err);
     }
