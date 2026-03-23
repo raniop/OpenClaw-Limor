@@ -50,7 +50,7 @@ export async function handleResponse(
     sendVoice?: (base64: string, mimetype: string) => Promise<void>;
   }
 ): Promise<void> {
-  if (response.trim() === "[SKIP]") {
+  if (response.trim().startsWith("[SKIP]")) {
     log.msgSkipGroup(contactName, trace);
     return;
   }
