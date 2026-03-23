@@ -36,11 +36,20 @@ function findClaudeCli(): string {
       if (existsSync(cliPath)) return cliPath;
     }
   } catch {}
-  // Fallback: try PATH
+  // Fallback: try common locations
+  const fallbackPaths = [
+    join(process.env.HOME || "/Users/raniophir", ".local/bin/claude"),
+    "/usr/local/bin/claude",
+    "/opt/homebrew/bin/claude",
+  ];
+  for (const p of fallbackPaths) {
+    if (existsSync(p)) return p;
+  }
+  // Last resort: try PATH
   try {
     return execSync("which claude", { encoding: "utf-8" }).trim();
   } catch {}
-  return join(baseDir, "2.1.76", "claude"); // last known good
+  return fallbackPaths[0]; // ~/.local/bin/claude
 }
 
 /**
