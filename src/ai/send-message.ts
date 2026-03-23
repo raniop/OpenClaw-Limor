@@ -127,14 +127,17 @@ export async function sendMessage(
 
   // If no text but we had a delegate_to_agent call, use the agent's response as the final text
   if (!finalText && toolsUsed.includes("delegate_to_agent")) {
-    const lastUserMsg = messages[messages.length - 1];
-    if (lastUserMsg && Array.isArray(lastUserMsg.content)) {
-      const agentResult = (lastUserMsg.content as any[]).find(
-        (c: any) => c.type === "tool_result" && typeof c.content === "string" && c.content.includes("*")
-      );
-      if (agentResult) {
-        // Strip the pass-through instruction prefix
-        finalText = agentResult.content.replace(/\[תשובת .+ — .+\]\n\n/, "");
+    // Search backwards through messages for the most recent tool_result from delegation
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg.role === "user" && Array.isArray(msg.content)) {
+        const agentResult = (msg.content as any[]).find(
+          (c: any) => c.type === "tool_result" && typeof c.content === "string" && c.content.length > 20
+        );
+        if (agentResult) {
+          finalText = agentResult.content.replace(/\[תשובת .+ — .+\]\n\n/, "");
+          break;
+        }
       }
     }
   }

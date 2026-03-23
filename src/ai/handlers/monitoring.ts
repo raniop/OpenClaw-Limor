@@ -5,6 +5,7 @@ import type { ToolHandler } from "./types";
 import { listAgents } from "../../agents/agent-registry";
 import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
+import { execSync } from "child_process";
 
 const STATE_DIR = resolve(__dirname, "../../../workspace/state");
 
@@ -18,6 +19,27 @@ export const monitoringHandlers: Record<string, ToolHandler> = {
       sub.get_agent_stats({}),
     ]);
     return `=== בריאות מערכת ===\n${health}\n\n=== שגיאות ב-24 שעות ===\n${errors}\n\n=== סוכנים ===\n${stats}`;
+  },
+
+  get_recent_changes: async (input) => {
+    const days = input.days || 1;
+    try {
+      const projectDir = resolve(__dirname, "../../..");
+      const since = `${days}.days.ago`;
+      const log = execSync(
+        `git log --since="${since}" --pretty=format:"%h | %ad | %s" --date=format:"%d/%m %H:%M" --no-merges`,
+        { cwd: projectDir, encoding: "utf-8", timeout: 5000 }
+      ).trim();
+      if (!log) return `אין שינויים ב-${days} ימים אחרונים`;
+      const lines = log.split("\n");
+      const diffStat = execSync(
+        `git diff --stat HEAD~${Math.min(lines.length, 20)}..HEAD`,
+        { cwd: projectDir, encoding: "utf-8", timeout: 5000 }
+      ).trim();
+      return `📝 שינויים ב-${days} ימים (${lines.length} commits):\n\n${log}\n\n📊 סיכום:\n${diffStat}`;
+    } catch (err: any) {
+      return `שגיאה: ${err.message}`;
+    }
   },
 
   system_health_check: async () => {

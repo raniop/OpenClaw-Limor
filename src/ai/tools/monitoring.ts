@@ -43,4 +43,18 @@ export const monitoringTools: Anthropic.Tool[] = [
       required: [],
     },
   },
+  {
+    name: "get_recent_changes",
+    description: "שינויים אחרונים בקוד המערכת — git commits, קבצים שהשתנו, מה נוסף/נמחק",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        days: {
+          type: "number",
+          description: "כמה ימים אחורה לבדוק (ברירת מחדל: 1)",
+        },
+      },
+      required: [],
+    },
+  },
 ];
