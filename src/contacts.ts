@@ -1,7 +1,8 @@
-import { writeFileSync } from "fs";
+import { writeFileSync, existsSync, readFileSync } from "fs";
 import { resolve } from "path";
 import { loadWithFallback } from "./state-migration";
 import { statePath } from "./state-dir";
+import { getDb } from "./stores/sqlite-init";
 
 const OLD_CONTACTS_PATH = resolve(__dirname, "..", "memory", "contacts.json");
 
@@ -93,11 +94,74 @@ function translateName(name: string): string[] {
   return results;
 }
 
+let _migrated = false;
+
 function loadContacts(): ContactsStore {
-  return loadWithFallback<ContactsStore>(statePath("contacts.json"), OLD_CONTACTS_PATH, {});
+  const db = getDb();
+
+  // One-time migration: JSON → SQLite
+  if (!_migrated) {
+    _migrated = true;
+    const count = (db.prepare("SELECT COUNT(*) as c FROM contacts").get() as any).c;
+    if (count === 0) {
+      // Try loading from JSON
+      const jsonPath = statePath("contacts.json");
+      const oldPath = OLD_CONTACTS_PATH;
+      let jsonData: ContactsStore = {};
+      try {
+        if (existsSync(jsonPath)) jsonData = JSON.parse(readFileSync(jsonPath, "utf-8"));
+        else if (existsSync(oldPath)) jsonData = JSON.parse(readFileSync(oldPath, "utf-8"));
+      } catch {}
+      if (Object.keys(jsonData).length > 0) {
+        const insert = db.prepare("INSERT OR IGNORE INTO contacts (chat_id, name, phone, aliases, relationship_type, last_seen, source) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        const tx = db.transaction(() => {
+          for (const [key, c] of Object.entries(jsonData)) {
+            if (!c || typeof c !== "object") continue;
+            insert.run(key, c.name || "", c.phone || "", JSON.stringify(c.aliases || []), c.relationship_type || "", c.lastSeen || new Date().toISOString(), key.startsWith("manual_") ? "manual" : "auto");
+          }
+        });
+        tx();
+        console.log(`[contacts] Migrated ${Object.keys(jsonData).length} contacts from JSON to SQLite`);
+      }
+    }
+  }
+
+  // Load from SQLite
+  const rows = db.prepare("SELECT * FROM contacts").all() as any[];
+  const store: ContactsStore = {};
+  for (const row of rows) {
+    let aliases: string[] = [];
+    try { aliases = JSON.parse(row.aliases || "[]"); } catch {}
+    store[row.chat_id] = {
+      chatId: row.chat_id,
+      name: row.name,
+      aliases: aliases.length > 0 ? aliases : undefined,
+      phone: row.phone || "",
+      lastSeen: row.last_seen || new Date().toISOString(),
+      relationship_type: row.relationship_type || undefined,
+    };
+  }
+  return store;
 }
 
 function saveContacts(contacts: ContactsStore): void {
+  const db = getDb();
+  const upsert = db.prepare(`INSERT OR REPLACE INTO contacts (chat_id, name, phone, aliases, relationship_type, last_seen, source) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+  const tx = db.transaction(() => {
+    // Get all existing keys
+    const existingKeys = new Set((db.prepare("SELECT chat_id FROM contacts").all() as any[]).map(r => r.chat_id));
+    // Upsert all contacts
+    for (const [key, c] of Object.entries(contacts)) {
+      upsert.run(key, c.name, c.phone || "", JSON.stringify(c.aliases || []), c.relationship_type || "", c.lastSeen || new Date().toISOString(), key.startsWith("manual_") ? "manual" : "auto");
+      existingKeys.delete(key);
+    }
+    // Delete contacts that were removed
+    for (const key of existingKeys) {
+      db.prepare("DELETE FROM contacts WHERE chat_id = ?").run(key);
+    }
+  });
+  tx();
+  // Also sync to JSON for dashboard compatibility
   writeFileSync(statePath("contacts.json"), JSON.stringify(contacts, null, 2), "utf-8");
 }
 

@@ -58,6 +58,20 @@ export function getDb(): Database.Database {
       summary TEXT NOT NULL,
       updated_at TEXT DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS contacts (
+      chat_id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      phone TEXT,
+      aliases TEXT,
+      relationship_type TEXT,
+      importance_score INTEGER DEFAULT 0,
+      last_seen TEXT DEFAULT (datetime('now')),
+      source TEXT DEFAULT 'auto'
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_contacts_phone ON contacts(phone);
+    CREATE INDEX IF NOT EXISTS idx_contacts_name ON contacts(name);
   `);
 
   console.log(`[sqlite] Database initialized at ${dbPath}`);
