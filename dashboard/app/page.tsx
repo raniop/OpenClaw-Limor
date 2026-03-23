@@ -132,8 +132,8 @@ export default function DashboardHome() {
                   {c.name}
                 </div>
                 {c.phone && (
-                  <div style={{ fontSize: 9, color: "var(--text-secondary)", direction: "ltr" }}>
-                    {c.phone.replace(/^972/, "0").replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3")}
+                  <div style={{ fontSize: 10, color: "var(--accent)", direction: "ltr", fontWeight: 500 }}>
+                    {c.phone.replace(/^972(\d)/, "0$1").replace(/^(\d{3})(\d{3,4})(\d{4})$/, "$1-$2-$3")}
                   </div>
                 )}
                 {msgCount > 0 && (
