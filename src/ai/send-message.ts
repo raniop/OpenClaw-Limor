@@ -109,7 +109,7 @@ export async function sendMessage(
   const apiParams: any = {
     model: selectedModel,
     max_tokens: config.maxTokens,
-    system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
+    system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral", ttl: "1h" } }],
     messages,
   };
   if (tools.length > 0) apiParams.tools = tools;
@@ -250,7 +250,7 @@ async function runToolLoop(
     const loopParams: any = {
       model,
       max_tokens: config.maxTokens,
-      system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
+      system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral", ttl: "1h" } }],
       messages,
     };
     if (tools.length > 0) loopParams.tools = tools;
