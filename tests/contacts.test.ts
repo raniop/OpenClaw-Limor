@@ -2,12 +2,12 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { resolve } from "path";
-
-const STATE_DIR = resolve(__dirname, "..", "workspace", "state");
-if (!existsSync(STATE_DIR)) mkdirSync(STATE_DIR, { recursive: true });
+import { getStateDir } from "../src/state-dir";
 
 function resetContacts() {
-  writeFileSync(resolve(STATE_DIR, "contacts.json"), "{}", "utf-8");
+  const stateDir = getStateDir();
+  if (!existsSync(stateDir)) mkdirSync(stateDir, { recursive: true });
+  writeFileSync(resolve(stateDir, "contacts.json"), "{}", "utf-8");
 }
 
 import {
@@ -89,16 +89,16 @@ describe("contacts", () => {
 
   describe("getRecentContacts", () => {
     it("returns contacts sorted by lastSeen", () => {
-      updateContact("chat1@lid", "First", "111");
-      updateContact("chat2@lid", "Second", "222");
+      updateContact("chat1@lid", "First", "972501110001");
+      updateContact("chat2@lid", "Second", "972501110002");
       const recent = getRecentContacts(2);
       assert.strictEqual(recent.length, 2);
     });
 
     it("respects limit", () => {
-      updateContact("chat1@lid", "A", "111");
-      updateContact("chat2@lid", "B", "222");
-      updateContact("chat3@lid", "C", "333");
+      updateContact("chat1@lid", "A", "972501110003");
+      updateContact("chat2@lid", "B", "972501110004");
+      updateContact("chat3@lid", "C", "972501110005");
       const recent = getRecentContacts(2);
       assert.strictEqual(recent.length, 2);
     });

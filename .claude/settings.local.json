@@ -279,7 +279,11 @@
       "Bash(rm -rf \"/Users/raniophir/Open Claude Bot AI/.worktrees/cap-mn\"*)",
       "Bash(\"/Users/raniophir/Open Claude Bot AI/workspace/state/capabilities.json\")",
       "Bash(node -e \"const { isAvailable } = require\\(''./dist/sms/sms-reader''\\); console.log\\(''SMS DB available:'', isAvailable\\(\\)\\);\")",
-      "Bash(pkill -f claude.*print)"
+      "Bash(pkill -f claude.*print)",
+      "Bash(grep \"Nuni\\\\|Dugi\\\\|Dan Shabtay\\\\|Yoni\" workspace/state/*.json)",
+      "Bash(curl -s http://localhost:3848/api/contacts)",
+      "Bash(grep phone.*replace.*972 '/Users/raniophir/Open Claude Bot AI/dashboard/.next/server/app/page.js')",
+      "Bash(grep -o direction.*ltr '/Users/raniophir/Open Claude Bot AI/dashboard/.next/server/app/page.js')"
     ]
   }
 }

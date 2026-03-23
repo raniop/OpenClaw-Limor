@@ -34,6 +34,18 @@
 ### חיפוש באינטרנט (src/web-search.ts)
 - **web_search** — חיפוש באינטרנט עם Brave Search API (או DuckDuckGo כ-fallback). מחזיר 5 תוצאות עם כותרת, תקציר וקישור. תומך בשפות שונות (ברירת מחדל: עברית).
 
+### מודלים ו-API
+- **Claude Sonnet 4.6** — מודל ברירת מחדל (claude-sonnet-4-6). 1M context window, 64K max output.
+- **Claude Opus 4.6** — למשימות מורכבות ו-capabilities (claude-opus-4-6). 1M context window, 128K max output.
+- **Adaptive Thinking** — ב-4.6 Claude מחליט בעצמו מתי לחשוב לעומק (מחליף את Extended Thinking הישן).
+- **Prompt Caching** — cache שעה (ttl: 3600) על system prompts יציבים — חוסך ~90% מעלויות קריאה.
+- **1M Context GA** — חלון הקשר של מיליון טוקנים ללא תוספת מחיר (מרץ 2026).
+
+### MCP (Model Context Protocol)
+- סטנדרט פתוח תחת Linux Foundation (הועבר דצמבר 2025).
+- מאפשר חיבור כלים חיצוניים ל-Claude בצורה סטנדרטית.
+- 75+ connectors זמינים ב-directory הרשמי.
+
 ### כלל: לפני שבונים capability חדשה
 1. תבדקי אם היכולת כבר קיימת ב-src/
 2. אם כן — **אל תבני מחדש!** תשתמשי במה שיש

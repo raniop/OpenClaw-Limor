@@ -25,7 +25,7 @@ function makeTextResponse(text: string) {
     type: "message",
     role: "assistant",
     content: [{ type: "text", text }],
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-6",
     stop_reason: "end_turn",
     usage: { input_tokens: 10, output_tokens: 10 },
   };
@@ -39,7 +39,7 @@ function makeToolUseResponse(toolName: string, toolId: string, input: any) {
     content: [
       { type: "tool_use", id: toolId, name: toolName, input },
     ],
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-6",
     stop_reason: "tool_use",
     usage: { input_tokens: 10, output_tokens: 10 },
   };
@@ -53,7 +53,7 @@ function makeMultiToolResponse(tools: Array<{ name: string; id: string; input: a
     content: tools.map((t) => ({
       type: "tool_use", id: t.id, name: t.name, input: t.input,
     })),
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-6",
     stop_reason: "tool_use",
     usage: { input_tokens: 10, output_tokens: 10 },
   };
@@ -82,7 +82,7 @@ describe("sendMessage", () => {
       { allowTools: false }
     );
 
-    assert.strictEqual(result, "שלום! מה שלומך?");
+    assert.strictEqual(result.text, "שלום! מה שלומך?");
     assert.strictEqual(callCount, 1);
   });
 
@@ -107,7 +107,7 @@ describe("sendMessage", () => {
         undefined,
         owner,
       );
-      assert.strictEqual(result, "הנה הקבצים שמצאתי.");
+      assert.strictEqual(result.text, "הנה הקבצים שמצאתי.");
       assert.strictEqual(callCount, 2); // initial + after tool result
     } finally {
       allHandlers["list_files"] = origHandler;
@@ -140,7 +140,7 @@ describe("sendMessage", () => {
         undefined,
         owner,
       );
-      assert.strictEqual(result, "הנה תוצאות שני הכלים.");
+      assert.strictEqual(result.text, "הנה תוצאות שני הכלים.");
       // Both tools should have been called (Promise.all)
       assert.ok(toolCallOrder.includes("files"));
       assert.ok(toolCallOrder.includes("instructions"));
@@ -172,7 +172,7 @@ describe("sendMessage", () => {
       // The initial call + 15 iterations = 16 calls to create
       assert.ok(callCount <= 17, `Expected ≤17 API calls, got ${callCount}`);
       // Result should be from the last tool_use response — no text block → fallback
-      assert.ok(typeof result === "string");
+      assert.ok(typeof result.text === "string");
     } finally {
       allHandlers["list_files"] = origHandler;
     }
@@ -197,7 +197,7 @@ describe("sendMessage", () => {
     );
 
     // Should have retried and returned the honest response
-    assert.strictEqual(result, "אין לי אפשרות לשלוח הודעות ישירות.");
+    assert.strictEqual(result.text, "אין לי אפשרות לשלוח הודעות ישירות.");
     assert.ok(callCount >= 2, "Should have made at least 2 API calls (original + retry)");
   });
 
@@ -219,7 +219,7 @@ describe("sendMessage", () => {
     );
 
     // retryOnHallucination returns the retry text even if still hallucinating
-    assert.strictEqual(result, "הפגישה נקבעה כמבוקש.");
+    assert.strictEqual(result.text, "הפגישה נקבעה כמבוקש.");
   });
 
   it("returns fallback text when response has no text block", async () => {
@@ -228,7 +228,7 @@ describe("sendMessage", () => {
       type: "message",
       role: "assistant",
       content: [], // empty content
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       stop_reason: "end_turn",
       usage: { input_tokens: 10, output_tokens: 10 },
     });
@@ -240,7 +240,7 @@ describe("sendMessage", () => {
       { allowTools: false }
     );
 
-    assert.ok(result.includes("אופס"));
+    assert.ok(result.text.includes("אופס"));
   });
 
   it("empty tool blocks cause loop to break", async () => {
@@ -253,7 +253,7 @@ describe("sendMessage", () => {
         type: "message",
         role: "assistant",
         content: [{ type: "text", text: "done" }],
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         stop_reason: "tool_use", // says tool_use but content has no tool blocks
         usage: { input_tokens: 10, output_tokens: 10 },
       };
@@ -265,7 +265,7 @@ describe("sendMessage", () => {
       owner,
     );
 
-    assert.strictEqual(result, "done");
+    assert.strictEqual(result.text, "done");
     assert.strictEqual(callCount, 1); // no additional calls
   });
 });

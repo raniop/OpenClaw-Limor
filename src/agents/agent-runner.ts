@@ -34,7 +34,7 @@ export async function runAgent(
   const apiParams: any = {
     model: agent.model,
     max_tokens: agent.maxTokens,
-    system: [{ type: "text", text: agent.systemPrompt + AGENT_ENFORCEMENT, cache_control: { type: "ephemeral" } }],
+    system: [{ type: "text", text: agent.systemPrompt + AGENT_ENFORCEMENT, cache_control: { type: "ephemeral", ttl: 3600 } }],
     messages,
   };
   if (agent.tools && agent.tools.length > 0) {
@@ -89,7 +89,7 @@ export async function runAgent(
     const loopParams: any = {
       model: agent.model,
       max_tokens: agent.maxTokens,
-      system: [{ type: "text", text: agent.systemPrompt + AGENT_ENFORCEMENT, cache_control: { type: "ephemeral" } }],
+      system: [{ type: "text", text: agent.systemPrompt + AGENT_ENFORCEMENT, cache_control: { type: "ephemeral", ttl: 3600 } }],
       messages,
     };
     if (agent.tools && agent.tools.length > 0) loopParams.tools = agent.tools;

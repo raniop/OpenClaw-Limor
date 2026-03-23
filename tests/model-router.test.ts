@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { selectModel } from "../src/ai/model-router";
 
 const OPUS = "claude-opus-4-6";
-const SONNET = "claude-sonnet-4-20250514";
+const SONNET = "claude-sonnet-4-6";
 
 describe("model-router", () => {
   describe("selectModel", () => {
@@ -36,55 +36,53 @@ describe("model-router", () => {
       assert.match(result.reason, /non-owner/);
     });
 
-    // Rule 1a: Owner + multi_step_request → Opus
-    it("returns Opus for owner + multi_step_request", () => {
+    // Cost optimization: Owner + complex requests now use Sonnet (not Opus)
+    it("returns Sonnet for owner + multi_step_request (cost optimization)", () => {
       const result = selectModel({
         isOwner: true, isGroup: false,
         turnIntent: "multi_step_request", toolIntentType: "none",
       });
-      assert.strictEqual(result.model, OPUS);
+      assert.strictEqual(result.model, SONNET);
     });
 
-    // Rule 1a: Owner + reminder_request → Opus
-    it("returns Opus for owner + reminder_request", () => {
+    it("returns Sonnet for owner + reminder_request (cost optimization)", () => {
       const result = selectModel({
         isOwner: true, isGroup: false,
         turnIntent: "reminder_request", toolIntentType: "none",
       });
-      assert.strictEqual(result.model, OPUS);
+      assert.strictEqual(result.model, SONNET);
     });
 
-    // Rule 1b: Owner + action_request with tool-heavy type → Opus
-    it("returns Opus for owner + action_request + calendar", () => {
+    it("returns Sonnet for owner + action_request + calendar (cost optimization)", () => {
       const result = selectModel({
         isOwner: true, isGroup: false,
         turnIntent: "action_request", toolIntentType: "calendar",
       });
-      assert.strictEqual(result.model, OPUS);
+      assert.strictEqual(result.model, SONNET);
     });
 
-    it("returns Opus for owner + action_request + booking", () => {
+    it("returns Sonnet for owner + action_request + booking (cost optimization)", () => {
       const result = selectModel({
         isOwner: true, isGroup: false,
         turnIntent: "action_request", toolIntentType: "booking",
       });
-      assert.strictEqual(result.model, OPUS);
+      assert.strictEqual(result.model, SONNET);
     });
 
-    it("returns Opus for owner + action_request + crm", () => {
+    it("returns Sonnet for owner + action_request + crm (cost optimization)", () => {
       const result = selectModel({
         isOwner: true, isGroup: false,
         turnIntent: "action_request", toolIntentType: "crm",
       });
-      assert.strictEqual(result.model, OPUS);
+      assert.strictEqual(result.model, SONNET);
     });
 
-    it("returns Opus for owner + action_request + messaging", () => {
+    it("returns Sonnet for owner + action_request + messaging (cost optimization)", () => {
       const result = selectModel({
         isOwner: true, isGroup: false,
         turnIntent: "action_request", toolIntentType: "messaging",
       });
-      assert.strictEqual(result.model, OPUS);
+      assert.strictEqual(result.model, SONNET);
     });
 
     // Rule 1b edge case: action_request with non-tool-heavy type → Sonnet
