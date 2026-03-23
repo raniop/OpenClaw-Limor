@@ -22,6 +22,7 @@ import { handleOwnerCommand } from "./owner-commands";
 import { checkApprovalGate } from "./approval-gate";
 import { handleResponse } from "./response-handler";
 import { classifyGroupMessage, recordGroupResponse, hasRecentGroupResponse } from "./group-classifier";
+import { trackMessage as trackThread, formatThreadContext, isPartOfOtherThread } from "./thread-tracker";
 import { getResolvedContext, formatCompressedContextForPrompt, formatDebugTrace, applyFollowupAutomation } from "../context";
 import type { ResolvedContext } from "../context";
 import { setPersistedState, clearState as clearConversationState } from "../context/conversation-state-store";
@@ -363,17 +364,17 @@ async function handleMessage(msg: Message): Promise<void> {
   const mediaDurationMs = mediaTimer.stop();
 
   // --- Quoted message context ---
+  let quotedSenderName = ""; // Track who was replied to (for thread tracking)
   if (msg.hasQuotedMsg) {
     try {
       const quotedMsg = await msg.getQuotedMessage();
       const quotedText = quotedMsg.body || "(מדיה)";
       // Include quoted message sender name so AI knows who the reply is directed at
-      let quotedSender = "";
       try {
         const quotedContact = await quotedMsg.getContact();
-        quotedSender = quotedContact.pushname || quotedContact.name || "";
+        quotedSenderName = quotedContact.pushname || quotedContact.name || "";
       } catch {}
-      const senderPrefix = quotedSender ? `${quotedSender}: ` : "";
+      const senderPrefix = quotedSenderName ? `${quotedSenderName}: ` : "";
       body = `[בתגובה ל: ${senderPrefix}${quotedText}]\n${body}`;
     } catch (err) {
       console.error("[quoted] Failed to get quoted message:", err);
@@ -426,9 +427,10 @@ async function handleMessage(msg: Message): Promise<void> {
   }
 
   try {
-    // No hardcoded bot filtering — let AI decide based on context.
-    // The AI has full conversation history with sender names and can
-    // understand when a conversation is between others.
+    // --- Track conversation threads in groups ---
+    if (isGroup) {
+      trackThread(chatId, contactName, quotedSenderName || undefined, body.substring(0, 50));
+    }
 
     // --- Muted groups ---
     if (isGroup && isGroupMuted(chatId)) {
@@ -555,7 +557,21 @@ async function handleMessage(msg: Message): Promise<void> {
 
       const mentionsLimor = /(^|\s)לימור($|\s|[?.!,])/i.test(body) || /\blimor\b/i.test(body);
       const recentlyResponded = hasRecentGroupResponse(chatId);
-      extraContext += `\n\nזו קבוצת וואטסאפ. ההודעה האחרונה נכתבה על ידי ${contactName}.${mentionsLimor ? " ⚠️ שימי לב: השם שלך (לימור) מוזכר בהודעה — חובה להגיב! אסור SKIP!" : ""}${recentlyResponded ? " ⚠️ הגבת לאחרונה בקבוצה — סביר שההודעה הזו היא המשך שיחה איתך." : ""} תגיבי (טקסט בלבד, 1-2 משפטים) אם: (1) פונים אלייך בשם (לימור/Limor) (2) שואלים שאלה (3) מגיבים למשהו שאמרת (4) שאלה כללית. אם מישהו פנה אלייך לאחרונה וההודעה הנוכחית יכולה להיות המשך — תגיבי! ספק = תגיבי. תחזירי [SKIP] רק אם ההודעה ברור שפונה למישהו אחר ולא קשורה אלייך כלל.`;
+      const inOtherThread = isPartOfOtherThread(chatId, contactName);
+
+      // Thread context — show active conversations
+      const threadCtx = formatThreadContext(chatId, contactName);
+      if (threadCtx) extraContext += "\n\n" + threadCtx;
+
+      extraContext += `\n\nזו קבוצת וואטסאפ. ההודעה האחרונה נכתבה על ידי ${contactName}.`;
+      if (mentionsLimor) {
+        extraContext += ` ⚠️ שימי לב: השם שלך (לימור) מוזכר בהודעה — חובה להגיב! אסור SKIP!`;
+      } else if (inOtherThread) {
+        extraContext += ` ⛔ ההודעה הזו שייכת לשיחה פעילה בין אנשים אחרים — חובה [SKIP]! אל תתערבי!`;
+      } else if (recentlyResponded) {
+        extraContext += ` ⚠️ הגבת לאחרונה בקבוצה — סביר שההודעה הזו היא המשך שיחה איתך.`;
+      }
+      extraContext += ` תגיבי (טקסט בלבד, 1-2 משפטים) אם: (1) פונים אלייך בשם (לימור/Limor) (2) מגיבים (reply) להודעה שלך. תחזירי [SKIP] אם: ההודעה שייכת לשיחה בין אנשים אחרים, reply למישהו אחר, או לא קשורה אלייך.`;
     }
 
     // Build model routing params from resolved context
