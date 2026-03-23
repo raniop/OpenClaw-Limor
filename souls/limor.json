@@ -57,7 +57,7 @@
   ],
 
   "model": {
-    "name": "claude-sonnet-4-6-20250227",
+    "name": "claude-sonnet-4-6",
     "maxTokens": 4096
   }
 }
