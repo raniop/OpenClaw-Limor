@@ -29,6 +29,14 @@
 - 📋 **סיכומי שיחות** — executive briefing פעמיים ביום (14:00 + 23:00) עם prompt caching
 - 🔄 **מעקב אוטומטי** — יצירת followups מתוך שיחות
 
+### קבוצות WhatsApp
+- 🎯 **Smart Group Pre-Filter** — פילטר דטרמיניסטי לפני AI call (חוסך עלות):
+  - **MUST_RESPOND**: שם לימור מוזכר, reply להודעה שלה, slash command
+  - **MUST_SKIP**: שולח הוא בוט, reply למישהו אחר, @mention לאדם אחר, thread בין אחרים
+  - **LET_AI_DECIDE**: מקרים לא ברורים
+- 🔇 **קבוצות מושתקות** — לימור שומרת היסטוריה אבל לא מגיבה (ניתן לסכם לפי בקשה)
+- 🧵 **Thread Tracker** — מעקב מי מדבר עם מי, זיהוי שיחות פעילות
+
 ### אבטחה והרשאות
 - 🔒 **אישור אנשי קשר** — רק מי שהבעלים אישר יכול לדבר
 - 🛡️ **הפרדת הרשאות** — יומן, CRM, קבצים = רק בעלים
@@ -142,6 +150,8 @@ src/
 │   └── ...                # 14 more resolver layers
 ├── whatsapp/              # WhatsApp client + handlers
 │   ├── index.ts           # Message routing + PM2
+│   ├── group-classifier.ts # Smart pre-filter (MUST_RESPOND/SKIP/AI)
+│   ├── thread-tracker.ts  # Conversation flow tracking
 │   ├── voice-response.ts  # TTS voice replies
 │   └── response-handler.ts # Response dispatch
 ├── meetings/              # Meeting state machine
