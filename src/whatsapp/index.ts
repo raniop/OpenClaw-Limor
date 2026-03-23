@@ -21,7 +21,7 @@ import { processMedia } from "./media-handler";
 import { handleOwnerCommand } from "./owner-commands";
 import { checkApprovalGate } from "./approval-gate";
 import { handleResponse } from "./response-handler";
-import { classifyGroupMessage, recordGroupResponse, hasRecentGroupResponse } from "./group-classifier";
+import { classifyGroupMessage, recordGroupResponse, hasRecentGroupResponse, filterGroupMessage, isBotContact } from "./group-classifier";
 import { trackMessage as trackThread, formatThreadContext, isPartOfOtherThread } from "./thread-tracker";
 import { getResolvedContext, formatCompressedContextForPrompt, formatDebugTrace, applyFollowupAutomation } from "../context";
 import type { ResolvedContext } from "../context";
@@ -43,6 +43,7 @@ import { syncContacts } from "../sync-contacts";
 let latestQR: string | null = null;
 let qrServer: http.Server | null = null;
 let whatsappClient: Client | null = null;
+let limorWhatsAppId: string = "";
 
 function startQRServer(): void {
   if (qrServer) return;
@@ -112,6 +113,7 @@ export function createWhatsAppClient(): Client {
   client.on("ready", () => {
     latestQR = null;
     whatsappClient = client;
+    try { limorWhatsAppId = client.info.wid._serialized; } catch {}
     if (qrServer) { qrServer.close(); qrServer = null; }
     log.systemReady();
 
@@ -377,9 +379,11 @@ async function handleMessage(msg: Message): Promise<void> {
 
   // --- Quoted message context ---
   let quotedSenderName = ""; // Track who was replied to (for thread tracking)
+  let quotedMsgFromMe = false; // Was the quoted message from Limor herself?
   if (msg.hasQuotedMsg) {
     try {
       const quotedMsg = await msg.getQuotedMessage();
+      quotedMsgFromMe = !!quotedMsg.fromMe;
       const quotedText = quotedMsg.body || "(מדיה)";
       // Include quoted message sender name so AI knows who the reply is directed at
       try {
@@ -456,9 +460,36 @@ async function handleMessage(msg: Message): Promise<void> {
       return;
     }
 
-    // --- Group messages: always let AI decide (no pre-filtering) ---
-    // The AI has [SKIP] logic and full context — it's smarter than regex.
-    // Muted groups are already handled above (save to history, don't process).
+    // --- Group pre-filter: deterministic skip before AI call ---
+    if (isGroup) {
+      const mentionsLimor = /(^|\s)לימור($|\s|[?.!,])/i.test(body) || /\blimor\b/i.test(body);
+      const inOtherThread = isPartOfOtherThread(chatId, contactName);
+      const mentionedIds: string[] = (msg as any).mentionedIds || [];
+
+      const filterResult = filterGroupMessage({
+        body, contactName, chatId,
+        mentionedIds,
+        hasQuotedMsg: msg.hasQuotedMsg,
+        quotedSenderName,
+        quotedMsgFromMe,
+        senderIsBot: isBotContact(contactName),
+        limorMentioned: mentionsLimor,
+        inOtherThread,
+        limorWhatsAppId,
+      });
+
+      if (filterResult.verdict === "must_skip") {
+        // Save to history for context, but skip AI call
+        const messageForHistory = `[${contactName}]: ${body}`;
+        conversationStore.addMessage(chatId, "user", messageForHistory);
+        try { trackGroupPerson(chatId, contactName, body); } catch {}
+        console.log(`[group-filter] SKIP: ${filterResult.reason} | ${contactName} in ${chat.name}`);
+        log.traceEnd(trace, "group_filtered", elapsed(trace));
+        return;
+      }
+      // Store verdict for context injection later
+      (trace as any)._groupFilter = filterResult;
+    }
 
     // --- Owner commands ---
     if (!isGroup && config.ownerChatId && chatId === config.ownerChatId) {
@@ -567,19 +598,16 @@ async function handleMessage(msg: Message): Promise<void> {
         if (groupPeopleCtx) extraContext += "\n\n" + groupPeopleCtx;
       } catch {}
 
-      const mentionsLimor = /(^|\s)לימור($|\s|[?.!,])/i.test(body) || /\blimor\b/i.test(body);
+      const filterResult = (trace as any)._groupFilter as { verdict: string; reason: string } | undefined;
       const recentlyResponded = hasRecentGroupResponse(chatId);
-      const inOtherThread = isPartOfOtherThread(chatId, contactName);
 
       // Thread context — show active conversations
       const threadCtx = formatThreadContext(chatId, contactName);
       if (threadCtx) extraContext += "\n\n" + threadCtx;
 
       extraContext += `\n\nזו קבוצת וואטסאפ. ההודעה האחרונה נכתבה על ידי ${contactName}.`;
-      if (mentionsLimor) {
-        extraContext += ` ⚠️ שימי לב: השם שלך (לימור) מוזכר בהודעה — חובה להגיב! אסור SKIP!`;
-      } else if (inOtherThread) {
-        extraContext += ` ⛔ ההודעה הזו שייכת לשיחה פעילה בין אנשים אחרים — חובה [SKIP]! אל תתערבי!`;
+      if (filterResult?.verdict === "must_respond") {
+        extraContext += ` ⚠️ פנו אלייך ישירות — חובה להגיב!`;
       } else if (recentlyResponded) {
         extraContext += ` ⚠️ הגבת לאחרונה בקבוצה — סביר שההודעה הזו היא המשך שיחה איתך.`;
       }

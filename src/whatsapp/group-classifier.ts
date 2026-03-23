@@ -11,6 +11,77 @@ export interface GroupClassification {
   confidence: number;
 }
 
+// ─── Smart Pre-Filter ──────────────────────────────────────────────────────────
+
+export interface GroupMessageContext {
+  body: string;
+  contactName: string;
+  chatId: string;
+  mentionedIds: string[];       // WhatsApp IDs from msg.mentionedIds
+  hasQuotedMsg: boolean;
+  quotedSenderName: string;     // who was the quoted message from
+  quotedMsgFromMe: boolean;     // was the quoted message from Limor
+  senderIsBot: boolean;         // is the sender a bot
+  limorMentioned: boolean;      // does body mention Limor by name
+  inOtherThread: boolean;       // is sender in thread without Limor
+  limorWhatsAppId: string;      // Limor's own WhatsApp ID
+}
+
+export interface GroupFilterResult {
+  verdict: "must_respond" | "must_skip" | "let_ai_decide";
+  reason: string;
+}
+
+/** Detect if a contact name looks like a bot */
+export function isBotContact(name: string): boolean {
+  if (!name) return false;
+  // Ends with "'s Ai", "Ai", "Bot" (case-insensitive)
+  if (/(?:'s\s*)?Ai$/i.test(name.trim())) return true;
+  if (/Bot$/i.test(name.trim())) return true;
+  return false;
+}
+
+/**
+ * Deterministic pre-filter for group messages.
+ * Runs BEFORE AI call — saves API costs and prevents incorrect responses.
+ */
+export function filterGroupMessage(ctx: GroupMessageContext): GroupFilterResult {
+  // ─── MUST_RESPOND (highest priority) ───────────────────────────────
+  if (ctx.limorMentioned) {
+    return { verdict: "must_respond", reason: "limor_mentioned_by_name" };
+  }
+  if (ctx.hasQuotedMsg && ctx.quotedMsgFromMe) {
+    return { verdict: "must_respond", reason: "reply_to_limor" };
+  }
+  if (ctx.body.trim().startsWith("/")) {
+    return { verdict: "must_respond", reason: "slash_command" };
+  }
+
+  // ─── MUST_SKIP (deterministic, before AI) ──────────────────────────
+  // 1. Sender is a bot — never comment on other bots' messages
+  if (ctx.senderIsBot) {
+    return { verdict: "must_skip", reason: "sender_is_bot" };
+  }
+  // 2. Reply to someone else (not Limor)
+  if (ctx.hasQuotedMsg && !ctx.quotedMsgFromMe) {
+    return { verdict: "must_skip", reason: "reply_to_other" };
+  }
+  // 3. @mentions someone else but NOT Limor
+  if (ctx.mentionedIds.length > 0) {
+    const mentionsLimor = ctx.limorWhatsAppId && ctx.mentionedIds.some(id => id === ctx.limorWhatsAppId);
+    if (!mentionsLimor) {
+      return { verdict: "must_skip", reason: "mention_directed_at_other" };
+    }
+  }
+  // 4. Part of active thread between others (without Limor)
+  if (ctx.inOtherThread) {
+    return { verdict: "must_skip", reason: "in_other_thread" };
+  }
+
+  // ─── LET_AI_DECIDE (ambiguous) ─────────────────────────────────────
+  return { verdict: "let_ai_decide", reason: "no_clear_signal" };
+}
+
 // Track when Limor last responded in each group (for conversation continuation)
 const lastResponseTime = new Map<string, number>();
 const CONVERSATION_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
