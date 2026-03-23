@@ -426,14 +426,9 @@ async function handleMessage(msg: Message): Promise<void> {
   }
 
   try {
-    // --- Skip messages from other bots in groups ---
-    const KNOWN_BOT_NAMES = /\b(ai|bot)\b|dvora|דבורה/i;
-    if (isGroup && KNOWN_BOT_NAMES.test(contactName) && chatId !== config.ownerChatId) {
-      const messageForHistory = `[${contactName}]: ${body}`;
-      conversationStore.addMessage(chatId, "user", messageForHistory);
-      log.traceEnd(trace, "skip_other_bot", elapsed(trace));
-      return;
-    }
+    // No hardcoded bot filtering — let AI decide based on context.
+    // The AI has full conversation history with sender names and can
+    // understand when a conversation is between others.
 
     // --- Muted groups ---
     if (isGroup && isGroupMuted(chatId)) {
