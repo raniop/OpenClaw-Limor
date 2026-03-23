@@ -57,4 +57,100 @@ export const monitoringTools: Anthropic.Tool[] = [
       required: [],
     },
   },
+  {
+    name: "run_command",
+    description: "הרצת פקודה על השרת (npm build, pm2 restart, git pull וכו')",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        command: { type: "string", description: "הפקודה להרצה" },
+        timeout: { type: "number", description: "timeout במילישניות (ברירת מחדל: 30000)" },
+      },
+      required: ["command"],
+    },
+  },
+  {
+    name: "pm2_manage",
+    description: "ניהול PM2 — restart, stop, status, logs",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        action: { type: "string", enum: ["restart", "stop", "status", "logs"], description: "פעולה" },
+        process: { type: "string", description: "שם התהליך (ברירת מחדל: limor)" },
+        lines: { type: "number", description: "כמה שורות לוג (ברירת מחדל: 30)" },
+      },
+      required: ["action"],
+    },
+  },
+  {
+    name: "tail_logs",
+    description: "צפייה בלוגים אחרונים של לימור",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        lines: { type: "number", description: "כמה שורות (ברירת מחדל: 50)" },
+        filter: { type: "string", description: "פילטר regex" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "git_manage",
+    description: "פעולות Git — pull, status, stash, log, diff",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        action: { type: "string", enum: ["pull", "status", "stash", "log", "diff"], description: "פעולה" },
+        args: { type: "string", description: "ארגומנטים נוספים" },
+      },
+      required: ["action"],
+    },
+  },
+  {
+    name: "edit_file",
+    description: "עריכת קובץ — חיפוש והחלפה",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        path: { type: "string", description: "נתיב הקובץ (יחסי לפרויקט)" },
+        search: { type: "string", description: "טקסט לחיפוש" },
+        replace: { type: "string", description: "טקסט להחלפה" },
+      },
+      required: ["path", "search", "replace"],
+    },
+  },
+  {
+    name: "read_file_source",
+    description: "קריאת קובץ מקוד המערכת",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        path: { type: "string", description: "נתיב הקובץ (יחסי לפרויקט)" },
+        startLine: { type: "number", description: "שורה התחלתית" },
+        endLine: { type: "number", description: "שורה סופית" },
+      },
+      required: ["path"],
+    },
+  },
+  {
+    name: "npm_manage",
+    description: "פעולות NPM — build, test, install",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        action: { type: "string", enum: ["build", "test", "install"], description: "פעולה" },
+        args: { type: "string", description: "ארגומנטים נוספים" },
+      },
+      required: ["action"],
+    },
+  },
+  {
+    name: "restart_and_deploy",
+    description: "בנייה מחדש והפעלה מחדש של לימור",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
 ];

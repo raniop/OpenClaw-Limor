@@ -261,7 +261,8 @@
       "Bash(curl -s http://localhost:3848/api/health)",
       "Bash(mv souls/nomi.json souls/boris.json)",
       "Bash(sed -i '' 's/נעמי/בוריס/g; s/🔬/🔧/g; s/את /אתה /g; s/תהיי/תהיה/g; s/ציני/ציין/g; s/סדרי/סדר/g; s/כתבי/כתוב/g' souls/boris.json)",
-      "Bash(do grep:*)"
+      "Bash(do grep:*)",
+      "Bash(rm -f \"/Users/raniophir/Open Claude Bot AI/.git/index.lock\")"
     ]
   }
 }
