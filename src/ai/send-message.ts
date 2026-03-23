@@ -87,7 +87,7 @@ export async function sendMessage(
   let tools = !toolsEnabled
     ? []
     : sender?.isOwner
-      ? [...calendarTools, ...travelTools, ...bookingTools, ...crmTools, ...instructionTools, ...fileTools, ...contactTools, ...smartHomeTools, ...capabilityTools, ...modelTools, ...codingTools, ...gettTools, ...whatsappExtraTools, ...smsTools, ...webSearchTools, ...agentTools]
+      ? [...calendarTools, ...travelTools, ...bookingTools, ...crmTools, ...instructionTools, ...fileTools, ...contactTools, ...smartHomeTools, ...modelTools, ...gettTools, ...whatsappExtraTools, ...smsTools, ...webSearchTools, ...agentTools]
       : [...calendarTools, ...travelTools, ...bookingTools, ...webSearchTools];
 
   if (toolsEnabled && options?.allowedToolNames && options.allowedToolNames.length > 0) {
