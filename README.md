@@ -90,26 +90,66 @@
 
 ## 🚀 התקנה
 
+### דרישות מערכת
+
+| דרישה | macOS | Windows | הערה |
+|-------|-------|---------|------|
+| **Node.js 20+** | ✅ | ✅ | [nodejs.org](https://nodejs.org) |
+| **npm** | ✅ (כלול) | ✅ (כלול) | |
+| **Python 3** | ✅ (כלול) | ✅ [python.org](https://python.org) | נדרש ל-SMS (macOS בלבד) |
+| **PM2** | ✅ `npm i -g pm2` | ✅ `npm i -g pm2` | ניהול תהליכים |
+| **Anthropic API Key** | ✅ | ✅ | [console.anthropic.com](https://console.anthropic.com) |
+| **WhatsApp** | ✅ | ✅ | חשבון WhatsApp פעיל |
+| **SMS features** | ✅ macOS בלבד | ❌ | דורש Full Disk Access |
+
+### התקנה מהירה (3 דקות)
+
 ```bash
-# Clone
+# 1. Clone
 git clone https://github.com/raniop/OpenClaw-Limor.git
 cd OpenClaw-Limor
 
-# Dependencies
+# 2. Dependencies
 npm install
 
-# Setup wizard (שם, טלפון, API key)
+# 3. Setup wizard — יגדיר שם, טלפון, API key, ויצור .env
 npm run setup
 
-# Build
+# 4. Build
 npm run build
 
-# Run
-npm start
+# 5. Run
+npx pm2 start ecosystem.config.js
+
+# 6. Scan QR — פתח WhatsApp → Linked Devices → Scan QR from terminal
 ```
 
 ### Quick Start (macOS)
 דאבל-קליק על **`Start Limor.command`** — בונה, מפעיל עם PM2, מעלה dashboard, פותח דפדפן.
+
+### Windows
+```powershell
+# אותו תהליך, רק ללא SMS features (macOS only)
+git clone https://github.com/raniop/OpenClaw-Limor.git
+cd OpenClaw-Limor
+npm install
+npm run setup
+npm run build
+npx pm2 start ecosystem.config.js
+```
+
+### מה ה-Setup Wizard שואל?
+1. **שם הבוט** — איך העוזר/ת יקרא (ברירת מחדל: לימור)
+2. **שם הבעלים** — השם שלך בעברית
+3. **טלפון** — מספר ישראלי (972XXXXXXXXX)
+4. **אימייל** — לשליחת מיילים מהבוט
+5. **Anthropic API Key** — חובה (sk-ant-...)
+6. **שירותים אופציונליים** — Google Calendar, SMTP, CRM, חיפוש אינטרנט, בית חכם, מונית
+
+ה-wizard יוצר:
+- `.env` — כל ההגדרות
+- `souls/[botname].json` — אישיות הבוט
+- `workspace/identity/SOUL.md` — זהות הבוט
 
 ## ⚙️ הגדרות
 

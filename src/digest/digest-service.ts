@@ -3,6 +3,7 @@
  * Produces a short, human, actionable morning briefing.
  * Like a real assistant telling you what matters TODAY.
  */
+import { config } from "../config";
 import { approvalStore } from "../stores";
 import { getPendingMeetings } from "../meetings";
 import { getPendingFollowups, getDueFollowups } from "../followups";
@@ -23,7 +24,7 @@ function isJunk(reason: string): boolean {
  */
 export async function generateDailyDigest(): Promise<string> {
   const lines: string[] = [];
-  lines.push("בוקר טוב רני! ☀️\n");
+  lines.push(`בוקר טוב ${config.ownerName}! ☀️\n`);
 
   const data: DigestData = {
     urgent: [], waiting: [], newContacts: [], meetings: [],

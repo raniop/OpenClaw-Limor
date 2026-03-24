@@ -1,10 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { config } from "../../config";
 
 /** Gett taxi booking tools (owner-only) */
 export const gettTools: Anthropic.Tool[] = [
   {
     name: "gett_book_ride",
-    description: "הזמנת מונית דרך Gett. השתמשי כשרני מבקש מונית, טקסי, או נסיעה.",
+    description: `הזמנת מונית דרך Gett. השתמשי כש${config.ownerName} מבקש מונית, טקסי, או נסיעה.`,
     input_schema: {
       type: "object" as const,
       properties: {

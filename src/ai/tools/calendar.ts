@@ -1,11 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { config } from "../../config";
 
 /** Calendar, meeting, messaging, and restaurant search tools (available to all users) */
 export const calendarTools: Anthropic.Tool[] = [
   {
     name: "create_event",
     description:
-      "יצירת אירוע חדש ביומן של רני. השתמשי בזה רק כשרני עצמו (הבעלים) מבקש לקבוע אירוע.",
+      `יצירת אירוע חדש ביומן של ${config.ownerName}. השתמשי בזה רק כש${config.ownerName} עצמו (הבעלים) מבקש לקבוע אירוע.`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -29,7 +30,7 @@ export const calendarTools: Anthropic.Tool[] = [
   {
     name: "delete_event",
     description:
-      "מחיקת אירוע מהיומן של רני. רק רני (הבעלים) יכול למחוק אירועים! אפשר למחוק לפי שם אירוע + תאריך, או למחוק את כל האירועים ביום מסוים.",
+      `מחיקת אירוע מהיומן של ${config.ownerName}. רק ${config.ownerName} (הבעלים) יכול למחוק אירועים! אפשר למחוק לפי שם אירוע + תאריך, או למחוק את כל האירועים ביום מסוים.`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -48,7 +49,7 @@ export const calendarTools: Anthropic.Tool[] = [
   {
     name: "list_events",
     description:
-      "הצגת אירועים ביומן של רני ליום מסוים. רק רני (הבעלים) יכול לראות את היומן!",
+      `הצגת אירועים ביומן של ${config.ownerName} ליום מסוים. רק ${config.ownerName} (הבעלים) יכול לראות את היומן!`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -63,7 +64,7 @@ export const calendarTools: Anthropic.Tool[] = [
   {
     name: "request_meeting",
     description:
-      "כשמישהו שהוא לא רני (לא הבעלים) רוצה לקבוע פגישה עם רני. השתמשי בזה כדי לשלוח בקשה לרני ולחכות לאישורו. אף פעם לא לקבוע ישירות ביומן כשמישהו אחר מבקש!",
+      `כשמישהו שהוא לא ${config.ownerName} (לא הבעלים) רוצה לקבוע פגישה עם ${config.ownerName}. השתמשי בזה כדי לשלוח בקשה ל${config.ownerName} ולחכות לאישורו. אף פעם לא לקבוע ישירות ביומן כשמישהו אחר מבקש!`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -82,13 +83,13 @@ export const calendarTools: Anthropic.Tool[] = [
   {
     name: "notify_owner",
     description:
-      "העברת הודעה לרני (הבעלים). ⚠️ שלחי פעם אחת בלבד לכל בקשה! בדקי בהיסטוריה שלא שלחת כבר על אותו נושא. אם כבר שלחת – לא לשלוח שוב!",
+      `העברת הודעה ל${config.ownerName} (הבעלים). ⚠️ שלחי פעם אחת בלבד לכל בקשה! בדקי בהיסטוריה שלא שלחת כבר על אותו נושא. אם כבר שלחת – לא לשלוח שוב!`,
     input_schema: {
       type: "object" as const,
       properties: {
         message: {
           type: "string",
-          description: "ההודעה להעביר לרני (למשל: 'יוני מבקש שתדבר איתו כשיש לך זמן')",
+          description: `ההודעה להעביר ל${config.ownerName} (למשל: 'יוני מבקש שתדבר איתו כשיש לך זמן')`,
         },
       },
       required: ["message"],
@@ -97,7 +98,7 @@ export const calendarTools: Anthropic.Tool[] = [
   {
     name: "send_message",
     description:
-      "שליחת הודעה לאיש קשר. רק רני (הבעלים) יכול לבקש לשלוח הודעות. השתמשי בזה כשרני מבקש לשלוח הודעה למישהו, להגיד למישהו משהו, או לענות למישהו.",
+      `שליחת הודעה לאיש קשר. רק ${config.ownerName} (הבעלים) יכול לבקש לשלוח הודעות. השתמשי בזה כש${config.ownerName} מבקש לשלוח הודעה למישהו, להגיד למישהו משהו, או לענות למישהו.`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -143,7 +144,7 @@ export const calendarTools: Anthropic.Tool[] = [
   {
     name: "mute_group",
     description:
-      "השתקת קבוצת וואטסאפ – לימור לא תגיב שם בכלל. רק רני (הבעלים) יכול להשתיק/לבטל השתקה.",
+      `השתקת קבוצת וואטסאפ – ${config.botName} לא תגיב שם בכלל. רק ${config.ownerName} (הבעלים) יכול להשתיק/לבטל השתקה.`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -162,7 +163,7 @@ export const calendarTools: Anthropic.Tool[] = [
   {
     name: "unmute_group",
     description:
-      "ביטול השתקת קבוצה – לימור תחזור להגיב שם.",
+      `ביטול השתקת קבוצה – ${config.botName} תחזור להגיב שם.`,
     input_schema: {
       type: "object" as const,
       properties: {

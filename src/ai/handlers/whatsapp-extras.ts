@@ -24,7 +24,7 @@ export const whatsappExtrasHandlers: Record<string, ToolHandler> = {
           const rawName = contact.pushname || contact.name || "לא ידוע";
           const phone = contact.number || pNumber;
           if (pNumber === botNumber) {
-            return { name: "לימור (אני 🤖)", phone };
+            return { name: `${appConfig.botName} (אני 🤖)`, phone };
           }
           if (phone.replace(/\D/g, "") === ownerPhone || pNumber === ownerPhone) {
             return { name: `${rawName} (הבעלים)`, phone };
@@ -33,7 +33,7 @@ export const whatsappExtrasHandlers: Record<string, ToolHandler> = {
           const finalName = knownContact ? knownContact.name : rawName;
           return { name: finalName, phone };
         } catch {
-          if (pNumber === botNumber) return { name: "לימור (אני 🤖)", phone: pNumber };
+          if (pNumber === botNumber) return { name: `${appConfig.botName} (אני 🤖)`, phone: pNumber };
           return { name: "לא ידוע", phone: pNumber };
         }
       })

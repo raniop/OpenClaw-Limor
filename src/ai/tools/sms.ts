@@ -1,10 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { config } from "../../config";
 
 /** SMS reading + delivery tracking tools (owner-only) */
 export const smsTools: Anthropic.Tool[] = [
   {
     name: "read_sms",
-    description: "קריאת הודעות SMS/iMessage אחרונות מהאייפון של רני. השתמשי כשרני שואל 'מה קיבלתי ב-SMS?', 'יש הודעות חדשות?', 'מה הגיע בהודעות?'",
+    description: `קריאת הודעות SMS/iMessage אחרונות מהאייפון של ${config.ownerName}. השתמשי כש${config.ownerName} שואל 'מה קיבלתי ב-SMS?', 'יש הודעות חדשות?', 'מה הגיע בהודעות?'`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -26,7 +27,7 @@ export const smsTools: Anthropic.Tool[] = [
   },
   {
     name: "search_sms",
-    description: "חיפוש בהודעות SMS/iMessage לפי מילת מפתח. השתמשי כשרני מחפש הודעה מסוימת.",
+    description: `חיפוש בהודעות SMS/iMessage לפי מילת מפתח. השתמשי כש${config.ownerName} מחפש הודעה מסוימת.`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -44,7 +45,7 @@ export const smsTools: Anthropic.Tool[] = [
   },
   {
     name: "check_deliveries",
-    description: "בדיקת הודעות SMS על חבילות ומשלוחים. השתמשי כשרני שואל 'יש חבילות?', 'מה עם המשלוח?', 'הגיע משהו?'",
+    description: `בדיקת הודעות SMS על חבילות ומשלוחים. השתמשי כש${config.ownerName} שואל 'יש חבילות?', 'מה עם המשלוח?', 'הגיע משהו?'`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -58,7 +59,7 @@ export const smsTools: Anthropic.Tool[] = [
   },
   {
     name: "mark_delivery_received",
-    description: "סימון משלוח/חבילה כנמסר. השתמשי כשרני אומר 'קיבלתי את החבילה', 'המשלוח הגיע', 'החבילה מפדקס הגיעה', 'קיבלתי את זה'. חפשי לפי שם חברת שליחות, מספר מעקב, או תיאור.",
+    description: `סימון משלוח/חבילה כנמסר. השתמשי כש${config.ownerName} אומר 'קיבלתי את החבילה', 'המשלוח הגיע', 'החבילה מפדקס הגיעה', 'קיבלתי את זה'. חפשי לפי שם חברת שליחות, מספר מעקב, או תיאור.`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -72,7 +73,7 @@ export const smsTools: Anthropic.Tool[] = [
   },
   {
     name: "list_pending_deliveries",
-    description: "הצגת כל המשלוחים שעדיין לא נמסרו. השתמשי כשרני שואל 'מה עוד לא הגיע?', 'אילו חבילות ממתינות?'",
+    description: `הצגת כל המשלוחים שעדיין לא נמסרו. השתמשי כש${config.ownerName} שואל 'מה עוד לא הגיע?', 'אילו חבילות ממתינות?'`,
     input_schema: {
       type: "object" as const,
       properties: {},

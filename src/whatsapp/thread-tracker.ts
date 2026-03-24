@@ -2,6 +2,7 @@
  * Thread Tracker — tracks active conversation threads in groups.
  * Knows who is talking to whom, so Limor can avoid interfering.
  */
+import { config } from "../config";
 
 interface ActiveThread {
   id: string;
@@ -101,7 +102,7 @@ export function getActiveThreads(chatId: string): ActiveThread[] {
 export function isPartOfOtherThread(
   chatId: string,
   senderName: string,
-  limorNames: string[] = ["Limor Rani's Ai", "לימור"]
+  limorNames: string[] = [`${config.botNameEn} Rani's Ai`, config.botName]
 ): boolean {
   cleanExpired(chatId);
   const threads = groupThreads.get(chatId) || [];

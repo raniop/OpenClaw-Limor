@@ -5,6 +5,7 @@
  */
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { dirname } from "path";
+import { config } from "../config";
 import { statePath } from "../state-dir";
 import { createEvent } from "../calendar";
 import { getNotifyOwnerCallback, getSendMessageCallback } from "../ai/callbacks";
@@ -149,7 +150,7 @@ async function notifyOwnerOfMeeting(meeting: MeetingRequest): Promise<void> {
     ? `\n⏰ זמן מועדף: ${meeting.preferredTime}`
     : "";
 
-  const ownerMsg = `📅 בקשת פגישה חדשה! (${meeting.id})\n👤 ${meeting.contactName} רוצה לקבוע פגישה עם רני\n📋 נושא: ${meeting.topic}${timeInfo}\n\n✅ לאשר: *אשר פגישה ${meeting.id}*\nלאשר עם זמן: *אשר פגישה ${meeting.id} מחר ב-14:00*\n❌ לדחות: *דחה פגישה ${meeting.id}*`;
+  const ownerMsg = `📅 בקשת פגישה חדשה! (${meeting.id})\n👤 ${meeting.contactName} רוצה לקבוע פגישה עם ${config.ownerName}\n📋 נושא: ${meeting.topic}${timeInfo}\n\n✅ לאשר: *אשר פגישה ${meeting.id}*\nלאשר עם זמן: *אשר פגישה ${meeting.id} מחר ב-14:00*\n❌ לדחות: *דחה פגישה ${meeting.id}*`;
 
   const notifyOwner = getNotifyOwnerCallback();
   if (notifyOwner) {
@@ -223,7 +224,7 @@ export async function approveMeeting(
     meeting.updatedAt = new Date().toISOString();
     saveMeetings(meetings);
 
-    logAudit("רני", "meeting_approved", id, "event_created", {
+    logAudit(config.ownerName, "meeting_approved", id, "event_created", {
       date: finalDate,
       time: finalTime,
       eventId: eventResult.eventId,
@@ -246,7 +247,7 @@ export async function approveMeeting(
         day: "numeric",
         month: "long",
       });
-      const contactMsg = `היי ${meeting.contactName}! 🎉\nרני אישר את הפגישה!\n📅 ${dateFormatted} בשעה ${finalTime}\n📋 נושא: ${meeting.topic}\n\nנתראה! 😊`;
+      const contactMsg = `היי ${meeting.contactName}! 🎉\n${config.ownerName} אישר את הפגישה!\n📅 ${dateFormatted} בשעה ${finalTime}\n📋 נושא: ${meeting.topic}\n\nנתראה! 😊`;
       await sendMessage(meeting.chatId, contactMsg);
 
       meeting.state = "contact_notified";
@@ -296,15 +297,15 @@ export async function rejectMeeting(
     const sendMessage = getSendMessageCallback();
     if (sendMessage) {
       const contactMsg = reason
-        ? `היי ${meeting.contactName}, לצערי רני לא יכול לקבוע פגישה כרגע. ${reason}`
-        : `היי ${meeting.contactName}, לצערי רני לא יכול בזמן הזה. אפשר לנסות מועד אחר 🙏`;
+        ? `היי ${meeting.contactName}, לצערי ${config.ownerName} לא יכול לקבוע פגישה כרגע. ${reason}`
+        : `היי ${meeting.contactName}, לצערי ${config.ownerName} לא יכול בזמן הזה. אפשר לנסות מועד אחר 🙏`;
       await sendMessage(meeting.chatId, contactMsg);
     }
   } catch (err) {
     console.error("[meeting-state] Failed to notify contact of rejection:", err);
   }
 
-  logAudit("רני", "meeting_rejected", id, "rejected");
+  logAudit(config.ownerName, "meeting_rejected", id, "rejected");
 
   return { success: true };
 }

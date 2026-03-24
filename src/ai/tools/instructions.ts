@@ -1,11 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { config } from "../../config";
 
 /** Owner instruction management tools (owner-only) */
 export const instructionTools: Anthropic.Tool[] = [
   {
     name: "learn_instruction",
     description:
-      "שמירת הוראה/כלל חדש שרני מלמד אותך. השתמשי כשרני אומר 'תזכרי ש...', 'מעכשיו...', 'כלל חדש:', או מלמד אותך התנהגות חדשה.",
+      `שמירת הוראה/כלל חדש ש${config.ownerName} מלמד אותך. השתמשי כש${config.ownerName} אומר 'תזכרי ש...', 'מעכשיו...', 'כלל חדש:', או מלמד אותך התנהגות חדשה.`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -19,7 +20,7 @@ export const instructionTools: Anthropic.Tool[] = [
   },
   {
     name: "forget_instruction",
-    description: "מחיקת הוראה שרני לימד אותך. אפשר לפי מספר סידורי או חיפוש טקסט.",
+    description: `מחיקת הוראה ש${config.ownerName} לימד אותך. אפשר לפי מספר סידורי או חיפוש טקסט.`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -33,7 +34,7 @@ export const instructionTools: Anthropic.Tool[] = [
   },
   {
     name: "list_instructions",
-    description: "הצגת כל ההוראות שרני לימד אותך.",
+    description: `הצגת כל ההוראות ש${config.ownerName} לימד אותך.`,
     input_schema: {
       type: "object" as const,
       properties: {},

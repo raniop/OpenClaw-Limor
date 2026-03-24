@@ -71,7 +71,7 @@ export function buildSystemPrompt(params: BuildSystemPromptParams): BuildSystemP
 - יורי 💻 = מתכנת! פיצ'רים חדשים, תיקון באגים, שינויי קוד, build, deploy.
 - כשמבקשים לפתח/לממש/לסדר/להוסיף/לשנות משהו בקוד — תמיד delegate ליורי (yuri)! לעולם לא לבוריס!
 - אסור להשתמש ב-create_capability_request! יורי מחליף את ה-capability system!
-- אם רני אומר "תסדרי את זה" על פיצ'ר — זה יורי! לא בוריס!
+- אם ${config.ownerName} אומר "תסדרי את זה" על פיצ'ר — זה יורי! לא בוריס!
 
 ⛔ כללי ברזל:
 1. אם הבקשה מתאימה לסוכן — חובה delegate! אסור לענות בעצמך על משהו שסוכן מתמחה בו.
@@ -85,22 +85,22 @@ export function buildSystemPrompt(params: BuildSystemPromptParams): BuildSystemP
   // Anti-hallucination rules for calendar — CRITICAL
   systemPrompt += `\n\n🚨 כללים חמורים ביותר — הפרה = כשל קריטי:
 
-1. אם מישהו מבקש פגישה עם רני — חובה להפעיל את הכלי request_meeting בפועל! אסור רק לכתוב "שולחת בקשה" בלי להפעיל את הכלי!
+1. אם מישהו מבקש פגישה עם ${config.ownerName} — חובה להפעיל את הכלי request_meeting בפועל! אסור רק לכתוב "שולחת בקשה" בלי להפעיל את הכלי!
 2. אסור בשום מצב לטעון שיש פגישה ביומן בלי להפעיל קודם את list_events!
 3. אסור להמציא זמנים או אירועים!
-4. אם אתה אומר למשתמש "שולחת בקשה לרני" — חייב להפעיל request_meeting באותו תור! אחרת זה שקר!
-5. ⛔ אסור להשתמש ב-create_event עבור אנשים שהם לא רני! המערכת תחסום את זה אוטומטית.
-6. אחרי שהפעלת request_meeting — אמרי "שלחתי בקשה לרני, אעדכן אותך!" ולא "קבעתי" או "סידרתי"!`;
+4. אם אתה אומר למשתמש "שולחת בקשה ל${config.ownerName}" — חייב להפעיל request_meeting באותו תור! אחרת זה שקר!
+5. ⛔ אסור להשתמש ב-create_event עבור אנשים שהם לא ${config.ownerName}! המערכת תחסום את זה אוטומטית.
+6. אחרי שהפעלת request_meeting — אמרי "שלחתי בקשה ל${config.ownerName}, אעדכן אותך!" ולא "קבעתי" או "סידרתי"!`;
 
   // Add sender context so bot knows who's talking
   if (sender) {
     if (sender.isOwner) {
-      systemPrompt += `\n\nהמשתמש הנוכחי: רני (הבעלים שלך). אפשר לקבוע לו אירועים ישירות ביומן. יש לך גם גישה ל-CRM של ביטוח אופיר.`;
+      systemPrompt += `\n\nהמשתמש הנוכחי: ${config.ownerName} (הבעלים שלך). אפשר לקבוע לו אירועים ישירות ביומן. יש לך גם גישה ל-CRM של ביטוח אופיר.`;
       if (config.ownerName && config.ownerPhone) {
-        systemPrompt += `\n\n📋 פרטי רני להזמנת מסעדות (השתמשי בהם אוטומטית בלי לשאול!): שם: ${config.ownerName}, טלפון: ${config.ownerPhone}, מייל: ${config.ownerEmail || ""}`;
+        systemPrompt += `\n\n📋 פרטי ${config.ownerName} להזמנת מסעדות (השתמשי בהם אוטומטית בלי לשאול!): שם: ${config.ownerName}, טלפון: ${config.ownerPhone}, מייל: ${config.ownerEmail || ""}`;
       }
     } else {
-      systemPrompt += `\n\nהמשתמש הנוכחי: ${sender.name} (לא הבעלים). אם הוא רוצה לקבוע פגישה עם רני – חובה להשתמש ב-request_meeting! המערכת מטפלת בשאר (שליחה לרני, יצירת אירוע, ועדכון חזרה). אסור לקבוע ישירות או לשלוח זימון בלי אישור רני!`;
+      systemPrompt += `\n\nהמשתמש הנוכחי: ${sender.name} (לא הבעלים). אם הוא רוצה לקבוע פגישה עם ${config.ownerName} – חובה להשתמש ב-request_meeting! המערכת מטפלת בשאר (שליחה ל${config.ownerName}, יצירת אירוע, ועדכון חזרה). אסור לקבוע ישירות או לשלוח זימון בלי אישור ${config.ownerName}!`;
     }
   }
 

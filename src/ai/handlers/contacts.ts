@@ -1,5 +1,6 @@
 import { findContactByName, findContactByPhone, getRecentContacts, addManualContact, listAllContacts, removeContact } from "../../contacts";
 import { approvalStore } from "../../stores";
+import { config } from "../../config";
 import { getHistory } from "../../conversation";
 import { findGroupChatId } from "../../muted-groups";
 import { getSendMessageCallback } from "../callbacks";
@@ -22,7 +23,7 @@ export const contactsHandlers: Record<string, ToolHandler> = {
         if (phone) {
           targetChatId = `${phone}@c.us`;
         } else {
-          return `❌ נכשל: אין ל-${contact.name} chatId אישי. הוא צריך לשלוח הודעה ללימור קודם.`;
+          return `❌ נכשל: אין ל-${contact.name} chatId אישי. הוא צריך לשלוח הודעה ל${config.botName} קודם.`;
         }
       }
       await getSendMessageCallback()!(targetChatId, input.message);
@@ -75,7 +76,7 @@ export const contactsHandlers: Record<string, ToolHandler> = {
     if (history.length === 0) return `אין היסטוריית שיחה עם ${contact.name}.`;
     const lastN = input.last_n || 10;
     const recent = history.slice(-lastN);
-    return recent.map((m: any) => `${m.role === "user" ? contact.name : "לימור"}: ${m.content}`).join("\n");
+    return recent.map((m: any) => `${m.role === "user" ? contact.name : config.botName}: ${m.content}`).join("\n");
   },
 
   get_group_history: async (input) => {
@@ -97,6 +98,6 @@ export const contactsHandlers: Record<string, ToolHandler> = {
     const lastN = Math.min(history.length, sinceHours * 2);
     const recent = history.slice(-lastN);
     const messages = recent.map((m: any) => m.content).join("\n");
-    return `📋 סיכום קבוצה "${input.group_name}" (${sinceHours} שעות אחרונות):\n\n${messages}\n\n---\nסה"כ ${recent.length} הודעות. סכם את ההודעות למעלה: מה קרה, מי הזכיר את רני, מה דורש פעולה.`;
+    return `📋 סיכום קבוצה "${input.group_name}" (${sinceHours} שעות אחרונות):\n\n${messages}\n\n---\nסה"כ ${recent.length} הודעות. סכם את ההודעות למעלה: מה קרה, מי הזכיר את ${config.ownerName}, מה דורש פעולה.`;
   },
 };

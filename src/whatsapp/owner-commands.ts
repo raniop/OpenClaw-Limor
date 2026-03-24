@@ -4,6 +4,7 @@
  */
 import { parseOwnerCommand } from "../command-parser";
 import { approvalStore } from "../stores";
+import { config } from "../config";
 import { log } from "../logger";
 import type { TraceContext } from "../observability";
 import { approveSpec, rejectSpec } from "../capabilities";
@@ -33,7 +34,7 @@ export async function handleOwnerCommand(ctx: OwnerCommandContext): Promise<bool
     if (entry) {
       log.approvalApproved(cmd.code, entry.phone, ctx.trace);
       await ctx.reply(`✅ אישרתי את ${entry.phone}! (קוד: ${cmd.code}) עכשיו הם יכולים לדבר איתי.`);
-      await ctx.sendToChat(entry.chatId, "🎉 אושרת! אני לימור, איך אפשר לעזור? 😊");
+      await ctx.sendToChat(entry.chatId, `🎉 אושרת! אני ${config.botName}, איך אפשר לעזור? 😊`);
     } else {
       log.approvalNotFound(cmd.code, ctx.trace);
       await ctx.reply(`❌ לא מצאתי בקשה עם קוד ${cmd.code}.`);
@@ -63,7 +64,7 @@ export async function handleOwnerCommand(ctx: OwnerCommandContext): Promise<bool
         const entry = approvalStore.approveByCode(pending.code);
         if (entry) {
           await ctx.reply(`✅ אישרתי את ${entry.phone}! עכשיו הם יכולים לדבר איתי.`);
-          await ctx.sendToChat(entry.chatId, "🎉 אושרת! אני לימור, איך אפשר לעזור? 😊");
+          await ctx.sendToChat(entry.chatId, `🎉 אושרת! אני ${config.botName}, איך אפשר לעזור? 😊`);
           return true;
         }
       }

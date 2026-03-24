@@ -2,6 +2,7 @@ import { writeFileSync } from "fs";
 import { resolve } from "path";
 import { loadWithFallback } from "./state-migration";
 import { statePath } from "./state-dir";
+import { config } from "./config";
 
 const OLD_INSTRUCTIONS_PATH = resolve(__dirname, "..", "memory", "instructions.json");
 const MAX_INSTRUCTIONS = 50;
@@ -81,7 +82,7 @@ export function getInstructionsContext(): string {
   if (store.instructions.length === 0) return "";
 
   const lines: string[] = [];
-  lines.push("## הוראות מיוחדות מרני (עקבי אחריהן תמיד!)");
+  lines.push(`## הוראות מיוחדות מ${config.ownerName} (עקבי אחריהן תמיד!)`);
   for (const inst of store.instructions) {
     lines.push(`- ${inst.text}`);
   }

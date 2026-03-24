@@ -1,5 +1,6 @@
 import { createEvent, listEvents } from "../../calendar";
 import { sendCalendarInviteEmail } from "../../email";
+import { config } from "../../config";
 import { createMeetingRequest } from "../../meetings";
 import { findContactByName } from "../../contacts";
 import { getNotifyOwnerCallback } from "../callbacks";
@@ -11,7 +12,7 @@ import type { ToolHandler } from "./types";
 export const calendarHandlers: Record<string, ToolHandler> = {
   create_event: async (input, sender) => {
     if (!sender?.isOwner) {
-      return "❌ רק רני יכול ליצור אירועים ביומן ישירות. השתמשי ב-request_meeting.";
+      return `❌ רק ${config.ownerName} יכול ליצור אירועים ביומן ישירות. השתמשי ב-request_meeting.`;
     }
     const start = new Date(input.start_date);
     const durationMs = (input.duration_minutes || 60) * 60 * 1000;
@@ -22,7 +23,7 @@ export const calendarHandlers: Record<string, ToolHandler> = {
 
   delete_event: async (input, sender) => {
     if (!sender?.isOwner) {
-      return "❌ רק רני יכול למחוק אירועים מהיומן.";
+      return `❌ רק ${config.ownerName} יכול למחוק אירועים מהיומן.`;
     }
     const date = new Date(input.date);
     if (input.title) {
@@ -34,7 +35,7 @@ export const calendarHandlers: Record<string, ToolHandler> = {
 
   list_events: async (input, sender) => {
     if (!sender?.isOwner) {
-      return "❌ רק רני יכול לראות את היומן. אם את צריכה לדעת אם רני פנוי — השתמשי ב-notify_owner.";
+      return `❌ רק ${config.ownerName} יכול לראות את היומן. אם את צריכה לדעת אם ${config.ownerName} פנוי — השתמשי ב-notify_owner.`;
     }
     const date = new Date(input.date);
     return await listEvents(date);
@@ -56,10 +57,10 @@ export const calendarHandlers: Record<string, ToolHandler> = {
     );
 
     if (alreadyPending) {
-      return `כבר שלחתי בקשה לרני בנושא הזה (${id}). מחכים לתשובה שלו – לא צריך לשלוח שוב.`;
+      return `כבר שלחתי בקשה ל${config.ownerName} בנושא הזה (${id}). מחכים לתשובה שלו – לא צריך לשלוח שוב.`;
     }
 
-    return `בקשת פגישה נשלחה לרני (${id}). הוא יחזור עם זמן מתאים.`;
+    return `בקשת פגישה נשלחה ל${config.ownerName} (${id}). הוא יחזור עם זמן מתאים.`;
   },
 
   notify_owner: async (input) => {
@@ -68,7 +69,7 @@ export const calendarHandlers: Record<string, ToolHandler> = {
         console.error("Failed to notify owner:", err)
       );
     }
-    return `ההודעה הועברה לרני.`;
+    return `ההודעה הועברה ל${config.ownerName}.`;
   },
 
   send_calendar_invite: async (input) => {
@@ -79,7 +80,7 @@ export const calendarHandlers: Record<string, ToolHandler> = {
       title: input.title,
       startDate,
       durationMinutes: duration,
-      description: "פגישה עם רני - נקבעה דרך לימור",
+      description: `פגישה עם ${config.ownerName} - נקבעה דרך ${config.botName}`,
     });
     return `✅ זימון נשלח למייל ${input.email}! (הזמנת יומן)`;
   },

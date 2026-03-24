@@ -4,6 +4,7 @@
  * Max 8 sections, min 4, priority-ordered.
  * Deterministic rules, no AI calls.
  */
+import { config } from "../config";
 import type { ResolvedContext, CompressedPrompt, PromptSection, PromptPriorityLevel } from "./context-types";
 
 type CompressorInput = Omit<ResolvedContext, "compressedPrompt" | "outcomeEvaluation" | "debugTrace" | "followupAutomationDecision" | "domainPolicy">;
@@ -194,7 +195,7 @@ function buildAllSections(r: CompressorInput): PromptSection[] {
   const personImportant = bundle.person.isOwner || bundle.person.importanceScore >= 70 || bundle.person.relationshipType !== "unknown";
   const personContent: string[] = [];
   if (bundle.person.isOwner) {
-    personContent.push("רני (הבעלים)");
+    personContent.push(`${config.ownerName} (הבעלים)`);
   } else if (bundle.person.isGroup) {
     personContent.push("קבוצה");
   } else {

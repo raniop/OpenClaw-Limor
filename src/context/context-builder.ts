@@ -3,6 +3,7 @@
  * Now includes open loop resolution, turn intent, and response guidance.
  * Deterministic, no AI calls, fast.
  */
+import { config } from "../config";
 import type { ContextBundle, PersonContext, ConversationContext, UrgencyContext, SystemContext, OpenLoopContext, ResolvedContext, MoodContext } from "./context-types";
 import { getProfile } from "../relationship-memory/relationship-store";
 import { conversationStore, approvalStore } from "../stores";
@@ -279,7 +280,7 @@ function buildHistorySummary(
 
   // Owner context
   if (person.isOwner) {
-    parts.push("זה רני (הבעלים)");
+    parts.push(`זה ${config.ownerName} (הבעלים)`);
   }
 
   // Group context

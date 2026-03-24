@@ -4,6 +4,7 @@
  * Replaces scattered `if (!sender?.isOwner)` checks.
  */
 import type { SenderContext } from "../ai/types";
+import { config } from "../config";
 
 export type Role = "owner" | "approved_contact" | "group" | "unknown";
 
@@ -138,5 +139,5 @@ export function canUseTool(toolName: string, sender?: SenderContext): boolean {
  * Get a Hebrew permission-denied message for a tool.
  */
 export function getPermissionDeniedMessage(toolName: string): string {
-  return "אין לך הרשאה לפעולה זו. רק רני יכול לבצע פעולה זו.";
+  return `אין לך הרשאה לפעולה זו. רק ${config.ownerName} יכול לבצע פעולה זו.`;
 }

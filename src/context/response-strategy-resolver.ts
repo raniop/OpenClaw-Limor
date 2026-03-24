@@ -3,6 +3,7 @@
  * Final decision layer sitting on top of all other resolved context.
  * Deterministic rules, no AI calls.
  */
+import { config } from "../config";
 import type { ResolvedContext, ResponseStrategy } from "./context-types";
 
 interface StrategyInput {
@@ -79,7 +80,7 @@ export function resolveResponseStrategy(resolved: StrategyInput): ResponseStrate
     return {
       type: "owner_summary",
       summary: "לתת סיכום מסודר לבעלים",
-      reason: "רני ביקש סטטוס",
+      reason: `${config.ownerName} ביקש סטטוס`,
       confidence: 0.9,
     };
   }

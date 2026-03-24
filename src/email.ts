@@ -42,10 +42,10 @@ export async function sendCalendarInviteEmail(opts: {
 
   const mail = getTransporter();
   await mail.sendMail({
-    from: `"לימור - עוזרת אישית" <${config.smtpEmail}>`,
+    from: `"${config.botName} - עוזרת אישית" <${config.smtpEmail}>`,
     to,
     subject: `📅 הזמנה: ${title} - ${dateStr} ${timeStr}`,
-    text: `הוזמנת לפגישה!\n\n${title}\nתאריך: ${dateStr}\nשעה: ${timeStr}\nמשך: ${durationMinutes} דקות\n${description ? `\n${description}` : ""}\n\nנשלח על ידי לימור 🐾`,
+    text: `הוזמנת לפגישה!\n\n${title}\nתאריך: ${dateStr}\nשעה: ${timeStr}\nמשך: ${durationMinutes} דקות\n${description ? `\n${description}` : ""}\n\nנשלח על ידי ${config.botName} 🐾`,
     html: `
       <div dir="rtl" style="font-family: Arial, sans-serif; padding: 20px;">
         <h2>📅 הזמנה לפגישה</h2>
@@ -55,7 +55,7 @@ export async function sendCalendarInviteEmail(opts: {
         <p>⏱️ משך: ${durationMinutes} דקות</p>
         ${description ? `<p>📝 ${description}</p>` : ""}
         <hr/>
-        <p style="color: #888; font-size: 12px;">נשלח על ידי לימור 🐾 - עוזרת אישית חכמה</p>
+        <p style="color: #888; font-size: 12px;">נשלח על ידי ${config.botName} 🐾 - עוזרת אישית חכמה</p>
       </div>
     `,
     icalEvent: {

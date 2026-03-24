@@ -4,6 +4,7 @@
  * Extracted from ai-core.ts — exact same logic, no behavior changes.
  */
 import { client } from "./client";
+import { config } from "../config";
 import type { Message } from "./types";
 import { log } from "../logger";
 
@@ -24,9 +25,9 @@ const EXTRACT_PROMPT = `אתה מנתח שיחות. תפקידך לחלץ מיד
 - כללי: כל העדפה אחרת שנלמדה
 
 מה לא לשמור:
-- פעולות זמניות ("לימור מחכה לתשובה", "לימור שלחה הודעה")
+- פעולות זמניות ("${config.botName} מחכה לתשובה", "${config.botName} שלחה הודעה")
 - בקשות חד-פעמיות שכבר טופלו
-- מידע על מה שלימור עשתה או לא עשתה
+- מידע על מה ש${config.botName} עשתה או לא עשתה
 - דברים כלליים וברורים מאליהם
 
 כלל חשוב: שמור רק 0-2 עובדות ו-0-2 העדפות מכל שיחה.
@@ -45,7 +46,7 @@ export async function extractFacts(
   try {
     const lastMessages = history.slice(-4);
     const conversation = lastMessages
-      .map((m) => `${m.role === "user" ? "משתמש" : "לימור"}: ${m.content}`)
+      .map((m) => `${m.role === "user" ? "משתמש" : config.botName}: ${m.content}`)
       .join("\n");
 
     const response = await client.messages.create({

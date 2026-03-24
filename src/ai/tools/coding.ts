@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { config } from "../../config";
 
 /** Self-programming / coding tools (owner-only) */
 export const codingTools: Anthropic.Tool[] = [
@@ -104,7 +105,7 @@ export const codingTools: Anthropic.Tool[] = [
   },
   {
     name: "code_apply",
-    description: "⚠️ החלת השינויים לפרודקשן! מחייב אישור מפורש מרני. ממזג את הקוד, בונה מחדש, ומריסטרט את לימור.",
+    description: `⚠️ החלת השינויים לפרודקשן! מחייב אישור מפורש מ${config.ownerName}. ממזג את הקוד, בונה מחדש, ומריסטרט את ${config.botName}.`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -132,7 +133,7 @@ export const codingTools: Anthropic.Tool[] = [
   },
   {
     name: "code_implement",
-    description: "⚡ הפעלת Claude Code לממש capability spec שאושרה. Claude Code כותב קוד, מקמפל, ומציג diff. השתמשי אחרי שרני אישר יכולת עם 'אשר יכולת cap-XXX'.",
+    description: `⚡ הפעלת Claude Code לממש capability spec שאושרה. Claude Code כותב קוד, מקמפל, ומציג diff. השתמשי אחרי ש${config.ownerName} אישר יכולת עם 'אשר יכולת cap-XXX'.`,
     input_schema: {
       type: "object" as const,
       properties: {

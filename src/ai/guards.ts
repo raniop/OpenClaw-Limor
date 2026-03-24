@@ -153,7 +153,7 @@ export function notifyHallucinationEvent(sender?: SenderContext): void {
     const notify = getNotifyOwnerCallback();
     if (notify) {
       const who = sender?.isOwner ? "בשיחה איתך" : `צ'אט: ${sender?.name || "unknown"}`;
-      notify(`⚠️ [hallucination] לימור טענה שביצעה פעולה בלי tool! (retry triggered)\n${who}`).catch(() => {});
+      notify(`⚠️ [hallucination] ${config.botName} טענה שביצעה פעולה בלי tool! (retry triggered)\n${who}`).catch(() => {});
     }
   } catch {}
 }

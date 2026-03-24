@@ -26,7 +26,7 @@ async function getDirectorToken(): Promise<string> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       clientInfo: {
-        device: { deviceName: "Limor", deviceUUID: "limor-bot-c4-001", make: "Limor", model: "Limor", os: "Android", osVersion: "10" },
+        device: { deviceName: config.botNameEn, deviceUUID: "limor-bot-c4-001", make: config.botNameEn, model: config.botNameEn, os: "Android", osVersion: "10" },
         userInfo: { applicationKey: C4_APP_KEY, password: config.control4Password, userName: config.control4Username },
       },
     }),

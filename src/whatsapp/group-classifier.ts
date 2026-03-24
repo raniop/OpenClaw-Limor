@@ -4,6 +4,7 @@
  * The AI still has its own [SKIP] logic as a secondary filter.
  * Tracks recent responses to detect conversation continuations.
  */
+import { config } from "../config";
 
 export interface GroupClassification {
   shouldRespond: boolean;
@@ -100,8 +101,8 @@ export function hasRecentGroupResponse(chatId: string): boolean {
 // Bot name patterns (case-insensitive)
 // Note: \b doesn't work with Hebrew characters, so we use (^|\s) and ($|\s|[?.!,])
 const NAME_PATTERNS = [
-  /(^|\s)לימור($|\s|[?.!,])/i,
-  /\blimor\b/i,
+  new RegExp(`(^|\\s)${config.botName}($|\\s|[?.!,])`, "i"),
+  new RegExp(`\\b${config.botNameEn}\\b`, "i"),
   /(^|\s)לי?מורי($|\s|[?.!,])/i, // diminutive
 ];
 

@@ -2,6 +2,7 @@
  * Monitoring handlers — system health checks for נעמי.
  */
 import type { ToolHandler } from "./types";
+import { config } from "../../config";
 import { listAgents } from "../../agents/agent-registry";
 import { readFileSync, existsSync, writeFileSync } from "fs";
 import { resolve } from "path";
@@ -286,7 +287,7 @@ export const monitoringHandlers: Record<string, ToolHandler> = {
         } catch {}
       }, 20000);
 
-      return `✅ בנייה הושלמה בהצלחה! 🔄 לימור תעשה restart עצמי בעוד 3 שניות.\n\nBuild:\n${buildSummary}`;
+      return `✅ בנייה הושלמה בהצלחה! 🔄 ${config.botName} תעשה restart עצמי בעוד 3 שניות.\n\nBuild:\n${buildSummary}`;
     } catch (err: any) {
       return `❌ שגיאה:\n${err.stderr || err.message}`;
     }

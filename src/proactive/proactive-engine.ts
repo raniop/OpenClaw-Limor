@@ -65,7 +65,7 @@ export function checkOverdueFollowups(): ProactiveMessage | null {
 
   return {
     type: "followup_reminder",
-    text: `היי רני 👋\nיש משהו שעבר הזמן שלו: "${reason}" (${name}).\nרוצה שאטפל בזה?`,
+    text: `היי ${config.ownerName} 👋\nיש משהו שעבר הזמן שלו: "${reason}" (${name}).\nרוצה שאטפל בזה?`,
     priority: "high",
   };
 }
@@ -101,7 +101,7 @@ export async function checkUpcomingEvents(): Promise<ProactiveMessage | null> {
         const eventName = line.replace(/^\d{1,2}:\d{2}[^:]*:\s*/, "").trim();
         return {
           type: "pre_meeting",
-          text: `⏰ רני, יש לך "${eventName}" בעוד ${diff} דקות!`,
+          text: `⏰ ${config.ownerName}, יש לך "${eventName}" בעוד ${diff} דקות!`,
           priority: "medium",
         };
       }
@@ -123,7 +123,7 @@ export async function generateMorningSummary(): Promise<ProactiveMessage | null>
     const eventsText = await listEvents(today);
 
     const overdue = getDueFollowups();
-    const parts: string[] = ["בוקר טוב רני! ☀️\n"];
+    const parts: string[] = [`בוקר טוב ${config.ownerName}! ☀️\n`];
 
     if (!eventsText.includes("אין אירועים")) {
       parts.push("📅 *היום ביומן:*");

@@ -8,6 +8,7 @@
  * If unsure — ask Rani via notify_owner / request_meeting.
  * Never silently block and cause Claude to hallucinate actions.
  */
+import { config } from "../config";
 import type { ResolvedContext, ExecutionDecision } from "./context-types";
 
 type GuardrailInput = Omit<ResolvedContext, "executionDecision" | "toolRoutingPolicy" | "compressedPrompt" | "outcomeEvaluation" | "debugTrace" | "followupAutomationDecision" | "domainPolicy">;
@@ -72,7 +73,7 @@ export function resolveExecutionDecision(resolved: GuardrailInput): ExecutionDec
     return {
       type: "allow_tool_execution",
       summary: "כלים זמינים, מומלץ לוודא פרטים לפני ביצוע",
-      reason: "יש כוונת כלי — אם חסר פרט, לשאול את המשתמש או את רני",
+      reason: `יש כוונת כלי — אם חסר פרט, לשאול את המשתמש או את ${config.ownerName}`,
       confidence: 0.85,
       allowTools: true,
     };

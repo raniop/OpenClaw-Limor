@@ -6,6 +6,7 @@
 import { appendFileSync, existsSync, statSync, renameSync, mkdirSync } from "fs";
 import { dirname } from "path";
 import { statePath } from "./state-dir";
+import { config } from "./config";
 import type { TraceContext, NormalizedError } from "./observability/types";
 
 type LogLevel = "info" | "warn" | "error" | "debug";
@@ -196,13 +197,13 @@ export const log = {
 
   // --- System ---
   systemStarting() {
-    write("info", "system", "Starting Limor (לימור)...");
+    write("info", "system", `Starting ${config.botNameEn} (${config.botName})...`);
   },
   systemReady() {
-    write("info", "system", "לימור מחוברת ומוכנה! (Limor is ready!)");
+    write("info", "system", `${config.botName} מחוברת ומוכנה! (${config.botNameEn} is ready!)`);
   },
   systemShutdown() {
-    write("info", "system", "Shutting down Limor...");
+    write("info", "system", `Shutting down ${config.botNameEn}...`);
   },
   systemError(message: string, error?: string) {
     write("error", "system", message, error ? { error } : undefined);

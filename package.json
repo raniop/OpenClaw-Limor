@@ -15,7 +15,7 @@
     "test": "rm -rf dist-test && tsc -p tsconfig.test.json && ln -sf ../souls dist-test/souls && ln -sf ../workspace dist-test/workspace && ln -sf ../.env dist-test/.env && node --require ./dist-test/tests/setup.js --test --test-concurrency=1 dist-test/tests/*.test.js",
     "benchmark": "rm -rf dist-test && tsc -p tsconfig.test.json && ln -sf ../souls dist-test/souls && ln -sf ../workspace dist-test/workspace && ln -sf ../.env dist-test/.env && node dist-test/tests/benchmark/run-benchmarks.js",
     "verify": "npm run build && node -e \"require('./dist/index.js')\" && echo 'entrypoint OK'",
-    "setup": "npx ts-node scripts/setup.ts"
+    "setup": "npx tsx scripts/setup.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

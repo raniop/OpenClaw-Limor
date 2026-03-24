@@ -7,7 +7,10 @@ import { execSync } from "child_process";
 import { existsSync } from "fs";
 import { resolve } from "path";
 
-const DB_PATH = resolve(process.env.HOME || "~", "Library/Messages/chat.db");
+// macOS Messages database — SMS features only available on macOS
+const DB_PATH = process.platform === "darwin"
+  ? resolve(process.env.HOME || "~", "Library/Messages/chat.db")
+  : ""; // SMS not available on Windows/Linux
 const PY_SCRIPT = resolve(__dirname, "..", "..", "src", "sms", "extract_sms.py");
 // Fallback for compiled dist/
 const PY_SCRIPT_DIST = resolve(__dirname, "..", "sms", "extract_sms.py");

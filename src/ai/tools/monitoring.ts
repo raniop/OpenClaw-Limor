@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { config } from "../../config";
 
 /** Monitoring tools for system health checks */
 export const monitoringTools: Anthropic.Tool[] = [
@@ -84,7 +85,7 @@ export const monitoringTools: Anthropic.Tool[] = [
   },
   {
     name: "tail_logs",
-    description: "צפייה בלוגים אחרונים של לימור",
+    description: `צפייה בלוגים אחרונים של ${config.botName}`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -146,7 +147,7 @@ export const monitoringTools: Anthropic.Tool[] = [
   },
   {
     name: "restart_and_deploy",
-    description: "בנייה מחדש והפעלה מחדש של לימור",
+    description: `בנייה מחדש והפעלה מחדש של ${config.botName}`,
     input_schema: {
       type: "object" as const,
       properties: {},

@@ -1,10 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { config } from "../../config";
 
 /** Contact management tools (owner-only) */
 export const contactTools: Anthropic.Tool[] = [
   {
     name: "add_contact",
-    description: "הוספת איש קשר חדש למערכת ולדשבורד. **חובה** להשתמש בכלי הזה כשרני מבקש להוסיף איש קשר, שולח כרטיס איש קשר, או מזכיר שם + מספר טלפון של מישהו חדש. לא מספיק לזכור — חייבים לקרוא לכלי!",
+    description: `הוספת איש קשר חדש למערכת ולדשבורד. **חובה** להשתמש בכלי הזה כש${config.ownerName} מבקש להוסיף איש קשר, שולח כרטיס איש קשר, או מזכיר שם + מספר טלפון של מישהו חדש. לא מספיק לזכור — חייבים לקרוא לכלי!`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -25,7 +26,7 @@ export const contactTools: Anthropic.Tool[] = [
   },
   {
     name: "delete_contact",
-    description: "מחיקת איש קשר מהמערכת לחלוטין. השתמשי כשרני מבקש למחוק/להסיר איש קשר.",
+    description: `מחיקת איש קשר מהמערכת לחלוטין. השתמשי כש${config.ownerName} מבקש למחוק/להסיר איש קשר.`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -39,7 +40,7 @@ export const contactTools: Anthropic.Tool[] = [
   },
   {
     name: "block_contact",
-    description: "חסימת איש קשר - הוא לא יוכל לדבר עם לימור יותר (עד שרני יאשר מחדש)",
+    description: `חסימת איש קשר - הוא לא יוכל לדבר עם ${config.botName} יותר (עד ש${config.ownerName} יאשר מחדש)`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -53,7 +54,7 @@ export const contactTools: Anthropic.Tool[] = [
   },
   {
     name: "get_contact_history",
-    description: "צפייה בהיסטוריית השיחה עם איש קשר. השתמשי כשרני שואל 'מה X כתב/רצה/אמר לך?' או 'מה דיברת עם X?'",
+    description: `צפייה בהיסטוריית השיחה עם איש קשר. השתמשי כש${config.ownerName} שואל 'מה X כתב/רצה/אמר לך?' או 'מה דיברת עם X?'`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -71,7 +72,7 @@ export const contactTools: Anthropic.Tool[] = [
   },
   {
     name: "get_group_history",
-    description: "צפייה בהיסטוריית שיחה של קבוצת וואטסאפ. השתמשי כשרני שואל 'מה היה בקבוצה X?' או 'תסכמי לי את הקבוצה'.",
+    description: `צפייה בהיסטוריית שיחה של קבוצת וואטסאפ. השתמשי כש${config.ownerName} שואל 'מה היה בקבוצה X?' או 'תסכמי לי את הקבוצה'.`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -89,7 +90,7 @@ export const contactTools: Anthropic.Tool[] = [
   },
   {
     name: "summarize_group_activity",
-    description: "סיכום פעילות בקבוצת וואטסאפ — מה קרה, מי הזכיר את רני, מה צריך תשומת לב. השתמשי כשרני שואל 'מה קרה בקבוצה X?' או 'תסכמי לי את הקבוצה'.",
+    description: `סיכום פעילות בקבוצת וואטסאפ — מה קרה, מי הזכיר את ${config.ownerName}, מה צריך תשומת לב. השתמשי כש${config.ownerName} שואל 'מה קרה בקבוצה X?' או 'תסכמי לי את הקבוצה'.`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -107,7 +108,7 @@ export const contactTools: Anthropic.Tool[] = [
   },
   {
     name: "create_reminder",
-    description: "יצירת תזכורת/מעקב. השתמשי כשמישהו מבקש לתזכר את רני, או כשרני מבקש תזכורת, או כשיש משימה שצריך לעקוב אחריה. חובה לציין מי ביקש (from_name) ומה בדיוק הבקשה (task).",
+    description: `יצירת תזכורת/מעקב. השתמשי כשמישהו מבקש לתזכר את ${config.ownerName}, או כש${config.ownerName} מבקש תזכורת, או כשיש משימה שצריך לעקוב אחריה. חובה לציין מי ביקש (from_name) ומה בדיוק הבקשה (task).`,
     input_schema: {
       type: "object" as const,
       properties: {

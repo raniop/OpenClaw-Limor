@@ -462,7 +462,7 @@ async function handleMessage(msg: Message): Promise<void> {
 
     // --- Group pre-filter: deterministic skip before AI call ---
     if (isGroup) {
-      const mentionsLimor = /(^|\s)לימור($|\s|[?.!,])/i.test(body) || /\blimor\b/i.test(body);
+      const mentionsLimor = new RegExp(`(^|\\s)${config.botName}($|\\s|[?.!,])`, "i").test(body) || new RegExp(`\\b${config.botNameEn}\\b`, "i").test(body);
       const inOtherThread = isPartOfOtherThread(chatId, contactName);
       const mentionedIds: string[] = (msg as any).mentionedIds || [];
 
@@ -529,8 +529,8 @@ async function handleMessage(msg: Message): Promise<void> {
     }
     if (body === "/help" || body === "/עזרה") {
       await msg.reply(
-        "🌟 *לימור* - העוזרת האישית שלך\n\n" +
-        "היי! אני לימור 👋\nפשוט תכתוב לי ואני אענה!\n\n" +
+        `🌟 *${config.botName}* - העוזרת האישית שלך\n\n` +
+        `היי! אני ${config.botName} 👋\nפשוט תכתוב לי ואני אענה!\n\n` +
         "🗣️ אני מדברת בכל שפה שתכתוב לי\n🧠 אני יודעת לעזור עם כל שאלה\n💻 כולל קוד, כתיבה, תרגום ועוד\n\n" +
         "⚡ *פקודות:*\n/clear או /נקה - איפוס שיחה\n/help או /עזרה - הודעה הזו"
       );
@@ -611,7 +611,7 @@ async function handleMessage(msg: Message): Promise<void> {
       } else if (recentlyResponded) {
         extraContext += ` ⚠️ הגבת לאחרונה בקבוצה — סביר שההודעה הזו היא המשך שיחה איתך.`;
       }
-      extraContext += ` תגיבי (טקסט בלבד, 1-2 משפטים) אם: (1) פונים אלייך בשם (לימור/Limor) (2) מגיבים (reply) להודעה שלך. תחזירי [SKIP] אם: ההודעה שייכת לשיחה בין אנשים אחרים, reply למישהו אחר, או לא קשורה אלייך.`;
+      extraContext += ` תגיבי (טקסט בלבד, 1-2 משפטים) אם: (1) פונים אלייך בשם (${config.botName}/${config.botNameEn}) (2) מגיבים (reply) להודעה שלך. תחזירי [SKIP] אם: ההודעה שייכת לשיחה בין אנשים אחרים, reply למישהו אחר, או לא קשורה אלייך.`;
     }
 
     // Build model routing params from resolved context

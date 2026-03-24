@@ -5,6 +5,7 @@
 import { spawn, execSync } from "child_process";
 import { existsSync, readFileSync, readdirSync } from "fs";
 import { resolve, join } from "path";
+import { config } from "../config";
 import { createWorktree, getDiff, applyWorktree, cleanupWorktree } from "./sandbox";
 import { getSpec } from "./spec-store";
 
@@ -121,7 +122,7 @@ export async function implementCapability(capId: string, onProgress?: (msg: stri
 }
 
 function buildPrompt(spec: any): string {
-  return `You are implementing a capability for the Limor WhatsApp AI assistant bot.
+  return `You are implementing a capability for the ${config.botNameEn} WhatsApp AI assistant bot.
 
 ## Capability: ${spec.title}
 
@@ -186,7 +187,7 @@ function runClaudeCode(cwd: string, prompt: string): Promise<string> {
       env: {
         ...process.env,
         PATH: extendedPath,
-        CLAUDE_CODE_ENTRYPOINT: "limor-bot",
+        CLAUDE_CODE_ENTRYPOINT: `${config.botNameEn.toLowerCase()}-bot`,
       },
     });
 

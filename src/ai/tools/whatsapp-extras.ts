@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { config } from "../../config";
 
 /** WhatsApp extra tools — group management, message ops, contact info, polls, labels, etc. (owner-only) */
 export const whatsappExtraTools: Anthropic.Tool[] = [
@@ -41,7 +42,7 @@ export const whatsappExtraTools: Anthropic.Tool[] = [
   // 3. Edit Message
   {
     name: "edit_message",
-    description: "עריכת הודעה שלימור שלחה — מחפשת בהודעות האחרונות שנשלחו ומחליפה את הטקסט",
+    description: `עריכת הודעה ש${config.botName} שלחה — מחפשת בהודעות האחרונות שנשלחו ומחליפה את הטקסט`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -65,7 +66,7 @@ export const whatsappExtraTools: Anthropic.Tool[] = [
   // 4. Delete Message
   {
     name: "delete_message",
-    description: "מחיקת הודעה שלימור שלחה (מחיקה לכולם)",
+    description: `מחיקת הודעה ש${config.botName} שלחה (מחיקה לכולם)`,
     input_schema: {
       type: "object" as const,
       properties: {

@@ -52,7 +52,7 @@ export async function checkApprovalGate(ctx: ApprovalContext): Promise<boolean> 
   }
 
   await ctx.reply(
-    `היי ${ctx.contactName}! 👋 אני לימור, עוזרת אישית חכמה.\nאני צריכה אישור מהבעלים שלי לפני שנוכל לדבר. כבר שלחתי לו בקשה – אני אודיע לך ברגע שתאושר! ✨`
+    `היי ${ctx.contactName}! 👋 אני ${config.botName}, עוזרת אישית חכמה.\nאני צריכה אישור מהבעלים שלי לפני שנוכל לדבר. כבר שלחתי לו בקשה – אני אודיע לך ברגע שתאושר! ✨`
   );
   return true;
 }

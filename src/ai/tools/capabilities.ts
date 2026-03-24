@@ -1,11 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { config } from "../../config";
 
 /** Capability learning tools (owner-only) */
 export const capabilityTools: Anthropic.Tool[] = [
   {
     name: "create_capability_request",
     description:
-      "יצירת בקשת יכולת חדשה. השתמשי כשרני מבקש ממך ללמוד לעשות משהו חדש שדורש שינוי קוד, tool חדש, אינטגרציה חדשה, או שיפור טכני. לא להשתמש בזה לעובדות פשוטות או הוראות התנהגות — רק ליכולות שדורשות פיתוח.",
+      `יצירת בקשת יכולת חדשה. השתמשי כש${config.ownerName} מבקש ממך ללמוד לעשות משהו חדש שדורש שינוי קוד, tool חדש, אינטגרציה חדשה, או שיפור טכני. לא להשתמש בזה לעובדות פשוטות או הוראות התנהגות — רק ליכולות שדורשות פיתוח.`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -61,7 +62,7 @@ export const capabilityTools: Anthropic.Tool[] = [
   },
   {
     name: "run_capability",
-    description: "הרצת תהליך מימוש מלא ליכולת שאושרה — יוצר סשן, מממש עם Claude Code, בונה ובודק, מחיל שינויים ומנקה. השתמשי כשרני רוצה לממש יכולת שכבר אושרה.",
+    description: `הרצת תהליך מימוש מלא ליכולת שאושרה — יוצר סשן, מממש עם Claude Code, בונה ובודק, מחיל שינויים ומנקה. השתמשי כש${config.ownerName} רוצה לממש יכולת שכבר אושרה.`,
     input_schema: {
       type: "object" as const,
       properties: {

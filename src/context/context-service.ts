@@ -2,6 +2,7 @@
  * Context service v3 — high-level API for building and formatting context.
  * Includes resolved context with primary focus and response mode.
  */
+import { config } from "../config";
 import type { ContextBundle, ResolvedContext, DebugTrace } from "./context-types";
 import { buildContext, buildResolvedContext } from "./context-builder";
 
@@ -268,7 +269,7 @@ function formatBundleSection(bundle: ContextBundle): string {
 
   // --- Person ---
   if (bundle.person.isOwner) {
-    lines.push(`  • רני (הבעלים)`);
+    lines.push(`  • ${config.ownerName} (הבעלים)`);
   } else if (bundle.person.isGroup) {
     lines.push(`  • שיחה בקבוצה`);
   } else {

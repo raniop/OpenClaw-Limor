@@ -2,6 +2,7 @@ import { writeFileSync, existsSync, readFileSync } from "fs";
 import { resolve } from "path";
 import { loadWithFallback } from "./state-migration";
 import { statePath } from "./state-dir";
+import { config } from "./config";
 import { getDb } from "./stores/sqlite-init";
 
 const OLD_CONTACTS_PATH = resolve(__dirname, "..", "memory", "contacts.json");
@@ -69,8 +70,8 @@ const NAME_MAP: Record<string, string[]> = {
   "רועי": ["roi"],
   "sharon": ["שרון"],
   "שרון": ["sharon"],
-  "limor": ["לימור"],
-  "לימור": ["limor"],
+  "limor": [config.botName],
+  [config.botName]: ["limor"],
 };
 
 function translateName(name: string): string[] {

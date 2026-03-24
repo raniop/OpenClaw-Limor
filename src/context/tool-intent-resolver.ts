@@ -2,6 +2,7 @@
  * Tool Intent Resolver — determines if this turn likely needs a tool call.
  * Deterministic pattern matching, no AI calls.
  */
+import { config } from "../config";
 import type { ContextBundle, PrimaryFocus, ResponseMode, ActionPlan, ToolIntent } from "./context-types";
 
 interface ToolIntentInput {
@@ -98,7 +99,7 @@ function matchToolCategory(message: string): ToolMatch | null {
     return { type: "contact_lookup", label: "אנשי קשר", reason: "יש בקשת חיפוש או הוספת איש קשר", confidence: 0.9 };
   }
   if (INSTRUCTION_PATTERNS.test(message)) {
-    return { type: "file", label: "הוראה/למידה", reason: "הוראה או כלל חדש ללימור", confidence: 0.85 };
+    return { type: "file", label: "הוראה/למידה", reason: `הוראה או כלל חדש ל${config.botName}`, confidence: 0.85 };
   }
   if (GROUP_HISTORY_PATTERNS.test(message)) {
     return { type: "contact_lookup", label: "היסטוריית קבוצה", reason: "בקשת סיכום או היסטוריה של קבוצה", confidence: 0.9 };

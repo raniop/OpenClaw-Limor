@@ -5,10 +5,11 @@
  * Uses Sonnet for cheap extraction.
  */
 import { client } from "../ai/client";
+import { config } from "../config";
 import { saveInstruction } from "../instructions";
 
-const CORRECTION_PROMPT = `אתה מנתח תיקונים. המשתמש תיקן את לימור (העוזרת האישית).
-תפקידך: לחלץ כלל התנהגותי שלימור צריכה לזכור כדי לא לחזור על הטעות.
+const CORRECTION_PROMPT = `אתה מנתח תיקונים. המשתמש תיקן את ${config.botName} (העוזרת האישית).
+תפקידך: לחלץ כלל התנהגותי ש${config.botName} צריכה לזכור כדי לא לחזור על הטעות.
 
 החזר JSON בלבד (בלי markdown, בלי backticks):
 {"rule": "הכלל בעברית, קצר וברור", "relevant": true}
@@ -19,8 +20,8 @@ const CORRECTION_PROMPT = `אתה מנתח תיקונים. המשתמש תיקן
 דוגמאות לכללים טובים:
 - "כשמחפשים מסעדה, תמיד לשאול כמה סועדים לפני שמחפשים"
 - "לא לשלוח הודעות לאנשי קשר בלי לשאול קודם"
-- "כשרני אומר 'תזכירי לי' הוא מתכוון ליצור תזכורת ביומן"
-- "להשתמש בעברית תמיד כשמדברים עם רני"
+- "כש${config.ownerName} אומר 'תזכירי לי' הוא מתכוון ליצור תזכורת ביומן"
+- "להשתמש בעברית תמיד כשמדברים עם ${config.ownerName}"
 
 כתוב כלל קצר וספציפי שאפשר ליישם.`;
 
@@ -34,7 +35,7 @@ export async function learnFromCorrection(
 ): Promise<void> {
   try {
     const conversation = [
-      `לימור אמרה: ${lastAssistantMessage}`,
+      `${config.botName} אמרה: ${lastAssistantMessage}`,
       `המשתמש תיקן: ${userCorrectionMessage}`,
     ].join("\n");
 

@@ -25,7 +25,7 @@ async function aiSummarizeDropped(chatId: string, messages: Message[]): Promise<
 
   try {
     const conversation = messages
-      .map((m) => `${m.role === "user" ? "משתמש" : "לימור"}: ${m.content.substring(0, 200)}`)
+      .map((m) => `${m.role === "user" ? "משתמש" : config.botName}: ${m.content.substring(0, 200)}`)
       .join("\n");
 
     // Load existing rolling summary

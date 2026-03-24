@@ -1,6 +1,8 @@
 /**
  * Generate ICS (iCalendar) content for a calendar invite
  */
+import { config } from "./config";
+
 export function generateICS(opts: {
   title: string;
   startDate: Date;
@@ -19,7 +21,7 @@ export function generateICS(opts: {
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Limor AI//WhatsApp Bot//HE",
+    `PRODID:-//${config.botNameEn} AI//WhatsApp Bot//HE`,
     "CALSCALE:GREGORIAN",
     "METHOD:REQUEST",
     "BEGIN:VEVENT",

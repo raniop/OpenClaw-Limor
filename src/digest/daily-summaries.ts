@@ -6,6 +6,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { dirname } from "path";
 import { statePath } from "../state-dir";
+import { config } from "../config";
 import { client, withRetry } from "../ai/client";
 import { getGroupNameById } from "../muted-groups";
 
@@ -144,7 +145,7 @@ async function analyzeChat(
   const formattedMessages = messages
     .map(
       (m) =>
-        `${m.role === "user" ? (isGroup ? "משתמש" : contactName) : "לימור"}: ${m.content.substring(0, 500)}`,
+        `${m.role === "user" ? (isGroup ? "משתמש" : contactName) : config.botName}: ${m.content.substring(0, 500)}`,
     )
     .join("\n");
 
@@ -160,7 +161,7 @@ ${groupInstruction}
 1. דחוף — מה דורש תשומת לב מיידית? (מישהו מחכה, דדליין, בקשה שלא טופלה)
 2. פתוח — מה עדיין לא סגור? (בקשות, שאלות, נושאים שצריך לחזור אליהם)
 3. טופל — מה כן נעשה? (בקצרה, שורה אחת לכל פריט)
-4. כשלים — מה לימור לא הצליחה לעשות? (tool failures, שגיאות, hallucinations)
+4. כשלים — מה ${config.botName} לא הצליחה לעשות? (tool failures, שגיאות, hallucinations)
 
 שיחה:
 ${formattedMessages}
