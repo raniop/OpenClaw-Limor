@@ -7,8 +7,14 @@ import { client, withRetry } from "../ai/client";
 import { handleToolCall } from "../ai/handle-tool-call";
 import type { AgentConfig, AgentResult } from "./agent-types";
 
-const AGENT_TIMEOUT_MS = 180_000; // 3 minutes for coding tasks
-const MAX_AGENT_TOOL_ITERATIONS = 20;
+const AGENT_TIMEOUT_MS = 600_000; // 10 minutes for coding tasks
+const MAX_AGENT_TOOL_ITERATIONS = 30;
+
+/** Use streaming to avoid Anthropic 10-minute non-streaming timeout */
+async function streamToMessage(params: any): Promise<Anthropic.Message> {
+  const stream = await client.messages.stream(params);
+  return stream.finalMessage();
+}
 
 export async function runAgent(
   agent: AgentConfig,
@@ -45,7 +51,7 @@ export async function runAgent(
   let response: Anthropic.Message;
   try {
     response = await Promise.race([
-      withRetry(() => client.messages.create(apiParams)),
+      withRetry(() => streamToMessage(apiParams)),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("AGENT_TIMEOUT")), AGENT_TIMEOUT_MS)
       ),
@@ -94,7 +100,7 @@ export async function runAgent(
     };
     if (agent.tools && agent.tools.length > 0) loopParams.tools = agent.tools;
 
-    response = await withRetry(() => client.messages.create(loopParams));
+    response = await withRetry(() => streamToMessage(loopParams));
   }
 
   // Extract text
