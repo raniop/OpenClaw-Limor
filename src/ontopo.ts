@@ -173,22 +173,25 @@ async function _searchAvailability(
       let result = `יש שולחן פנוי! ✅\nמסעדה: ${displayName}\nתאריך: ${formatDate(date)}\nשעה: ${formatTime(time)}\nסועדים: ${partySize}`;
       result += `\nלהזמנה: ${restaurantUrl}`;
 
-      // Show available times from areas
-      const allTimes: string[] = [];
+      // Show available areas with times — let the user choose
+      const areaDetails: string[] = [];
       for (const area of areas) {
+        const areaName = area.name || area.title || "אזור";
         const options = area.options as any[] | undefined;
-        if (options) {
-          for (const opt of options.slice(0, 5)) {
-            if (opt.time) {
-              const timeStr = formatTime(opt.time);
-              const status = opt.text || "";
-              allTimes.push(`${timeStr} (${status})`);
-            }
-          }
+        if (options && options.length > 0) {
+          const times = options.slice(0, 4).map((opt: any) => {
+            const timeStr = opt.time ? formatTime(opt.time) : "";
+            const status = opt.text || "";
+            return timeStr ? `${timeStr} (${status})` : status;
+          }).filter(Boolean);
+          areaDetails.push(`• ${areaName}: ${times.join(", ")}`);
         }
       }
-      if (allTimes.length > 0) {
-        result += `\nזמנים זמינים: ${allTimes.slice(0, 8).join(", ")}`;
+      if (areaDetails.length > 1) {
+        result += `\n\n🪑 אזורי ישיבה זמינים:\n${areaDetails.join("\n")}`;
+        result += `\n\nאיזה אזור מעדיף?`;
+      } else if (areaDetails.length === 1) {
+        result += `\n${areaDetails[0]}`;
       }
 
       result += `\n[booking_data: page_slug=${pageSlug}, numeric_slug=${numericSlug}]`;
