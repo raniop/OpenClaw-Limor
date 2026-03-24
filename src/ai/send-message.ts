@@ -20,7 +20,7 @@ import { checkHallucination, retryOnHallucination, notifyHallucinationEvent } fr
 import { getNotifyOwnerCallback } from "./callbacks";
 
 const MAX_TOOL_ITERATIONS = 15;
-const SEND_MESSAGE_TIMEOUT_MS = 90_000;
+const SEND_MESSAGE_TIMEOUT_MS = 300_000; // 5 minutes — agents like Yuri can take 2-3 min
 
 export interface SendMessageOptions {
   /** When false, tools are stripped from the API call to prevent execution. Default: true. */
