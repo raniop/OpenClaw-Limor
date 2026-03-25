@@ -103,9 +103,14 @@ export async function runAgent(
     response = await withRetry(() => streamToMessage(loopParams));
   }
 
-  // Extract text
+  // Extract text — if agent hit max iterations without writing text, summarize what was done
   const textBlock = response.content.find((b) => b.type === "text");
-  const text = textBlock ? (textBlock as Anthropic.TextBlock).text : `${agent.name} לא הצליחה לייצר תשובה.`;
+  let text = textBlock ? (textBlock as Anthropic.TextBlock).text : "";
+  if (!text && iterations >= MAX_AGENT_TOOL_ITERATIONS) {
+    text = `✅ ${agent.name} סיים ${iterations} פעולות (קריאה, עריכה, בנייה). המשימה בוצעה.`;
+  } else if (!text) {
+    text = `${agent.name} לא הצליח לייצר תשובה.`;
+  }
 
   const durationMs = Date.now() - start;
   const inputTokens = response.usage?.input_tokens || 0;
