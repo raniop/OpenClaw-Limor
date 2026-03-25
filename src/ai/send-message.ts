@@ -109,12 +109,15 @@ export async function sendMessage(
   const apiParams: any = {
     model: selectedModel,
     max_tokens: config.maxTokens,
-    system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral", ttl: "1h" } }],
+    system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
     messages,
   };
   if (tools.length > 0) apiParams.tools = tools;
 
-  let response = await withRetry(() => client.messages.create(apiParams));
+  let response: Anthropic.Message = await withRetry(async () => {
+    const stream = await client.messages.stream(apiParams);
+    return stream.finalMessage() as unknown as Anthropic.Message;
+  });
 
   // --- Tool use loop ---
   const loopResult = await runToolLoop(response, messages, systemPrompt, tools, selectedModel, sender);
@@ -250,12 +253,15 @@ async function runToolLoop(
     const loopParams: any = {
       model,
       max_tokens: config.maxTokens,
-      system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral", ttl: "1h" } }],
+      system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
       messages,
     };
     if (tools.length > 0) loopParams.tools = tools;
 
-    response = await withRetry(() => client.messages.create(loopParams));
+    response = await withRetry(async () => {
+      const stream = await client.messages.stream(loopParams);
+      return stream.finalMessage() as unknown as Anthropic.Message;
+    });
   }
 
   return { response, toolsUsed };
