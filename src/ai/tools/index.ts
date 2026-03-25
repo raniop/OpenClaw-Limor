@@ -16,3 +16,4 @@ export { smsTools } from "./sms";
 export { webSearchTools } from "./web-search";
 export { agentTools } from "./agents";
 export { monitoringTools } from "./monitoring";
+export { nimrodTools } from "./nimrod";

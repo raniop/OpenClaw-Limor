@@ -12,6 +12,7 @@ import { instructionTools } from "../ai/tools/instructions";
 import { bookingTools } from "../ai/tools/booking";
 import { smartHomeTools } from "../ai/tools/smarthome";
 import { monitoringTools } from "../ai/tools/monitoring";
+import { nimrodTools } from "../ai/tools/nimrod";
 
 const SOULS_DIR = resolve(__dirname, "../../souls");
 
@@ -85,6 +86,9 @@ agents.set("boris", buildAgent("boris.json", monitoringTools));
 
 // יורי — developer (has ALL monitoring/DevOps tools for coding)
 agents.set("yuri", buildAgent("yuri.json", monitoringTools));
+
+// נמרוד — cyber security agent
+agents.set("nimrod", buildAgent("nimrod.json", nimrodTools));
 
 export function getAgent(id: string): AgentConfig | undefined {
   return agents.get(id);

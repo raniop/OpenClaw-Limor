@@ -16,6 +16,7 @@ import { smsHandlers } from "./sms";
 import { webSearchHandlers } from "./web-search";
 import { agentHandlers } from "./agents";
 import { monitoringHandlers } from "./monitoring";
+import { nimrodHandlers } from "./nimrod";
 
 export type { ToolHandler } from "./types";
 
@@ -37,4 +38,5 @@ export const allHandlers: Record<string, ToolHandler> = {
   ...webSearchHandlers,
   ...agentHandlers,
   ...monitoringHandlers,
+  ...nimrodHandlers,
 };

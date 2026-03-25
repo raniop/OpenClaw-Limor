@@ -15,13 +15,14 @@ export const agentTools: Anthropic.Tool[] = [
       "- adi: ניהול יומן (פגישות, התנגשויות, זמנים פנויים)\n" +
       "- hila: מסעדות ובילויים (המלצות, הזמנות, ביקורות)\n" +
       "- dana: קניות והשוואת מחירים (מוצרים, דילים, קופונים)\n" +
-      "- boris: בקרת מערכת ו-DevOps (סטטוס, שגיאות, ביצועים, בריאות המערכת)",
+      "- boris: בקרת מערכת ו-DevOps (סטטוס, שגיאות, ביצועים, בריאות המערכת)\n" +
+      "- nimrod: סייבר וביטחון (סריקת איומים, תהליכים חשודים, רשת, persistence, הרשאות)",
     input_schema: {
       type: "object" as const,
       properties: {
         agent_id: {
           type: "string",
-          enum: ["michal", "ronit", "noa", "yael", "tal", "maya", "adi", "hila", "dana", "boris"],
+          enum: ["michal", "ronit", "noa", "yael", "tal", "maya", "adi", "hila", "dana", "boris", "nimrod"],
           description: "מזהה הסוכנת",
         },
         task: {

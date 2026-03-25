@@ -20,10 +20,11 @@ const INTERIM_MESSAGES: Record<string, string> = {
   dana: "דנה 🛒 משווה מחירים...",
   boris: "בוריס 🔧 בודק את המערכת...",
   yuri: "יורי 💻 עובד על זה...",
+  nimrod: "נמרוד 🔐 סורק את המערכת...",
 };
 
 // Agents that do long-running coding/devops tasks — run in background
-const BACKGROUND_AGENTS = new Set(["yuri"]);
+const BACKGROUND_AGENTS = new Set(["yuri", "nimrod"]);
 
 export const agentHandlers: Record<string, ToolHandler> = {
   delegate_to_agent: async (input, sender) => {
