@@ -25,7 +25,7 @@ async function getToken(): Promise<string> {
       grant_type: "client_credentials",
       client_id: config.gettClientId,
       client_secret: config.gettClientSecret,
-      scope: "order company.reference finance employee",
+      scope: "finance employee order",
     }),
   });
 
