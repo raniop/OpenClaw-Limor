@@ -73,8 +73,10 @@
 | דנה 🛒 | קניות והשוואת מחירים | `web_search` |
 | בוריס 🔧 | DevOps ובקרת מערכת | `system_health_check`, `get_error_logs`, `get_agent_stats` |
 | יורי 💻 | מפתח — עריכת קוד, build ו-deploy | `read_file_source`, `edit_file`, `npm_manage`, `restart_and_deploy`, `run_command` |
+| נמרוד 🔐 | סייבר — ניטור איומים, סריקת מערכת | `nimrod_run_scan`, `nimrod_scan_processes`, `nimrod_scan_persistence`, `nimrod_scan_network`, `nimrod_scan_filesystem`, `nimrod_scan_permissions`, `nimrod_get_alerts` |
 
 - **Delegation אוטומטי** — לימור מזהה את הבקשה ומעבירה לסוכן המתאים
+- **Async Delegation** — סוכנים ארוכים (יורי, נמרוד) רצים ברקע, לימור חופשיה לענות על הודעות אחרות
 - **הודעת ביניים** — "הילה 🍽️ מחפשת לך משהו טוב..." בזמן שהסוכן עובד
 - **Anti-hallucination** — סוכנים לא יכולים להמציא, רק לדווח מה הכלים החזירו
 
