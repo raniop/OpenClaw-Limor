@@ -279,15 +279,15 @@ export const monitoringHandlers: Record<string, ToolHandler> = {
         return `❌ Build failed:\n${buildSummary}`;
       }
 
-      // Schedule restart AFTER response is sent (20 second delay)
-      // Agent needs to finish tool loop → Limor processes → sends WhatsApp → then restart
+      // Schedule restart AFTER agent finishes tool loop + Limor sends WhatsApp response
+      // 60s delay: agent tool loop (~30s) + Limor API call (~15s) + buffer
       setTimeout(() => {
         try {
           execSync("npx pm2 restart limor", { cwd: projectDir, encoding: "utf-8", timeout: 15000 });
         } catch {}
-      }, 20000);
+      }, 60000);
 
-      return `✅ בנייה הושלמה בהצלחה! 🔄 ${config.botName} תעשה restart עצמי בעוד 3 שניות.\n\nBuild:\n${buildSummary}`;
+      return `✅ בנייה הושלמה בהצלחה! 🔄 ${config.botName} יעשה restart בעוד דקה.\n\nBuild:\n${buildSummary}`;
     } catch (err: any) {
       return `❌ שגיאה:\n${err.stderr || err.message}`;
     }
