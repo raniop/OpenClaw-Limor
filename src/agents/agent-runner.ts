@@ -16,6 +16,11 @@ async function streamToMessage(params: any): Promise<Anthropic.Message> {
   return stream.finalMessage();
 }
 
+import type { SenderContext } from "../ai/types";
+
+// Owner sender context — agents run with owner permissions since they're delegated by Limor
+const OWNER_SENDER: SenderContext = { chatId: "owner", name: "owner", isOwner: true };
+
 export async function runAgent(
   agent: AgentConfig,
   task: string,
@@ -80,7 +85,7 @@ export async function runAgent(
     const toolResults = await Promise.all(
       toolBlocks.map(async (tb) => {
         console.log(`[agent:${agent.id}] 🔧 Tool: ${tb.name}`);
-        const result = await handleToolCall(tb.name, tb.input as Record<string, any>);
+        const result = await handleToolCall(tb.name, tb.input as Record<string, any>, OWNER_SENDER);
         return {
           type: "tool_result" as const,
           tool_use_id: tb.id,
