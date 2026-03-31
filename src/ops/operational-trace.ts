@@ -181,6 +181,10 @@ function loadTraceStore(): TraceStore {
   return { traces: [] };
 }
 
+export function getRecentTraces(limit: number = 500): OperationalTrace[] {
+  return loadTraceStore().traces.slice(-limit);
+}
+
 export function saveOperationalTrace(trace: OperationalTrace): void {
   try {
     const store = loadTraceStore();

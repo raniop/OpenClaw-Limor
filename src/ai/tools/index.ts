@@ -20,3 +20,4 @@ export { nimrodTools } from "./nimrod";
 export { healthTools } from "./health";
 export { officePcTools } from "./office-pc";
 export { planTools } from "./plans";
+export { selfAwarenessTools } from "./self-awareness";

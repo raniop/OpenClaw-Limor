@@ -9,6 +9,7 @@ import { startAmitScheduler } from "./agents/amit/amit-scheduler";
 import { startHealthWebhook, stopHealthWebhook } from "./health-webhook";
 import { startInsightScheduler } from "./insights/insight-scheduler";
 import { startSocialGraphScheduler } from "./insights/social-graph-analyzer";
+import { startCleanupScheduler } from "./insights/cleanup-scheduler";
 
 log.systemStarting();
 
@@ -100,6 +101,9 @@ startInsightScheduler();
 
 // Start social graph analyzer — nightly relationship inference (02:30 Israel time)
 startSocialGraphScheduler();
+
+// Start cleanup scheduler — nightly data maintenance (03:30 Israel time)
+startCleanupScheduler();
 
 // Graceful shutdown — close WhatsApp session and kill Chrome cleanly
 let isShuttingDown = false;

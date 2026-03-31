@@ -20,6 +20,7 @@ import { nimrodHandlers } from "./nimrod";
 import { healthHandlers } from "./health";
 import { officePcHandlers } from "./office-pc";
 import { planHandlers } from "./plans";
+import { selfAwarenessHandlers } from "./self-awareness";
 
 export type { ToolHandler } from "./types";
 
@@ -45,4 +46,5 @@ export const allHandlers: Record<string, ToolHandler> = {
   ...healthHandlers,
   ...officePcHandlers,
   ...planHandlers,
+  ...selfAwarenessHandlers,
 };
