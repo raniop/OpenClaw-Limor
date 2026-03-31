@@ -72,6 +72,51 @@ export function getDb(): Database.Database {
 
     CREATE INDEX IF NOT EXISTS idx_contacts_phone ON contacts(phone);
     CREATE INDEX IF NOT EXISTS idx_contacts_name ON contacts(name);
+
+    CREATE TABLE IF NOT EXISTS health_data (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date TEXT NOT NULL,
+      steps INTEGER,
+      calories_burned INTEGER,
+      active_calories INTEGER,
+      exercise_minutes INTEGER,
+      distance_km REAL,
+      stand_hours INTEGER,
+      resting_heart_rate INTEGER,
+      source TEXT DEFAULT 'apple_health',
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(date, source)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_health_data_date ON health_data(date);
+
+    CREATE TABLE IF NOT EXISTS conversation_states (
+      chat_id TEXT PRIMARY KEY,
+      state TEXT NOT NULL,
+      context TEXT,
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS topic_segments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      chat_id TEXT NOT NULL,
+      topic TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      key_details TEXT,
+      started_at TEXT NOT NULL DEFAULT (datetime('now')),
+      ended_at TEXT,
+      message_count INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_topic_segments_chat ON topic_segments(chat_id);
+    CREATE INDEX IF NOT EXISTS idx_topic_segments_topic ON topic_segments(topic);
+
+    CREATE TABLE IF NOT EXISTS context_snapshots (
+      chat_id TEXT PRIMARY KEY,
+      snapshot TEXT NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
   `);
 
   console.log(`[sqlite] Database initialized at ${dbPath}`);

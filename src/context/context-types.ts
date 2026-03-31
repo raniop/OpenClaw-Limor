@@ -80,9 +80,9 @@ export interface TurnIntent {
 // --- v5 reference + missing info resolution ---
 
 export interface ResolvedReference {
-  kind: "person" | "followup" | "meeting" | "unknown";
+  kind: "person" | "followup" | "meeting" | "topic" | "preference" | "unknown";
   displayName: string;
-  source: "mentioned_entity" | "recent_contact" | "open_loop" | "last_assistant_message" | "unknown";
+  source: "mentioned_entity" | "recent_contact" | "open_loop" | "last_assistant_message" | "topic_segment" | "memory" | "unknown";
   confidence: number;
 }
 

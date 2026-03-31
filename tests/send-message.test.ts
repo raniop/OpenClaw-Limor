@@ -4,7 +4,7 @@
  * Strategy: We test the tool loop and hallucination guard by directly
  * importing and testing the sendMessage function with mocked dependencies.
  * Since the module imports `client` from "./client", we mock it by
- * replacing `client.messages.create` before each test.
+ * replacing `client.messages.stream` before each test.
  */
 import { describe, it, beforeEach, mock } from "node:test";
 import assert from "node:assert/strict";
@@ -59,20 +59,25 @@ function makeMultiToolResponse(tools: Array<{ name: string; id: string; input: a
   };
 }
 
+// Helper: wrap a response in a fake stream object (matching client.messages.stream() API)
+function fakeStream(response: any) {
+  return { finalMessage: () => Promise.resolve(response) };
+}
+
 // Saved original
-const originalCreate = client.messages.create.bind(client.messages);
+const originalStream = client.messages.stream.bind(client.messages);
 
 describe("sendMessage", () => {
   beforeEach(() => {
     // Restore any mocked handlers
-    client.messages.create = originalCreate;
+    (client.messages as any).stream = originalStream;
   });
 
   it("returns text for simple response (no tools)", async () => {
     let callCount = 0;
-    (client.messages as any).create = async () => {
+    (client.messages as any).stream = () => {
       callCount++;
-      return makeTextResponse("שלום! מה שלומך?");
+      return fakeStream(makeTextResponse("שלום! מה שלומך?"));
     };
 
     const result = await sendMessage(
@@ -88,13 +93,13 @@ describe("sendMessage", () => {
 
   it("handles single tool call → tool result → final text", async () => {
     let callCount = 0;
-    (client.messages as any).create = async () => {
+    (client.messages as any).stream = () => {
       callCount++;
       if (callCount === 1) {
-        return makeToolUseResponse("list_files", "toolu_1", { directory: "/" });
+        return fakeStream(makeToolUseResponse("list_files", "toolu_1", { directory: "/" }));
       }
       // After tool result, return final text
-      return makeTextResponse("הנה הקבצים שמצאתי.");
+      return fakeStream(makeTextResponse("הנה הקבצים שמצאתי."));
     };
 
     // Mock the handler
@@ -118,15 +123,15 @@ describe("sendMessage", () => {
     let callCount = 0;
     const toolCallOrder: string[] = [];
 
-    (client.messages as any).create = async () => {
+    (client.messages as any).stream = () => {
       callCount++;
       if (callCount === 1) {
-        return makeMultiToolResponse([
+        return fakeStream(makeMultiToolResponse([
           { name: "list_files", id: "toolu_1", input: { directory: "/" } },
           { name: "list_instructions", id: "toolu_2", input: {} },
-        ]);
+        ]));
       }
-      return makeTextResponse("הנה תוצאות שני הכלים.");
+      return fakeStream(makeTextResponse("הנה תוצאות שני הכלים."));
     };
 
     const origFiles = allHandlers["list_files"];
@@ -153,10 +158,10 @@ describe("sendMessage", () => {
 
   it("breaks tool loop at MAX_TOOL_ITERATIONS", async () => {
     let callCount = 0;
-    (client.messages as any).create = async () => {
+    (client.messages as any).stream = () => {
       callCount++;
       // Always return tool_use — should hit the max iterations limit
-      return makeToolUseResponse("list_files", `toolu_${callCount}`, { directory: "/" });
+      return fakeStream(makeToolUseResponse("list_files", `toolu_${callCount}`, { directory: "/" }));
     };
 
     const origHandler = allHandlers["list_files"];
@@ -179,14 +184,16 @@ describe("sendMessage", () => {
   });
 
   it("hallucination guard triggers retry on claimed action without tool use", async () => {
-    let callCount = 0;
+    let streamCount = 0;
+    let createCount = 0;
+    // Initial call goes through stream()
+    (client.messages as any).stream = () => {
+      streamCount++;
+      return fakeStream(makeTextResponse("שלחתי הודעה ליוסי בהצלחה!"));
+    };
+    // Hallucination retry goes through create() in guards.ts
     (client.messages as any).create = async () => {
-      callCount++;
-      if (callCount === 1) {
-        // First response claims action without tool_use — uses a phrase that matches HALLUCINATION_PATTERN
-        return makeTextResponse("שלחתי הודעה ליוסי בהצלחה!");
-      }
-      // Retry response — honest this time
+      createCount++;
       return makeTextResponse("אין לי אפשרות לשלוח הודעות ישירות.");
     };
 
@@ -198,17 +205,19 @@ describe("sendMessage", () => {
 
     // Should have retried and returned the honest response
     assert.strictEqual(result.text, "אין לי אפשרות לשלוח הודעות ישירות.");
-    assert.ok(callCount >= 2, "Should have made at least 2 API calls (original + retry)");
+    assert.strictEqual(streamCount, 1, "Initial call via stream");
+    assert.ok(createCount >= 1, "Retry call via create");
   });
 
   it("hallucination guard retry also fails — returns retry text", async () => {
-    let callCount = 0;
+    let streamCount = 0;
+    let createCount = 0;
+    (client.messages as any).stream = () => {
+      streamCount++;
+      return fakeStream(makeTextResponse("קבעתי פגישה ביומן!"));
+    };
     (client.messages as any).create = async () => {
-      callCount++;
-      if (callCount === 1) {
-        return makeTextResponse("קבעתי פגישה ביומן!");
-      }
-      // Retry also claims action (still hallucinating but retryOnHallucination returns its text)
+      createCount++;
       return makeTextResponse("הפגישה נקבעה כמבוקש.");
     };
 
@@ -223,7 +232,7 @@ describe("sendMessage", () => {
   });
 
   it("returns fallback text when response has no text block", async () => {
-    (client.messages as any).create = async () => ({
+    (client.messages as any).stream = () => fakeStream({
       id: "msg_test",
       type: "message",
       role: "assistant",
@@ -245,10 +254,10 @@ describe("sendMessage", () => {
 
   it("empty tool blocks cause loop to break", async () => {
     let callCount = 0;
-    (client.messages as any).create = async () => {
+    (client.messages as any).stream = () => {
       callCount++;
       // stop_reason is tool_use but no tool blocks
-      return {
+      return fakeStream({
         id: "msg_test",
         type: "message",
         role: "assistant",
@@ -256,7 +265,7 @@ describe("sendMessage", () => {
         model: "claude-sonnet-4-6",
         stop_reason: "tool_use", // says tool_use but content has no tool blocks
         usage: { input_tokens: 10, output_tokens: 10 },
-      };
+      });
     };
 
     const result = await sendMessage(

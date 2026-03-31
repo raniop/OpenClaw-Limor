@@ -25,7 +25,9 @@ import { classifyGroupMessage, recordGroupResponse, hasRecentGroupResponse, filt
 import { trackMessage as trackThread, formatThreadContext, isPartOfOtherThread } from "./thread-tracker";
 import { getResolvedContext, formatCompressedContextForPrompt, formatDebugTrace, applyFollowupAutomation } from "../context";
 import type { ResolvedContext } from "../context";
-import { setPersistedState, clearState as clearConversationState } from "../context/conversation-state-store";
+import { setPersistedState, clearState as clearConversationState, saveContextSnapshot, getContextSnapshot } from "../context/conversation-state-store";
+import { selectRelevantHistory } from "../context/history-selector";
+import { getRelevantTopicSegments } from "../context/topic-retriever";
 import { extractFollowups } from "../followups";
 import { updateFromMessage } from "../relationship-memory";
 import { approvalStore } from "../stores";
@@ -113,7 +115,11 @@ export function createWhatsAppClient(): Client {
   client.on("ready", () => {
     latestQR = null;
     whatsappClient = client;
-    try { limorWhatsAppId = client.info.wid._serialized; } catch {}
+    try {
+      limorWhatsAppId = client.info.wid._serialized;
+      console.log(`[whatsapp] Bot ID: ${limorWhatsAppId}`);
+      console.log(`[whatsapp] client.info.me:`, JSON.stringify((client.info as any).me));
+    } catch {}
     if (qrServer) { qrServer.close(); qrServer = null; }
     log.systemReady();
 
@@ -544,9 +550,11 @@ async function handleMessage(msg: Message): Promise<void> {
     }
 
     // --- AI conversation ---
+    // Mark as read (blue checkmarks) and show typing indicator
+    try { await chat.sendSeen(); } catch {}
     const messageForHistory = isGroup ? `[${contactName}]: ${body}` : body;
     conversationStore.addMessage(chatId, "user", messageForHistory);
-    if (!isGroup) await chat.sendStateTyping();
+    try { await chat.sendStateTyping(); } catch {}
 
     // Track per-person activity in groups
     if (isGroup) {
@@ -557,8 +565,11 @@ async function handleMessage(msg: Message): Promise<void> {
 
     const memoryContext = getMemoryContext(chatId);
     const conversationSummary = conversationStore.getSummary(chatId);
-    const history = conversationStore.getHistory(chatId);
+    const fullHistory = conversationStore.getHistory(chatId);
     const sender = { chatId, name: contactName, isOwner };
+
+    // Smart history selection — pick most relevant messages instead of sending all 200
+    const history = selectRelevantHistory(fullHistory, body);
 
     if (imageData && history.length > 0) {
       const lastMsg = history[history.length - 1];
@@ -575,6 +586,20 @@ async function handleMessage(msg: Message): Promise<void> {
     if (conversationSummary) {
       extraContext += `\n\n⚠️ שים לב: יש היסטוריה ישנה שלא נראית בשיחה הנוכחית. סיכום: ${conversationSummary}`;
     }
+
+    // Inject relevant topic segments from past conversations
+    try {
+      const topicContext = getRelevantTopicSegments(chatId, body);
+      if (topicContext) extraContext += "\n\n" + topicContext;
+    } catch {}
+
+    // Restore context snapshot after restart (if available and recent)
+    try {
+      const savedSnapshot = getContextSnapshot(chatId);
+      if (savedSnapshot) {
+        extraContext += `\n\n📋 הקשר שיחה שנשמר (לפני restart): ${savedSnapshot}`;
+      }
+    } catch {}
 
     try {
       resolvedCtx = getResolvedContext(chatId, body, { name: contactName, isOwner, isGroup });
@@ -621,6 +646,11 @@ async function handleMessage(msg: Message): Promise<void> {
       turnIntent: resolvedCtx.bundle.turnIntent.category,
       toolIntentType: resolvedCtx.toolIntent.type,
     } : undefined;
+
+    // Save context snapshot for restart recovery
+    if (resolvedCtx) {
+      try { saveContextSnapshot(chatId, resolvedCtx.debugTrace.summary); } catch {}
+    }
 
     log.aiRequestStart(trace);
     const aiTimer = startTimer();

@@ -82,6 +82,10 @@
 
 ### אינטליגנציה
 - 🧠 **17-Layer Context Engine** — הבנת הקשר דטרמיניסטית
+- 📚 **Topic Segments** — "פרקי שיחה" מובנים שנשמרים ב-SQLite וניתנים לחיפוש ("זוכרת שדיברנו על...?")
+- 🎯 **Smart History Selection** — בחירת 60 הודעות רלוונטיות מתוך 200 (חיסכון tokens + תשובות ממוקדות)
+- 📋 **Structured Summaries** — סיכומי שיחה מובנים (JSON) שמשמרים שמות, תאריכים והחלטות
+- 🔄 **Persistent State** — מצב שיחה שורד restart (SQLite) + שחזור הקשר אוטומטי
 - 😊 **Mood Detection** — 7 מצבי רוח, התאמת טון
 - 🔀 **Smart Model Router** — Sonnet 4.6 כברירת מחדל, Opus 4.6 רק ל-capability (אופטימיזציית עלויות)
 - 🧠 **1M Context Window** — חלון הקשר של מיליון טוקנים (GA, ללא תוספת מחיר)
@@ -190,6 +194,9 @@ src/
 │   ├── mood-detector.ts   # Emotional state detection
 │   ├── turn-intent.ts     # Intent classification
 │   ├── response-mode.ts   # Tone/brevity adaptation
+│   ├── history-selector.ts # Smart history selection (top 60 of 200)
+│   ├── topic-segmenter.ts # Extract conversation chapters on rotation
+│   ├── topic-retriever.ts # Find relevant past segments for context
 │   ├── correction-learner.ts # Learn from user corrections
 │   └── ...                # 14 more resolver layers
 ├── whatsapp/              # WhatsApp client + handlers
