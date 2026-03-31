@@ -1,12 +1,41 @@
 /**
  * Capability implementation orchestrator.
- * Runs the full lifecycle: start session → implement → build/test → diff → apply → cleanup.
+ * Routes capability specs to Yuri (developer agent) for implementation.
+ * Yuri handles: read files → plan → edit → build → deploy.
  */
-import { getSpec } from "./spec-store";
-import { createWorktree, buildAndTest, getDiff, applyWorktree, cleanupWorktree } from "./sandbox";
-import { implementCapability } from "./claude-code";
+import { getSpec, saveSpec } from "./spec-store";
+import { getAgent } from "../agents/agent-registry";
+import { runAgent } from "../agents/agent-runner";
 import { logAudit } from "../audit/audit-log";
 import { getNotifyOwnerCallback } from "../ai/callbacks";
+import type { CapabilitySpec } from "./types";
+
+function buildYuriTask(spec: CapabilitySpec): string {
+  const modules = spec.affectedModules.length > 0
+    ? `\n\n**מודולים שכנראה צריך לשנות:** ${spec.affectedModules.join(", ")}`
+    : "";
+  const risks = spec.risks.length > 0
+    ? `\n\n**סיכונים לשים לב:** ${spec.risks.join(", ")}`
+    : "";
+  const validation = spec.validationPlan
+    ? `\n\n**תוכנית בדיקה:** ${spec.validationPlan}`
+    : "";
+
+  return `📋 **בקשת יכולת: ${spec.title}** (${spec.id})
+
+**הבעיה:** ${spec.problem}
+
+**למה המערכת לא יכולה עכשיו:** ${spec.whyCurrentSystemCantDoIt}
+
+**הפתרון המוצע:** ${spec.proposedSolution}${modules}${risks}${validation}
+
+**הוראות:**
+1. קרא את הקבצים הרלוונטיים והבן את הארכיטקטורה
+2. ממש את הפתרון המוצע
+3. בנה (npm run build) וודא שאין שגיאות
+4. פרוס (restart_and_deploy)
+5. דווח סיכום: מה שונה, אילו קבצים נוגעו, ואיך לבדוק`;
+}
 
 export async function runCapabilityImplementation(capabilityId: string): Promise<string> {
   const spec = getSpec(capabilityId);
@@ -17,60 +46,40 @@ export async function runCapabilityImplementation(capabilityId: string): Promise
     return `❌ היכולת "${spec.title}" לא אושרה עדיין. סטטוס: ${spec.status}`;
   }
 
-  const steps: string[] = [];
-  let currentStep = "";
+  const yuri = getAgent("yuri");
+  if (!yuri) {
+    return `❌ הסוכן יורי לא נמצא ברישום`;
+  }
+
+  const notify = getNotifyOwnerCallback();
 
   try {
-    // Step 1: Start session (create worktree)
-    currentStep = "start_session";
-    const worktreeResult = await createWorktree(capabilityId);
-    steps.push(`✅ סשן נוצר: ${worktreeResult}`);
-    logAudit("system", "capability_start_session", capabilityId, "success");
+    logAudit("system", "capability_start", capabilityId, "success");
 
-    // Step 2: Implement with Claude Code (with progress updates to owner)
-    currentStep = "implement";
-    const notify = getNotifyOwnerCallback();
-    const onProgress = notify
-      ? (msg: string) => { notify(msg).catch(() => {}); }
-      : undefined;
-    const implResult = await implementCapability(capabilityId, onProgress);
-    steps.push(`✅ מימוש: ${implResult.substring(0, 200)}...`);
-    logAudit("system", "capability_implement", capabilityId, "success");
-
-    // Step 3: Build and test
-    currentStep = "build_test";
-    const buildResult = await buildAndTest(capabilityId);
-    const buildOk = !buildResult.toLowerCase().includes("error");
-    steps.push(buildOk ? `✅ בנייה ובדיקות עברו` : `⚠️ בנייה: ${buildResult.substring(0, 200)}`);
-    logAudit("system", "capability_build_test", capabilityId, buildOk ? "success" : "warning");
-
-    if (!buildOk) {
-      steps.push(`\n⚠️ הבנייה נכשלה. הקוד נשאר ב-worktree לבדיקה ידנית.`);
-      return steps.join("\n");
+    if (notify) {
+      await notify(`🧩 מתחילה לממש: **${spec.title}**\nמעבירה ליורי 💻...`);
     }
 
-    // Step 4: Show diff
-    currentStep = "show_diff";
-    const diff = await getDiff(capabilityId);
-    const diffLines = diff.split("\n").length;
-    steps.push(`📝 שינויים: ${diffLines} שורות`);
+    const task = buildYuriTask(spec);
+    const result = await runAgent(yuri, task);
 
-    // Step 5: Apply
-    currentStep = "apply";
-    const applyResult = await applyWorktree(capabilityId);
-    steps.push(`✅ שינויים הוחלו: ${applyResult}`);
-    logAudit("system", "capability_apply", capabilityId, "success");
+    logAudit("system", "capability_implemented", capabilityId, "success");
 
-    // Step 6: Cleanup
-    currentStep = "cleanup";
-    const cleanResult = await cleanupWorktree(capabilityId);
-    steps.push(`🧹 נוקה: ${cleanResult}`);
-    logAudit("system", "capability_cleanup", capabilityId, "success");
+    const summary = `🎉 יכולת "${spec.title}" מומשה!\n\n${result.text}\n\n⏱️ ${Math.round(result.durationMs / 1000)}s | 🔤 ${result.tokensUsed.input + result.tokensUsed.output} tokens`;
 
-    return `🎉 יכולת "${spec.title}" מומשה בהצלחה!\n\n${steps.join("\n")}`;
+    if (notify) {
+      await notify(summary);
+    }
+
+    return summary;
   } catch (error: any) {
-    logAudit("system", `capability_${currentStep}`, capabilityId, `error: ${error.message}`);
-    steps.push(`\n❌ נכשל בשלב ${currentStep}: ${error.message}`);
-    return steps.join("\n");
+    logAudit("system", "capability_failed", capabilityId, `error: ${error.message}`);
+    const errorMsg = `❌ מימוש יכולת "${spec.title}" נכשל: ${error.message}`;
+
+    if (notify) {
+      await notify(errorMsg);
+    }
+
+    return errorMsg;
   }
 }

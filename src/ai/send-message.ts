@@ -8,7 +8,7 @@ import { client, withRetry } from "./client";
 import type { Message, SenderContext } from "./types";
 import {
   calendarTools, travelTools, bookingTools,
-  crmTools, instructionTools, fileTools, contactTools, smartHomeTools, capabilityTools, modelTools, codingTools, gettTools, whatsappExtraTools, smsTools, webSearchTools, agentTools, nimrodTools,
+  crmTools, instructionTools, fileTools, contactTools, smartHomeTools, capabilityTools, modelTools, codingTools, gettTools, whatsappExtraTools, smsTools, webSearchTools, agentTools, nimrodTools, healthTools, officePcTools, planTools,
 } from "./tools";
 import { handleToolCall } from "./handle-tool-call";
 import { selectModel } from "./model-router";
@@ -87,8 +87,8 @@ export async function sendMessage(
   let tools = !toolsEnabled
     ? []
     : sender?.isOwner
-      ? [...calendarTools, ...travelTools, ...bookingTools, ...crmTools, ...instructionTools, ...fileTools, ...contactTools, ...smartHomeTools, ...modelTools, ...gettTools, ...whatsappExtraTools, ...smsTools, ...webSearchTools, ...agentTools, ...nimrodTools]
-      : [...calendarTools, ...travelTools, ...bookingTools, ...webSearchTools];
+      ? [...calendarTools, ...travelTools, ...bookingTools, ...crmTools, ...instructionTools, ...fileTools, ...contactTools, ...smartHomeTools, ...modelTools, ...gettTools, ...whatsappExtraTools, ...smsTools, ...webSearchTools, ...agentTools, ...nimrodTools, ...healthTools, ...officePcTools, ...capabilityTools, ...planTools]
+      : [...calendarTools, ...travelTools, ...bookingTools, ...webSearchTools, ...officePcTools];
 
   if (toolsEnabled && options?.allowedToolNames && options.allowedToolNames.length > 0) {
     const allowed = new Set(options.allowedToolNames);

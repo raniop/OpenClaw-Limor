@@ -48,4 +48,26 @@ export const fileTools: Anthropic.Tool[] = [
       required: ["path", "content"],
     },
   },
+  {
+    name: "send_file",
+    description: "שליחת קובץ כ-attachment בוואטסאפ לאיש קשר או לעצמך (הבעלים). תומך ב-PDF, TXT, MD, CSV, JSON, תמונות, וכו'.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        file_path: {
+          type: "string",
+          description: "נתיב הקובץ לשליחה (יחסי לתיקיית files, למשל: apple-health-shortcut.md)",
+        },
+        contact_name: {
+          type: "string",
+          description: "שם איש הקשר לשליחה. השתמש ב-'owner' או 'רני' לשליחה לבעלים.",
+        },
+        caption: {
+          type: "string",
+          description: "כיתוב אופציונלי שיוצג עם הקובץ",
+        },
+      },
+      required: ["file_path", "contact_name"],
+    },
+  },
 ];

@@ -17,6 +17,9 @@ import { webSearchHandlers } from "./web-search";
 import { agentHandlers } from "./agents";
 import { monitoringHandlers } from "./monitoring";
 import { nimrodHandlers } from "./nimrod";
+import { healthHandlers } from "./health";
+import { officePcHandlers } from "./office-pc";
+import { planHandlers } from "./plans";
 
 export type { ToolHandler } from "./types";
 
@@ -39,4 +42,7 @@ export const allHandlers: Record<string, ToolHandler> = {
   ...agentHandlers,
   ...monitoringHandlers,
   ...nimrodHandlers,
+  ...healthHandlers,
+  ...officePcHandlers,
+  ...planHandlers,
 };

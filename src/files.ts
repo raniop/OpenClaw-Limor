@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync, statSync } from "fs";
-import { resolve, join, relative } from "path";
+import { resolve, join, relative, extname } from "path";
 
 const FILES_DIR = resolve(__dirname, "..", "files");
 
@@ -79,6 +79,65 @@ export function saveFile(filename: string, data: string | Buffer): string {
     return `✅ הקובץ "${filename}" נשמר בהצלחה.`;
   } catch (err: any) {
     return `שגיאה בשמירה: ${err.message}`;
+  }
+}
+
+/** MIME type mapping by extension */
+const MIME_MAP: Record<string, string> = {
+  ".pdf":  "application/pdf",
+  ".txt":  "text/plain",
+  ".md":   "text/plain",
+  ".csv":  "text/csv",
+  ".json": "application/json",
+  ".png":  "image/png",
+  ".jpg":  "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif":  "image/gif",
+  ".webp": "image/webp",
+  ".mp4":  "video/mp4",
+  ".mp3":  "audio/mpeg",
+  ".zip":  "application/zip",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+};
+
+const MAX_SEND_SIZE = 50 * 1024 * 1024; // 50MB — WhatsApp limit
+
+export interface FileAsBase64Result {
+  base64: string;
+  mimetype: string;
+  filename: string;
+  sizeBytes: number;
+}
+
+/**
+ * Read a file from the files dir and return it as base64 + mimetype (for WhatsApp attachment).
+ */
+export function readFileAsBase64(filepath: string): FileAsBase64Result | { error: string } {
+  let full: string;
+  try {
+    full = safePath(filepath);
+  } catch (err: any) {
+    return { error: err.message };
+  }
+
+  if (!existsSync(full)) return { error: `הקובץ "${filepath}" לא נמצא.` };
+
+  const stat = statSync(full);
+  if (stat.isDirectory()) return { error: `"${filepath}" היא תיקייה, לא קובץ.` };
+  if (stat.size > MAX_SEND_SIZE) {
+    return { error: `הקובץ גדול מדי (${formatSize(stat.size)}). מקסימום לשליחה: 50MB.` };
+  }
+
+  try {
+    const buffer = readFileSync(full);
+    const base64 = buffer.toString("base64");
+    const ext = extname(filepath).toLowerCase();
+    const mimetype = MIME_MAP[ext] || "application/octet-stream";
+    const filename = filepath.split("/").pop() || filepath;
+    return { base64, mimetype, filename, sizeBytes: stat.size };
+  } catch (err: any) {
+    return { error: `שגיאה בקריאת הקובץ: ${err.message}` };
   }
 }
 

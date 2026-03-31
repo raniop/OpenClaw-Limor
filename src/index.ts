@@ -5,6 +5,10 @@ import { existsSync, readdirSync, unlinkSync, rmSync } from "fs";
 import { execSync } from "child_process";
 import { resolve } from "path";
 import { startDigestScheduler } from "./digest";
+import { startAmitScheduler } from "./agents/amit/amit-scheduler";
+import { startHealthWebhook, stopHealthWebhook } from "./health-webhook";
+import { startInsightScheduler } from "./insights/insight-scheduler";
+import { startSocialGraphScheduler } from "./insights/social-graph-analyzer";
 
 log.systemStarting();
 
@@ -85,6 +89,18 @@ initWithRetry();
 // Start daily digest scheduler
 startDigestScheduler();
 
+// Start Amit — daily dependency update scheduler (03:00 Israel time)
+startAmitScheduler();
+
+// Start Apple Health webhook (receives data from iPhone Shortcut)
+startHealthWebhook();
+
+// Start insight scheduler — nightly behavioral pattern analysis (02:00 Israel time)
+startInsightScheduler();
+
+// Start social graph analyzer — nightly relationship inference (02:30 Israel time)
+startSocialGraphScheduler();
+
 // Graceful shutdown — close WhatsApp session and kill Chrome cleanly
 let isShuttingDown = false;
 function gracefulShutdown(signal: string) {
@@ -97,6 +113,8 @@ function gracefulShutdown(signal: string) {
     console.error("[shutdown] Timeout waiting for client.destroy(), forcing exit");
     r();
   }, 8000));
+
+  stopHealthWebhook();
 
   Promise.race([client.destroy(), timeout])
     .catch(err => console.error("[shutdown] Error during destroy:", err))

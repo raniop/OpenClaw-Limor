@@ -6,6 +6,7 @@
 import { allHandlers } from "./handlers";
 import { canUseTool, getPermissionDeniedMessage } from "../permissions/permission-service";
 import { logAudit } from "../audit/audit-log";
+import { recordToolFailure } from "../context/failure-learner";
 import type { SenderContext } from "./types";
 
 export async function handleToolCall(
@@ -24,8 +25,14 @@ export async function handleToolCall(
   if (!handler) return "פעולה לא מוכרת";
 
   try {
-    return await handler(input, sender);
+    const result = await handler(input, sender);
+    // Record failures that return error indicators (not just thrown exceptions)
+    if (result && (result.includes("❌") || result.startsWith("שגיאה:"))) {
+      recordToolFailure(name, result.slice(0, 300), input);
+    }
+    return result;
   } catch (error: any) {
+    recordToolFailure(name, error.message, input);
     return `שגיאה: ${error.message}`;
   }
 }

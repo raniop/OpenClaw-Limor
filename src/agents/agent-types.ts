@@ -24,4 +24,4 @@ export interface AgentResult {
   durationMs: number;
 }
 
-export type AgentId = "michal" | "ronit" | "noa" | "yael" | "tal" | "maya" | "adi" | "hila" | "dana" | "boris" | "yuri" | "nimrod";
+export type AgentId = "michal" | "ronit" | "noa" | "yael" | "tal" | "maya" | "adi" | "hila" | "dana" | "boris" | "yuri" | "nimrod" | "amit";

@@ -39,6 +39,12 @@ export const config = {
   gettClientSecret: process.env.GETT_CLIENT_SECRET || "",
   gettBusinessId: process.env.GETT_BUSINESS_ID || "",
   braveSearchApiKey: process.env.BRAVE_SEARCH_API_KEY || "",
+  healthWebhookToken: process.env.HEALTH_WEBHOOK_TOKEN || "",
+  healthWebhookPort: parseInt(process.env.HEALTH_WEBHOOK_PORT || "3848", 10),
+  officePcHost: process.env.OFFICE_PC_HOST || "",
+  officePcUser: process.env.OFFICE_PC_USER || "",
+  officePcPass: process.env.OFFICE_PC_PASS || "",
+  officePcKeyPath: process.env.OFFICE_PC_KEY_PATH || "",
 };
 
 export function validateConfig(): void {

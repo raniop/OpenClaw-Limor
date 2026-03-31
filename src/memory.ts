@@ -281,6 +281,15 @@ export function savePattern(chatId: string, pattern: string): void {
   saveUserMemory(chatId, mem);
 }
 
+/**
+ * Bulk-replace all patterns for a user (used by insight scheduler).
+ */
+export function replacePatterns(chatId: string, patterns: string[]): void {
+  const mem = loadUserMemory(chatId);
+  mem.patterns = patterns.slice(0, 15);
+  saveUserMemory(chatId, mem);
+}
+
 // Common Hebrew↔English transliterations for better dedup
 const TRANSLITERATIONS: Record<string, string> = {
   "קונטרול": "control", "קונטרולר": "controller", "אופוס": "opus",

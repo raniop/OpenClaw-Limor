@@ -5,7 +5,27 @@
 import { config } from "../config";
 import { getRecentContacts } from "../contacts";
 import { resolvePolicies } from "../context/policy-resolver";
+import { listApproved } from "../capabilities/spec-store";
+import { getActivePlans, formatPlanStatus } from "../stores/plan-store";
 import type { SenderContext } from "./types";
+
+function getApprovedCapabilities(): string[] {
+  try {
+    return listApproved().map(s => s.title);
+  } catch {
+    return [];
+  }
+}
+
+function getActivePlansSummary(chatId: string): string {
+  try {
+    const plans = getActivePlans(chatId);
+    if (plans.length === 0) return "";
+    return plans.map(formatPlanStatus).join("\n\n");
+  } catch {
+    return "";
+  }
+}
 
 export interface BuildSystemPromptParams {
   memoryContext?: string;
@@ -70,7 +90,8 @@ export function buildSystemPrompt(params: BuildSystemPromptParams): BuildSystemP
 - בוריס 🔧 = DevOps בלבד! סטטוס, לוגים, restart, מוניטורינג. בוריס לא כותב קוד ולא מפתח!
 - יורי 💻 = מתכנת! פיצ'רים חדשים, תיקון באגים, שינויי קוד, build, deploy.
 - כשמבקשים לפתח/לממש/לסדר/להוסיף/לשנות משהו בקוד — תמיד delegate ליורי (yuri)! לעולם לא לבוריס!
-- אסור להשתמש ב-create_capability_request! יורי מחליף את ה-capability system!
+- **תיקון באג / שינוי קטן / משימה טכנית מהירה** → delegate ליורי ישירות (נתיב מהיר)
+- **פיצ'ר חדש / אינטגרציה חדשה / יכולת חדשה / "תלמדי לעשות X"** → השתמשי ב-create_capability_request (יוצר spec → יורי מממש אוטומטית)
 - אם ${config.ownerName} אומר "תסדרי את זה" על פיצ'ר — זה יורי! לא בוריס!
 
 ⛔ כללי ברזל:
@@ -80,6 +101,24 @@ export function buildSystemPrompt(params: BuildSystemPromptParams): BuildSystemP
 4. משימות פשוטות שאין להן סוכן מתאים (שליחת הודעה, פגישה רגילה, שאלה כללית) — טפלי בעצמך.
 5. כשסוכן מחזיר תשובה — העבירי אותה כמו שהיא! אל תשכתבי, אל תנסחי מחדש, אל תוסיפי. מקסימום הקדמה קצרה של משפט אחד.
 6. לפני שאת קוראת ל-delegate_to_agent, תמיד שלחי קודם הודעה קצרה למשתמש! למשל: "בודקת עם הילה 🍽️ רגע..." או "מעבירה לרונית 🔍 שנייה..." — ככה המשתמש יודע שאת עובדת על זה ולא תקועה.`;
+
+    // Capability catalog — show owner what capabilities have been learned
+    const approvedCaps = getApprovedCapabilities();
+    if (approvedCaps.length > 0) {
+      systemPrompt += `\n\n🧩 *יכולות שלמדתי:*\n${approvedCaps.map(c => `- ${c}`).join("\n")}`;
+    }
+
+    // Active plans — show current multi-step plans
+    const plansSummary = getActivePlansSummary(config.ownerChatId);
+    if (plansSummary) {
+      systemPrompt += `\n\n📋 *תוכניות פעילות:*\n${plansSummary}`;
+    }
+
+    // Multi-step planning guidance
+    systemPrompt += `\n\n📋 תוכניות רב-שלביות:
+- כשמקבלת בקשה מורכבת (חופשה, אירוע, פרויקט, רכישה) — השתמשי ב-create_plan כדי לפרק לשלבים
+- עדכני שלבים עם update_plan_step ככל שמתקדמת
+- כשהמשתמש שואל "מה המצב עם..." — הראי סטטוס תוכנית רלוונטית`;
   }
 
   // Anti-hallucination rules for calendar — CRITICAL

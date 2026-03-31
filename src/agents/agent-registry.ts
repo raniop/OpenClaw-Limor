@@ -90,6 +90,11 @@ agents.set("yuri", buildAgent("yuri.json", monitoringTools));
 // נמרוד — cyber security agent
 agents.set("nimrod", buildAgent("nimrod.json", nimrodTools));
 
+// עמית — dependency version monitor & updater
+agents.set("amit", buildAgent("amit.json",
+  pickTools(monitoringTools, ["run_command", "npm_manage", "read_file_source", "edit_file", "restart_and_deploy"])
+));
+
 export function getAgent(id: string): AgentConfig | undefined {
   return agents.get(id);
 }

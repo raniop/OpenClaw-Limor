@@ -156,102 +156,13 @@ async function runAndSendSummaries(
 
 /**
  * Start the daily digest scheduler.
- * - 08:00: Daily digest (status, followups, calendar)
- * - 14:00: Midday executive briefing
- * - 23:00: Evening executive briefing + tomorrow's calendar
+ * DISABLED by Rani's request (2025-03-25) — automatic briefings turned off.
+ * The scheduler starts but no tasks are registered.
  */
 export function startDigestScheduler(): void {
-  if (digestTask) {
-    console.log("[digest] Scheduler already running");
-    return;
-  }
-
-  // Run at 08:00 every day, Israel timezone
-  digestTask = schedule(
-    "0 8 * * *",
-    async () => {
-      const now = Date.now();
-      if (now - lastDigestTime < 60000) {
-        console.log("[digest] Skipping duplicate fire");
-        return;
-      }
-      lastDigestTime = now;
-
-      // Rotate conversations daily
-      try {
-        rotateConversations();
-      } catch (err: any) {
-        console.error("[digest] Conversation rotation failed:", err.message);
-      }
-
-      console.log("[digest] Running daily digest...");
-      try {
-        const digest = await generateDailyDigest();
-        const notify = getNotifyOwnerCallback();
-        if (notify) {
-          await notify(digest);
-          logAudit("system", "daily_digest_sent", "owner", "success");
-          console.log("[digest] Daily digest sent to owner");
-        } else {
-          console.warn(
-            "[digest] No notify callback available — skipping",
-          );
-        }
-      } catch (error: any) {
-        console.error(
-          "[digest] Failed to send digest:",
-          error.message,
-        );
-        logAudit(
-          "system",
-          "daily_digest_sent",
-          "owner",
-          `error: ${error.message}`,
-        );
-      }
-    },
-    {
-      timezone: "Asia/Jerusalem",
-    },
-  );
-
-  // Midday briefing at 14:00 (no calendar)
-  summariesTask1 = schedule(
-    "0 14 * * *",
-    () => {
-      const now = Date.now();
-      if (now - lastSummary1Time < 60000) {
-        console.log("[daily-summaries] Skipping duplicate midday fire");
-        return;
-      }
-      lastSummary1Time = now;
-      runAndSendSummaries("צהריים", false);
-    },
-    {
-      timezone: "Asia/Jerusalem",
-    },
-  );
-
-  // Evening briefing at 23:00 (with tomorrow's calendar)
-  summariesTask2 = schedule(
-    "0 23 * * *",
-    () => {
-      const now = Date.now();
-      if (now - lastSummary2Time < 60000) {
-        console.log("[daily-summaries] Skipping duplicate evening fire");
-        return;
-      }
-      lastSummary2Time = now;
-      runAndSendSummaries("ערב", true);
-    },
-    {
-      timezone: "Asia/Jerusalem",
-    },
-  );
-
-  console.log(
-    "[digest] Scheduler started — digest 08:00, briefings 14:00 + 23:00 Israel time",
-  );
+  console.log("[digest] Scheduler disabled — automatic briefings are OFF (disabled by owner request)");
+  // All three scheduled tasks (08:00 digest, 14:00 midday, 23:00 evening) are disabled.
+  // To re-enable, restore the schedule() calls for digestTask, summariesTask1, summariesTask2.
 }
 
 /**

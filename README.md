@@ -28,6 +28,13 @@
 - 📊 **בריפינג יומי** — מה מחכה לך, מה פתוח, ימי הולדת
 - 📋 **סיכומי שיחות** — executive briefing פעמיים ביום (14:00 + 23:00) עם prompt caching
 - 🔄 **מעקב אוטומטי** — יצירת followups מתוך שיחות
+- 📋 **Multi-Step Planning** — תוכניות רב-שלביות עם מעקב התקדמות לאורך שיחות
+
+### למידה עצמית
+- 🧠 **Memory That Evolves** — ניתוח לילי שמזהה דפוסי התנהגות ("נוטה להזמין ברגע האחרון", "מגיב מהר בלילה")
+- 🔧 **Self-Debugging** — לומדת מכשלי כלים — כשכלי נכשל 3+ פעמים, מייצרת כלל מניעה אוטומטי
+- 🧬 **Social Graph Learning** — ניתוח לילי של דפוסי תקשורת — מסיקה אוטומטית סוג קשר, סגנון, וחשיבות
+- 🧩 **Capability Marketplace** — "תלמדי לעשות X" → spec → יורי מממש → deploy אוטומטי
 
 ### קבוצות WhatsApp
 - 🎯 **Smart Group Pre-Filter** — פילטר דטרמיניסטי לפני AI call (חוסך עלות):
@@ -58,7 +65,7 @@
 - 📊 **Dashboard** — מרכז בקרה עם לוגים, metrics, alerts
 
 ### 🏢 מערכת סוכנים — "המשרד של לימור"
-לימור מנהלת צוות של 11 סוכנים מתמחים, כל אחד עם אישיות וכלים ייחודיים:
+לימור מנהלת צוות של 13 סוכנים מתמחים, כל אחד עם אישיות וכלים ייחודיים:
 
 | סוכן/ת | תפקיד | כלים |
 |---------|--------|------|
@@ -74,6 +81,7 @@
 | בוריס 🔧 | DevOps ובקרת מערכת | `system_health_check`, `get_error_logs`, `get_agent_stats` |
 | יורי 💻 | מפתח — עריכת קוד, build ו-deploy | `read_file_source`, `edit_file`, `npm_manage`, `restart_and_deploy`, `run_command` |
 | נמרוד 🔐 | סייבר — ניטור איומים, סריקת מערכת | `nimrod_run_scan`, `nimrod_scan_processes`, `nimrod_scan_persistence`, `nimrod_scan_network`, `nimrod_scan_filesystem`, `nimrod_scan_permissions`, `nimrod_get_alerts` |
+| עמית 📦 | עדכון dependencies — בדיקה יומית | `npm_manage`, `edit_file`, `restart_and_deploy`, `run_command` |
 
 - **Delegation אוטומטי** — לימור מזהה את הבקשה ומעבירה לסוכן המתאים
 - **Async Delegation** — סוכנים ארוכים (יורי, נמרוד) רצים ברקע, לימור חופשיה לענות על הודעות אחרות
@@ -92,7 +100,6 @@
 - 💰 **Prompt Caching** — cache שעה על system prompts יציבים (חיסכון ~90% בקריאה)
 - 🔁 **Tool Retry** — ניסיון שני אוטומטי על כשל
 - 🚫 **Anti-Hallucination** — כללי ברזל + retry אוטומטי על סוכנים וכלים
-- 🔗 **Multi-step Planning** — תכנון וביצוע משימות מורכבות
 
 ## 🚀 התקנה
 
@@ -216,6 +223,9 @@ src/
 ├── proactive/             # Proactive messaging
 │   ├── proactive-engine.ts # Followup/calendar/morning checks
 │   └── rate-limiter.ts    # Anti-spam protection
+├── insights/              # Nightly intelligence
+│   ├── insight-scheduler.ts      # Behavioral pattern analysis (02:00)
+│   └── social-graph-analyzer.ts  # Relationship inference (02:30)
 ├── digest/                # Daily briefings
 │   ├── digest-service.ts  # Morning briefing
 │   └── daily-summaries.ts # Executive briefings

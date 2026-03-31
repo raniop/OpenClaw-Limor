@@ -63,15 +63,26 @@ export function filterGroupMessage(ctx: GroupMessageContext): GroupFilterResult 
   if (ctx.senderIsBot) {
     return { verdict: "must_skip", reason: "sender_is_bot" };
   }
-  // 2. Reply to someone else (not Limor)
-  if (ctx.hasQuotedMsg && !ctx.quotedMsgFromMe) {
-    return { verdict: "must_skip", reason: "reply_to_other" };
-  }
-  // 3. @mentions someone else but NOT Limor
+  // 2. Reply to someone else (not Limor) — let AI decide, they might be asking Limor
+  //    (removed hard skip — AI can still [SKIP] if it's irrelevant)
+  // 3. @mentions someone — check if Limor is among them
   if (ctx.mentionedIds.length > 0) {
-    const mentionsLimor = ctx.limorWhatsAppId && ctx.mentionedIds.some(id => id === ctx.limorWhatsAppId);
-    if (!mentionsLimor) {
-      return { verdict: "must_skip", reason: "mention_directed_at_other" };
+    // Normalize IDs — may be strings or objects with _serialized
+    const ids = ctx.mentionedIds.map(id =>
+      typeof id === "string" ? id : (id as any)?._serialized || String(id)
+    );
+    const hasLidMention = ids.some(id => id.endsWith("@lid"));
+    if (hasLidMention) {
+      // LID format: can't compare IDs, but if someone is @mentioned,
+      // their name appears in the message body. If Limor's name isn't there, skip.
+      if (!ctx.limorMentioned) {
+        return { verdict: "must_skip", reason: "mention_directed_at_other" };
+      }
+    } else {
+      const mentionsLimor = ctx.limorWhatsAppId && ids.some(id => id === ctx.limorWhatsAppId);
+      if (!mentionsLimor) {
+        return { verdict: "must_skip", reason: "mention_directed_at_other" };
+      }
     }
   }
   // 4. Part of active thread between others (without Limor)

@@ -17,3 +17,6 @@ export { webSearchTools } from "./web-search";
 export { agentTools } from "./agents";
 export { monitoringTools } from "./monitoring";
 export { nimrodTools } from "./nimrod";
+export { healthTools } from "./health";
+export { officePcTools } from "./office-pc";
+export { planTools } from "./plans";

@@ -1,5 +1,64 @@
 [
   {
+    "id": "self-evolving-intelligence",
+    "date": "2026-03-31",
+    "title": "מערכת למידה עצמית — לימור שמשתפרת לבד",
+    "subtitle": "5 מערכות חדשות: זיכרון מתפתח, debugging עצמי, capability marketplace, תוכניות רב-שלביות, וגרף חברתי",
+    "stats": {
+      "improvements": 5,
+      "linesOfCode": 996,
+      "files": 23,
+      "tests": 460
+    },
+    "items": [
+      {
+        "number": 1,
+        "title": "Memory That Evolves — זיכרון שמתפתח",
+        "impactHigh": true,
+        "complexityLow": true,
+        "problem": "לימור שומרת עובדות אבל לא מסיקה מסקנות — לא יודעת שרני מזמין ברגע האחרון או מגיב מהר בלילה",
+        "solution": "ניתוח לילי (02:00) של שיחות 7 ימים אחרונים עם Claude — מייצר דפוסים התנהגותיים אוטומטית",
+        "detail": "כל לילה, Sonnet מנתח את השיחות ומזהה: דפוסי תזמון, סגנון תקשורת, נטיות החלטה, נושאים חוזרים. הדפוסים מתמזגים עם קיימים — מה שלא רלוונטי נמחק, מה שהשתנה מתעדכן. עד 15 דפוסים, מוזרקים לכל prompt."
+      },
+      {
+        "number": 2,
+        "title": "Self-Debugging — למידה מכשלים",
+        "impactHigh": true,
+        "complexityLow": true,
+        "problem": "כשכלי נכשל, השגיאה מוחזרת ל-AI פעם אחת ונשכחת — אותה טעות חוזרת שוב",
+        "solution": "כל כשל כלי נרשם. כשאותו כלי נכשל 3+ פעמים ב-7 ימים, Sonnet מנתח ומייצר כלל מניעה",
+        "detail": "הכלל נשמר כהוראה: '[למדתי מכשל] לפני create_event, לוודא timezone בפורמט ISO'. מוזרק לכל prompt עתידי — לימור לומדת מטעויות בלי שמישהו יתקן אותה."
+      },
+      {
+        "number": 3,
+        "title": "Capability Marketplace — יורי + Capabilities",
+        "impactHigh": true,
+        "complexityLow": false,
+        "problem": "מערכת ה-capabilities הייתה מושבתת — יורי עבד ישירות בלי spec, audit trail או catalog",
+        "solution": "מיזוג: 'תלמדי X' יוצר spec מובנה → auto-approve → יורי מממש → deploy. תיקונים מהירים עדיין ישירות ליורי",
+        "detail": "שלושה כלים הופעלו מחדש: create_capability_request, list_capability_requests, run_capability. Specs נשמרים כ-markdown. יכולות מאושרות מוצגות ב-prompt כקטלוג."
+      },
+      {
+        "number": 4,
+        "title": "Multi-Step Planning — תוכניות רב-שלביות",
+        "impactHigh": true,
+        "complexityLow": false,
+        "problem": "בקשות מורכבות ('תזמיני חופשה ליוון') נעלמות אחרי תשובה אחת — אין מעקב, אין שלבים",
+        "solution": "מערכת plans ב-SQLite עם כלי create_plan, update_plan_step, list_plans. תוכניות פעילות מוצגות בכל prompt",
+        "detail": "לימור מפרקת בקשה מורכבת לשלבים (בחר תאריכים, מצא טיסות, הזמן מלון...), מעקבת התקדמות, ומראה סטטוס כשנשאל 'מה המצב?'. תוכנית מסתיימת אוטומטית כשכל השלבים done."
+      },
+      {
+        "number": 5,
+        "title": "Social Graph Learning — גרף חברתי אוטומטי",
+        "impactHigh": true,
+        "complexityLow": true,
+        "problem": "סוג הקשר, סגנון תקשורת וחשיבות של אנשי קשר מוגדרים ידנית — לא מתעדכנים",
+        "solution": "ניתוח לילי (02:30) של 10 אנשי הקשר הפעילים ביותר — מסיק אוטומטית relationship type, style, importance",
+        "detail": "Sonnet מנתח 30 יום שיחות: תדירות, טון, נושאים, מי יוזם. מעדכן profiles קיימים בלי לדרוס מידע ידני. התוצאה: טון שיחה מותאם אוטומטית (חבר=ידידותי, לקוח=פורמלי)."
+      }
+    ]
+  },
+  {
     "id": "context-engine-v2",
     "date": "2026-03-31",
     "title": "שיפורי מערכת הקשרים בשיחה",

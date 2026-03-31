@@ -78,4 +78,12 @@ export class SqliteConversationStore implements IConversationStore {
     const row = db.prepare("SELECT COUNT(*) as cnt FROM conversations WHERE chat_id = ?").get(chatId) as any;
     return row.cnt;
   }
+
+  /** Get recent conversations from the last N days */
+  getRecentHistory(chatId: string, days: number): Array<{ role: string; content: string; created_at: string }> {
+    const db = getDb();
+    return db.prepare(
+      "SELECT role, content, created_at FROM conversations WHERE chat_id = ? AND created_at >= datetime('now', '-' || ? || ' days') ORDER BY id ASC"
+    ).all(chatId, days) as Array<{ role: string; content: string; created_at: string }>;
+  }
 }

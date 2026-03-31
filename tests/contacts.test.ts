@@ -3,11 +3,14 @@ import assert from "node:assert/strict";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { resolve } from "path";
 import { getStateDir } from "../src/state-dir";
+import { getDb } from "../src/stores/sqlite-init";
 
 function resetContacts() {
   const stateDir = getStateDir();
   if (!existsSync(stateDir)) mkdirSync(stateDir, { recursive: true });
   writeFileSync(resolve(stateDir, "contacts.json"), "{}", "utf-8");
+  // Also clear SQLite contacts table to prevent cross-test auto-merge
+  try { getDb().prepare("DELETE FROM contacts").run(); } catch {}
 }
 
 import {
