@@ -445,6 +445,31 @@ export function getLogs(limit: number = 200, level?: string, domain?: string): L
   }
 }
 
+// --- Changelog ---
+
+export interface ChangelogItem {
+  number: number;
+  title: string;
+  impactHigh: boolean;
+  complexityLow: boolean;
+  problem: string;
+  solution: string;
+  detail: string;
+}
+
+export interface ChangelogEntry {
+  id: string;
+  date: string;
+  title: string;
+  subtitle: string;
+  stats: { improvements: number; linesOfCode: number; files: number; tests: number };
+  items: ChangelogItem[];
+}
+
+export function getChangelog(): ChangelogEntry[] {
+  return readJSON<ChangelogEntry[]>("changelog.json", []);
+}
+
 export function isLimorRunning(): boolean {
   // Try pm2 first
   try {
