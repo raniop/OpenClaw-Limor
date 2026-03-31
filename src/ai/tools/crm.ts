@@ -4,16 +4,20 @@ import Anthropic from "@anthropic-ai/sdk";
 export const crmTools: Anthropic.Tool[] = [
   {
     name: "crm_search_policy",
-    description: "חיפוש פוליסות ב-CRM לפי תעודת זהות של לקוח",
+    description: "חיפוש פוליסות ב-CRM לפי תעודת זהות של לקוח או לפי מספר פוליסה. מחזיר גם פוליסות מבוטלות.",
     input_schema: {
       type: "object" as const,
       properties: {
         person_id: {
           type: "string",
-          description: "תעודת זהות של הלקוח (9 ספרות)",
+          description: "תעודת זהות של הלקוח (9 ספרות). השתמש בזה כשמחפשים לפי ת.ז.",
+        },
+        policy_number: {
+          type: "string",
+          description: "מספר פוליסה מלא (למשל 765677370726). השתמש בזה כשמחפשים לפי מספר פוליסה.",
         },
       },
-      required: ["person_id"],
+      required: [],
     },
   },
   {

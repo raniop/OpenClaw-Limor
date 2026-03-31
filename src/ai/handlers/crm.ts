@@ -1,5 +1,6 @@
 import {
   searchPolicyByPersonId,
+  searchPolicyByNumber,
   getPolicyDetails,
   getPolicyCustomers,
   getTopPolicies,
@@ -11,7 +12,13 @@ import type { ToolHandler } from "./types";
 
 export const crmHandlers: Record<string, ToolHandler> = {
   crm_search_policy: async (input) => {
-    return await searchPolicyByPersonId(input.person_id);
+    if (input.policy_number) {
+      return await searchPolicyByNumber(input.policy_number);
+    }
+    if (input.person_id) {
+      return await searchPolicyByPersonId(input.person_id);
+    }
+    return "❌ צריך לספק תעודת זהות (person_id) או מספר פוליסה (policy_number)";
   },
 
   crm_policy_details: async (input) => {

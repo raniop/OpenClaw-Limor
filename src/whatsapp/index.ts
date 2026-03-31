@@ -657,6 +657,8 @@ async function handleMessage(msg: Message): Promise<void> {
     const sendResult = await sendMessage(history, (memoryContext || "") + extraContext, sender, { allowTools, allowedToolNames, modelRouting });
     const response = sendResult.text;
     const toolsUsedInMessage = sendResult.toolsUsed;
+    const toolsSucceededInMessage = sendResult.toolsSucceeded || [];
+    const toolsFailedInMessage = sendResult.toolsFailed || [];
     const aiDurationMs = aiTimer.stop();
     log.aiRequestEnd(aiDurationMs, toolsUsedInMessage.length, trace);
 
@@ -713,6 +715,8 @@ async function handleMessage(msg: Message): Promise<void> {
 
         // Fill execution results with actual tool usage data from sendMessage
         opTrace.toolsUsed = toolsUsedInMessage;
+        opTrace.toolsSucceeded = toolsSucceededInMessage;
+        opTrace.toolsFailed = toolsFailedInMessage;
         opTrace.responseLength = response.length;
         opTrace.aiDurationMs = aiDurationMs;
         opTrace.totalDurationMs = elapsed(trace);

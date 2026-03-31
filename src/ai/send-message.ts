@@ -34,6 +34,8 @@ export interface SendMessageOptions {
 export interface SendMessageResult {
   text: string;
   toolsUsed: string[];
+  toolsSucceeded: string[];
+  toolsFailed: string[];
 }
 
 export async function sendMessage(
@@ -87,7 +89,16 @@ export async function sendMessage(
   let tools = !toolsEnabled
     ? []
     : sender?.isOwner
-      ? [...calendarTools, ...travelTools, ...bookingTools, ...crmTools, ...instructionTools, ...fileTools, ...contactTools, ...smartHomeTools, ...modelTools, ...gettTools, ...whatsappExtraTools, ...smsTools, ...webSearchTools, ...agentTools, ...nimrodTools, ...healthTools, ...officePcTools, ...capabilityTools, ...planTools]
+      ? [
+          ...calendarTools, ...travelTools, ...crmTools, ...instructionTools,
+          ...fileTools,
+          ...contactTools.filter(t => !["get_group_history", "summarize_group_activity", "create_reminder"].includes(t.name)),
+          // smartHomeTools → maya agent only
+          // bookingTools → hila agent only
+          // nimrodTools → nimrod agent only
+          ...modelTools, ...gettTools, ...whatsappExtraTools, ...smsTools, ...webSearchTools,
+          ...agentTools, ...healthTools, ...officePcTools, ...capabilityTools, ...planTools,
+        ]
       : [...calendarTools, ...travelTools, ...bookingTools, ...webSearchTools, ...officePcTools];
 
   if (toolsEnabled && options?.allowedToolNames && options.allowedToolNames.length > 0) {
@@ -168,12 +179,12 @@ export async function sendMessage(
     notifyHallucinationEvent(sender);
   }
 
-  return { text: finalText, toolsUsed };
+  return { text: finalText, toolsUsed, toolsSucceeded: loopResult.toolsSucceeded, toolsFailed: loopResult.toolsFailed };
     })()]);
   } catch (err: any) {
     if (err?.message === "__SEND_MESSAGE_TIMEOUT__") {
       console.error(`[send-message] ⏰ Timeout after ${SEND_MESSAGE_TIMEOUT_MS}ms`);
-      return { text: "⏰ הפעולה לקחה יותר מדי זמן. נסה שוב עם בקשה פשוטה יותר?", toolsUsed: [] };
+      return { text: "⏰ הפעולה לקחה יותר מדי זמן. נסה שוב עם בקשה פשוטה יותר?", toolsUsed: [], toolsSucceeded: [], toolsFailed: [] };
     }
     throw err;
   }
@@ -184,6 +195,8 @@ export async function sendMessage(
 interface ToolLoopResult {
   response: Anthropic.Message;
   toolsUsed: string[];
+  toolsSucceeded: string[];
+  toolsFailed: string[];
 }
 
 async function runToolLoop(
@@ -196,6 +209,8 @@ async function runToolLoop(
 ): Promise<ToolLoopResult> {
   const toolRetries = new Map<string, number>();
   const toolsUsed: string[] = [];
+  const toolsSucceeded: string[] = [];
+  const toolsFailed: string[] = [];
   let iterations = 0;
 
   while (response.stop_reason === "tool_use") {
@@ -229,11 +244,14 @@ async function runToolLoop(
     );
 
     const toolResultContent = toolResults.map((tr) => {
-      const isError = tr.result.includes("\u274C");
+      const isError = tr.result.includes("\u274C") || tr.result.startsWith("שגיאה:");
       const retryCount = toolRetries.get(tr.name) || 0;
 
       if (isError) {
         toolRetries.set(tr.name, retryCount + 1);
+        if (!toolsFailed.includes(tr.name)) toolsFailed.push(tr.name);
+      } else {
+        if (!toolsSucceeded.includes(tr.name)) toolsSucceeded.push(tr.name);
       }
 
       const content = (isError && retryCount === 0)
@@ -264,5 +282,5 @@ async function runToolLoop(
     });
   }
 
-  return { response, toolsUsed };
+  return { response, toolsUsed, toolsSucceeded, toolsFailed };
 }

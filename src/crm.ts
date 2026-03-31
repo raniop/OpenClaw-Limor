@@ -87,6 +87,19 @@ async function _searchPolicyByPersonId(personId: string): Promise<string> {
   }
 }
 
+async function _searchPolicyByNumber(policyNumber: string): Promise<string> {
+  try {
+    // GetById also works with full policy numbers (fullPolicyID)
+    const data = await apiCall(`/api/Policy/GetById?id=${encodeURIComponent(policyNumber)}`);
+    if (!data || (Array.isArray(data) && data.length === 0)) {
+      return `לא נמצאה פוליסה ${policyNumber}`;
+    }
+    return JSON.stringify(data, null, 2);
+  } catch (error: any) {
+    return `שגיאה בחיפוש: ${error.message}`;
+  }
+}
+
 async function _getPolicyDetails(policyIndex: number): Promise<string> {
   try {
     const data = await apiCall(`/api/Policy/GetPolicyDetailsById?policyIndex=${policyIndex}`);
@@ -177,6 +190,9 @@ const CRM_FALLBACK = "❌ שרת ה-CRM לא זמין כרגע.";
 
 export function searchPolicyByPersonId(personId: string): Promise<string> {
   return withCircuitBreaker(crmBreaker, () => _searchPolicyByPersonId(personId), CRM_FALLBACK);
+}
+export function searchPolicyByNumber(policyNumber: string): Promise<string> {
+  return withCircuitBreaker(crmBreaker, () => _searchPolicyByNumber(policyNumber), CRM_FALLBACK);
 }
 export function getPolicyDetails(policyIndex: number): Promise<string> {
   return withCircuitBreaker(crmBreaker, () => _getPolicyDetails(policyIndex), CRM_FALLBACK);
