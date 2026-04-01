@@ -18,6 +18,7 @@ export interface DeliveryEntry {
   status: "pending" | "received";
   createdAt: string;
   receivedAt?: string;
+  emailOrderId?: string; // Cross-reference to EmailOrder.id from email detection
 }
 
 function getPath(): string {

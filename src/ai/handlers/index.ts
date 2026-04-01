@@ -21,6 +21,8 @@ import { healthHandlers } from "./health";
 import { officePcHandlers } from "./office-pc";
 import { planHandlers } from "./plans";
 import { selfAwarenessHandlers } from "./self-awareness";
+import { emailHandlers } from "./email";
+import { telegramHandlers } from "./telegram";
 
 export type { ToolHandler } from "./types";
 
@@ -47,4 +49,6 @@ export const allHandlers: Record<string, ToolHandler> = {
   ...officePcHandlers,
   ...planHandlers,
   ...selfAwarenessHandlers,
+  ...emailHandlers,
+  ...telegramHandlers,
 };

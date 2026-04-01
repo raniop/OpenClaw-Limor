@@ -35,6 +35,7 @@ import { learnFromCorrection } from "../context/correction-learner";
 import { startProactiveScheduler, recordOwnerResponse } from "../proactive";
 import { buildOperationalTrace, saveOperationalTrace, formatTraceSummary, runSelfCheck } from "../ops";
 import { startDeliveryPoller, startSmsWatcher } from "../sms";
+import { startEmailPoller } from "../email/email-poller";
 import { startAlertPoller } from "../telegram/alert-poller";
 import { statePath } from "../state-dir";
 import { readFileSync, writeFileSync, existsSync } from "fs";
@@ -174,6 +175,18 @@ export function createWhatsAppClient(): Client {
       });
     } catch (err) {
       console.error("[sms-watcher] Failed to start SMS watcher:", err);
+    }
+
+    // Poll iCloud email for order/booking confirmations
+    try {
+      startEmailPoller(async (text: string) => {
+        if (config.ownerChatId && whatsappClient) {
+          await whatsappClient.sendMessage(config.ownerChatId, text);
+          conversationStore.addMessage(config.ownerChatId, "assistant", text);
+        }
+      });
+    } catch (err) {
+      console.error("[email] Failed to start email poller:", err);
     }
 
     // Poll Telegram alert channel for rocket/missile alerts

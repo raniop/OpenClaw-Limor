@@ -21,7 +21,8 @@
 - 🚕 **מונית** — הזמנת Gett
 - 📱 **SMS** — קריאת הודעות, מעקב משלוחים, ו-**SMS Watcher** (העברת הודעות SMS לוואטסאפ בזמן אמת כל 10 שניות)
 - 💻 **Self-Programming** — יורי (סוכן מפתח) יכול לערוך קוד, לבנות ולפרוס ישירות מוואטסאפ
-- 📡 **טלגרם** — ניטור ערוצים (התרעות + חדשות) עם תמונות
+- 📡 **טלגרם** — ניטור ערוצים (התרעות + חדשות) עם תמונות + **סיכום קבוצות** (gramjs Client API)
+- 📧 **אימייל** — קריאת דוא"ל (iCloud IMAP)
 
 ### אוטומציות
 - ⏰ **תזכורות יזומות** — followup reminders, התראות לפני פגישות
@@ -69,7 +70,7 @@
 
 | סוכן/ת | תפקיד | כלים |
 |---------|--------|------|
-| מיכל 👁️ | סיכום קבוצות WhatsApp | `get_group_history`, `summarize_group_activity` |
+| מיכל 👁️ | סיכום קבוצות WhatsApp + Telegram | `get_group_history`, `summarize_group_activity`, `telegram_summary`, `list_telegram_groups` |
 | רונית 🔍 | מחקר אינטרנט עם מקורות | `web_search` |
 | נועה 📊 | ניתוח נתונים וסטטיסטיקות | `list_events`, `read_sms`, `list_contacts` |
 | יעל ⚡ | אוטומציות ותזכורות | `create_reminder`, `learn_instruction` |
@@ -178,6 +179,9 @@ npx pm2 start ecosystem.config.js
 | `BRAVE_SEARCH_API_KEY` | אופציונלי | חיפוש אינטרנט (fallback: DuckDuckGo) |
 | `RAPIDAPI_KEY` | אופציונלי | טיסות ומלונות |
 | `CRM_API_URL` | אופציונלי | CRM server |
+| `TELEGRAM_API_ID` | אופציונלי | Telegram Client API (מ-my.telegram.org) |
+| `TELEGRAM_API_HASH` | אופציונלי | Telegram Client API |
+| `TELEGRAM_PHONE` | אופציונלי | מספר טלפון לחשבון טלגרם |
 
 ## 🏗️ ארכיטקטורה
 
@@ -229,8 +233,9 @@ src/
 ├── digest/                # Daily briefings
 │   ├── digest-service.ts  # Morning briefing
 │   └── daily-summaries.ts # Executive briefings
-├── telegram/              # Channel monitoring
-│   └── alert-poller.ts    # Scraping + images + circuit breaker
+├── telegram/              # Channel monitoring + group reading
+│   ├── alert-poller.ts    # Scraping + images + circuit breaker
+│   └── client.ts          # gramjs Client API — read group messages
 ├── memory.ts              # Deep memory (facts, preferences, patterns, emotional log)
 ├── conversation.ts        # History + rolling summary + rotation (SQLite-backed)
 ├── web-search.ts          # Internet search (circuit breaker protected)

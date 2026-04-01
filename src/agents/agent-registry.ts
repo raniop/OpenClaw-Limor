@@ -13,6 +13,7 @@ import { bookingTools } from "../ai/tools/booking";
 import { smartHomeTools } from "../ai/tools/smarthome";
 import { monitoringTools } from "../ai/tools/monitoring";
 import { nimrodTools } from "../ai/tools/nimrod";
+import { telegramTools } from "../ai/tools/telegram";
 
 const SOULS_DIR = resolve(__dirname, "../../souls");
 
@@ -44,9 +45,9 @@ function pickTools(sources: any[], names: string[]): any[] {
 // Build all agents with their specific tools
 const agents: Map<string, AgentConfig> = new Map();
 
-// מיכל — group summarizer
+// מיכל — group summarizer (WhatsApp + Telegram)
 agents.set("michal", buildAgent("michal.json",
-  pickTools(contactTools, ["get_group_history", "summarize_group_activity"])
+  pickTools([...contactTools, ...telegramTools], ["get_group_history", "summarize_group_activity", "telegram_summary", "list_telegram_groups"])
 ));
 
 // רונית — internet researcher

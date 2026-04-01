@@ -21,3 +21,5 @@ export { healthTools } from "./health";
 export { officePcTools } from "./office-pc";
 export { planTools } from "./plans";
 export { selfAwarenessTools } from "./self-awareness";
+export { emailTools } from "./email";
+export { telegramTools } from "./telegram";

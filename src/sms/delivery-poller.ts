@@ -5,6 +5,7 @@
 import { isAvailable, getMessagesSince, getLatestMessageId } from "./sms-reader";
 import { findDeliveryAlerts } from "./delivery-detector";
 import { addDelivery } from "./delivery-store";
+import { findOrderByTracking, findOrderByVendor, linkOrderToDelivery } from "../email/email-order-store";
 
 let lastCheckedId = 0;
 let sendToOwner: ((text: string) => Promise<void>) | null = null;
@@ -55,6 +56,21 @@ async function checkForDeliveries(): Promise<void> {
         alert.trackingNumber
       );
       if (!saved) continue; // duplicate
+
+      // Cross-reference with email orders
+      try {
+        const emailOrder =
+          (alert.trackingNumber && findOrderByTracking(alert.trackingNumber)) ||
+          findOrderByVendor(alert.carrier);
+        if (emailOrder) {
+          linkOrderToDelivery(emailOrder.id, saved.id);
+          saved.emailOrderId = emailOrder.id;
+          console.log(`[sms] Linked delivery ${saved.id} to email order ${emailOrder.id}`);
+        }
+      } catch {
+        // Non-critical, ignore cross-reference errors
+      }
+
       const text = `📦 ${alert.summary}\n💬 ${alert.message.text.substring(0, 300)}`;
       try {
         await sendToOwner(text);

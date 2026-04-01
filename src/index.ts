@@ -10,6 +10,7 @@ import { startHealthWebhook, stopHealthWebhook } from "./health-webhook";
 import { startInsightScheduler } from "./insights/insight-scheduler";
 import { startSocialGraphScheduler } from "./insights/social-graph-analyzer";
 import { startCleanupScheduler } from "./insights/cleanup-scheduler";
+import { initTelegramClient } from "./telegram/client";
 
 log.systemStarting();
 
@@ -104,6 +105,11 @@ startSocialGraphScheduler();
 
 // Start cleanup scheduler — nightly data maintenance (03:30 Israel time)
 startCleanupScheduler();
+
+// Initialize Telegram client (gramjs) for group reading
+initTelegramClient().catch((err) =>
+  console.error("[telegram] Init failed:", err.message)
+);
 
 // Graceful shutdown — close WhatsApp session and kill Chrome cleanly
 let isShuttingDown = false;

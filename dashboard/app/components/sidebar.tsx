@@ -25,6 +25,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/ops", labelHe: "תפעול ובקרה", labelEn: "Operations", icon: "📊" },
   { href: "/changelog", labelHe: "חידושים", labelEn: "Changelog", icon: "✨" },
   { href: "/logs", labelHe: "לוגים", labelEn: "Logs", icon: "🔍" },
+  { href: "/world", labelHe: "עולם הסוכנים", labelEn: "Agent World", icon: "🌐" },
 ];
 
 export function Sidebar() {

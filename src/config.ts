@@ -45,6 +45,11 @@ export const config = {
   officePcUser: process.env.OFFICE_PC_USER || "",
   officePcPass: process.env.OFFICE_PC_PASS || "",
   officePcKeyPath: process.env.OFFICE_PC_KEY_PATH || "",
+  icloudImapEmail: process.env.ICLOUD_IMAP_EMAIL || "",
+  icloudImapPassword: process.env.ICLOUD_IMAP_PASSWORD || "",
+  telegramApiId: process.env.TELEGRAM_API_ID || "",
+  telegramApiHash: process.env.TELEGRAM_API_HASH || "",
+  telegramPhone: process.env.TELEGRAM_PHONE || "",
 };
 
 export function validateConfig(): void {

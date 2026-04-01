@@ -87,6 +87,21 @@ export default async function TelegramPage() {
         When a new alert/message appears, it&apos;s forwarded to your WhatsApp instantly.
         beforeredalert is filtered for launch keywords only. אלמוג בוקר forwards everything.
       </div>
+
+      <div className="mt-3">
+        <div className="section-header">📋 סיכום קבוצות טלגרם</div>
+        <div className="card" style={{ padding: "14px 18px", fontSize: 13, direction: "rtl", lineHeight: 1.7 }}>
+          <p style={{ margin: "0 0 8px 0" }}>
+            לימור יכולה לקרוא ולסכם כל קבוצה או ערוץ טלגרם שאתה חבר בהם, באמצעות <strong>gramjs Client API</strong>.
+          </p>
+          <p style={{ margin: "0 0 8px 0", color: "var(--text-secondary)" }}>
+            <strong>איך להפעיל:</strong> שלח ללימור בוואטסאפ &quot;סכמי לי את קבוצת X בטלגרם&quot; והיא תחזיר סיכום מסודר לפי נושאים.
+          </p>
+          <p style={{ margin: 0, color: "var(--text-secondary)" }}>
+            <strong>כלים:</strong> <code>telegram_summary</code>, <code>list_telegram_groups</code>
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
