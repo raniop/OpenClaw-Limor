@@ -46,9 +46,15 @@ const AUTONOMOUS_TASKS: Record<string, string> = {
   boris: `בצע בדיקת בריאות מהירה:
 1. הרץ full_system_report
 2. השווה לתוצאה האחרונה (מצב קודם למטה)
-3. אם יש שינוי לרעה (שגיאות חדשות, סוכנת שנפלה, WhatsApp מנותק, PM2 restarts) — החזר את ההתראה בלבד
-4. אם הכל תקין — החזר רק "ok"
-אל תחזיר דוח מלא אם הכל תקין. רק "ok" או התראה ספציפית.`,
+3. התריע רק על בעיות קריטיות:
+   - PM2 process crashed או restarts חוזרים
+   - WhatsApp מנותק
+   - Build failure
+   - Database error
+   - סוכנת שנפלה לגמרי
+4. התעלם לחלוטין מ-self-check warnings כמו: followup_needed, contradiction_unresolved, tool_intended_not_used, unnecessary_tool_used — אלה דברים נורמליים, לא באגים!
+5. אם הכל תקין (גם אם יש self-check warnings) — החזר רק "ok"
+אל תחזיר דוח מלא אם הכל תקין. רק "ok" או התראה קריטית ספציפית.`,
 
   michal: `סכמי את כל הקבוצות הפעילות היום.
 1. השתמשי ב-get_group_history וב-summarize_group_activity לכל קבוצה פעילה
