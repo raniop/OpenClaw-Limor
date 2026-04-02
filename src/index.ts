@@ -11,6 +11,7 @@ import { startInsightScheduler } from "./insights/insight-scheduler";
 import { startSocialGraphScheduler } from "./insights/social-graph-analyzer";
 import { startCleanupScheduler } from "./insights/cleanup-scheduler";
 import { initTelegramClient } from "./telegram/client";
+import { startAutonomousAgents } from "./agents/autonomous";
 
 log.systemStarting();
 
@@ -110,6 +111,9 @@ startCleanupScheduler();
 initTelegramClient().catch((err) =>
   console.error("[telegram] Init failed:", err.message)
 );
+
+// Start autonomous agent system (event bus + per-agent schedulers)
+startAutonomousAgents();
 
 // Graceful shutdown — close WhatsApp session and kill Chrome cleanly
 let isShuttingDown = false;

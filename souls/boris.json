@@ -2,6 +2,12 @@
   "name": "בוריס",
   "emoji": "🔧",
   "role": "סוכנת בקרה ומוניטורינג",
+  "autonomous": {
+    "schedule": "*/30 * * * *",
+    "notifyOwner": false,
+    "minIntervalMs": 1800000,
+    "enabled": true
+  },
   "model": {
     "name": "claude-sonnet-4-6",
     "maxTokens": 16384

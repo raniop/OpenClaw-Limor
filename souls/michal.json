@@ -2,6 +2,12 @@
   "name": "מיכל",
   "emoji": "👁️",
   "role": "סוכנת סיכום קבוצות",
+  "autonomous": {
+    "schedule": "0 21 * * 0-4",
+    "notifyOwner": true,
+    "minIntervalMs": 43200000,
+    "enabled": true
+  },
   "model": {
     "name": "claude-sonnet-4-6",
     "maxTokens": 1024

@@ -3,7 +3,7 @@
  */
 import { readFileSync } from "fs";
 import { resolve } from "path";
-import type { AgentConfig, AgentId } from "./agent-types";
+import type { AgentConfig, AgentId, AutonomousConfig } from "./agent-types";
 import { webSearchTools } from "../ai/tools/web-search";
 import { contactTools } from "../ai/tools/contacts";
 import { calendarTools } from "../ai/tools/calendar";
@@ -24,7 +24,7 @@ function loadSoul(filename: string): any {
 
 function buildAgent(filename: string, tools?: any[]): AgentConfig {
   const soul = loadSoul(filename);
-  return {
+  const config: AgentConfig = {
     id: filename.replace(".json", ""),
     name: soul.name,
     emoji: soul.emoji,
@@ -34,6 +34,11 @@ function buildAgent(filename: string, tools?: any[]): AgentConfig {
     tools,
     delegationHint: soul.role,
   };
+  // Parse autonomous config if present in soul file
+  if (soul.autonomous) {
+    config.autonomousConfig = soul.autonomous as AutonomousConfig;
+  }
+  return config;
 }
 
 // Helper: pick specific tools by name from a tool array

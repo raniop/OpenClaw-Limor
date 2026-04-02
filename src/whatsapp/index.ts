@@ -273,6 +273,17 @@ export function createWhatsAppClient(): Client {
 
   client.on("message", async (msg: Message) => {
     const chatId = msg.from;
+    // Emit event for autonomous agents
+    try {
+      const { agentEventBus } = require("../agents/autonomous");
+      const chat = await msg.getChat();
+      agentEventBus.emitTyped("message:received", {
+        chatId,
+        isGroup: chat.isGroup,
+        senderName: msg.author || chatId,
+        timestamp: Date.now(),
+      });
+    } catch {}
     await withChatLock(chatId, () => handleMessage(msg));
   });
 

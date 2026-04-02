@@ -129,6 +129,29 @@ export function getDb(): Database.Database {
     );
 
     CREATE INDEX IF NOT EXISTS idx_plans_chat_id ON plans(chat_id);
+
+    CREATE TABLE IF NOT EXISTS agent_runs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      agent_id TEXT NOT NULL,
+      trigger TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'success',
+      result_summary TEXT,
+      tokens_input INTEGER DEFAULT 0,
+      tokens_output INTEGER DEFAULT 0,
+      duration_ms INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_agent_runs_agent ON agent_runs(agent_id);
+    CREATE INDEX IF NOT EXISTS idx_agent_runs_created ON agent_runs(created_at);
+
+    CREATE TABLE IF NOT EXISTS agent_state (
+      agent_id TEXT NOT NULL,
+      key TEXT NOT NULL,
+      value TEXT,
+      updated_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (agent_id, key)
+    );
   `);
 
   console.log(`[sqlite] Database initialized at ${dbPath}`);

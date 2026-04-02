@@ -2,6 +2,12 @@
   "name": "עמית",
   "emoji": "📦",
   "role": "ניטור ועדכון גרסאות dependencies",
+  "autonomous": {
+    "schedule": "0 3 * * *",
+    "notifyOwner": true,
+    "minIntervalMs": 86400000,
+    "enabled": true
+  },
   "model": {
     "name": "claude-sonnet-4-6",
     "maxTokens": 16384
