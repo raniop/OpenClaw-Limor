@@ -72,28 +72,35 @@ export async function getTelegramGroupMessages(
     throw new Error("Telegram client not connected");
   }
 
-  // Find the group/channel by name
-  const result = await client.invoke(
-    new Api.contacts.Search({ q: groupName, limit: 10 })
+  // Search through user's actual dialogs (not contacts.Search which returns wrong results)
+  const dialogs = await client.getDialogs({ limit: 150 });
+  const searchLower = groupName.toLowerCase();
+
+  const dialog = dialogs.find((d) =>
+    (d.isGroup || d.isChannel) && d.title?.toLowerCase().includes(searchLower)
   );
 
-  const chat = result.chats.find((c: any) =>
-    c.title?.toLowerCase().includes(groupName.toLowerCase())
-  );
-
-  if (!chat) {
-    throw new Error(`Group "${groupName}" not found`);
+  if (!dialog || !dialog.entity) {
+    // Log available groups for debugging
+    const available = dialogs
+      .filter((d) => d.isGroup || d.isChannel)
+      .map((d) => d.title)
+      .slice(0, 20);
+    console.log(`[telegram] Group "${groupName}" not found. Available: ${available.join(", ")}`);
+    throw new Error(`Group "${groupName}" not found. Available groups: ${available.join(", ")}`);
   }
+
+  console.log(`[telegram] Found: "${dialog.title}" (id: ${dialog.id}, type: ${dialog.isChannel ? "channel" : "group"})`);
 
   const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
   const messages: string[] = [];
 
-  for await (const msg of client.iterMessages(chat, { limit })) {
+  for await (const msg of client.iterMessages(dialog.entity, { limit })) {
     if (msg.date && new Date(msg.date * 1000) < cutoff) break;
     if (msg.message) {
       const sender = msg.sender && "firstName" in msg.sender
         ? `${msg.sender.firstName || ""} ${msg.sender.lastName || ""}`.trim()
-        : "???";
+        : dialog.title || "ערוץ";
       const time = new Date(msg.date * 1000).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
       messages.push(`[${time}] ${sender}: ${msg.message}`);
     }

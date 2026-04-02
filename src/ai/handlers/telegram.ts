@@ -19,13 +19,21 @@ export const telegramHandlers: Record<string, ToolHandler> = {
 
       const today = new Date().toLocaleDateString("he-IL", { day: "numeric", month: "numeric", year: "numeric" });
 
+      // Log raw messages for debugging
+      console.log(`[telegram] Raw messages from "${groupName}" (${messages.length}):\n${messages.slice(0, 10).join("\n")}\n... (${messages.length} total)`);
+
       return (
         `📋 הודעות מקבוצת "${groupName}" (${today}, ${hours} שעות אחרונות):\n` +
         `סה"כ ${messages.length} הודעות.\n\n` +
         messages.join("\n") +
         "\n\n---\n" +
-        "סכמי את ההודעות בפורמט מסודר לפי נושאים עיקריים. " +
-        "השתמשי בכותרות לכל נושא ונקודות תבליט לפרטים. תמציתי וברור."
+        "⚠️ חוקי ברזל לסיכום:\n" +
+        "1. אסור להמציא, לפרש, או להוסיף מידע שלא כתוב מילה במילה בהודעות. לא לשנות ניסוח, לא להסיק מסקנות.\n" +
+        "2. קצר מאוד! מקסימום 10-12 נקודות בסה\"כ לכל הסיכום. רק האירועים הכי חשובים.\n" +
+        "3. כל נקודה = חצי משפט. למשל: '- שיגורים מאיראן — עד כה ללא נפגעים'\n" +
+        "4. פורמט מדויק:\n" +
+        "סיכום היום מ[שם] (תאריך):\n\n*איראן:*\n- נקודה קצרה\n- נקודה קצרה\n\n*לבנון:*\n- נקודה קצרה\n\n" +
+        "5. בלי אימוג'ים. בלי כותרות משנה. בלי הסברים. בלי 'סה\"כ' או 'בשורה תחתונה'. רק עובדות יבשות קצרות."
       );
     } catch (err: any) {
       return `❌ שגיאה בקריאת טלגרם: ${err.message}`;
