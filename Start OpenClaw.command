@@ -1,15 +1,19 @@
 #!/bin/bash
 cd "$(dirname "$0")"
 
+# Read bot name from .env (fallback: openclaw)
+BOT_NAME=$(grep '^BOT_NAME_EN=' .env 2>/dev/null | cut -d= -f2 | tr '[:upper:]' '[:lower:]')
+BOT_NAME=${BOT_NAME:-openclaw}
+
 # Build silently
 npm run build > /dev/null 2>&1
 if [ $? -ne 0 ]; then
-  osascript -e 'display notification "Build failed!" with title "Limor ❌"'
+  osascript -e "display notification \"Build failed!\" with title \"OpenClaw ❌\""
   exit 1
 fi
 
-# Start Limor with PM2 (background, auto-restart on crash)
-npx pm2 start dist/index.js --name limor --update-env --silent 2>/dev/null || npx pm2 restart limor --silent 2>/dev/null
+# Start bot with PM2 (background, auto-restart on crash)
+npx pm2 start ecosystem.config.js --silent 2>/dev/null || npx pm2 restart "$BOT_NAME" --silent 2>/dev/null
 
 # Clean dashboard cache and start
 cd dashboard
@@ -23,7 +27,7 @@ sleep 5
 open http://localhost:3848
 
 # Notify success
-osascript -e 'display notification "Limor + Dashboard running!" with title "Limor ✅"'
+osascript -e "display notification \"OpenClaw + Dashboard running!\" with title \"OpenClaw ✅\""
 
 # Dashboard health check — restart if it crashes
 while true; do
@@ -37,6 +41,6 @@ while true; do
     npm run dev > /dev/null 2>&1 &
     DASHBOARD_PID=$!
     cd ..
-    osascript -e 'display notification "Dashboard restarted" with title "Limor ⚠️"'
+    osascript -e "display notification \"Dashboard restarted\" with title \"OpenClaw ⚠️\""
   fi
 done

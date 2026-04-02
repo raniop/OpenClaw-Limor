@@ -12,6 +12,7 @@ import { startSocialGraphScheduler } from "./insights/social-graph-analyzer";
 import { startCleanupScheduler } from "./insights/cleanup-scheduler";
 import { initTelegramClient } from "./telegram/client";
 import { startAutonomousAgents } from "./agents/autonomous";
+import { startUpdateChecker } from "./updater/version-checker";
 
 log.systemStarting();
 
@@ -114,6 +115,9 @@ initTelegramClient().catch((err) =>
 
 // Start autonomous agent system (event bus + per-agent schedulers)
 startAutonomousAgents();
+
+// Start update checker — checks GitHub for new versions daily
+startUpdateChecker();
 
 // Graceful shutdown — close WhatsApp session and kill Chrome cleanly
 let isShuttingDown = false;

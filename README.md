@@ -110,47 +110,54 @@
 |-------|-------|---------|------|
 | **Node.js 20+** | ✅ | ✅ | [nodejs.org](https://nodejs.org) |
 | **npm** | ✅ (כלול) | ✅ (כלול) | |
-| **Python 3** | ✅ (כלול) | ✅ [python.org](https://python.org) | נדרש ל-SMS (macOS בלבד) |
-| **PM2** | ✅ `npm i -g pm2` | ✅ `npm i -g pm2` | ניהול תהליכים |
 | **Anthropic API Key** | ✅ | ✅ | [console.anthropic.com](https://console.anthropic.com) |
 | **WhatsApp** | ✅ | ✅ | חשבון WhatsApp פעיל |
 | **SMS features** | ✅ macOS בלבד | ❌ | דורש Full Disk Access |
 
 ### התקנה מהירה (3 דקות)
 
+עובד אותו דבר על macOS ו-Windows:
+
 ```bash
 # 1. Clone
 git clone https://github.com/raniop/OpenClaw-Limor.git
 cd OpenClaw-Limor
 
-# 2. Dependencies
-npm install
+# 2. Dependencies (bot + dashboard)
+npm run install-all
 
-# 3. Setup wizard — יגדיר שם, טלפון, API key, ויצור .env
+# 3. Setup wizard — שם, טלפון, API key → יוצר .env
 npm run setup
 
 # 4. Build
 npm run build
 
-# 5. Run
+# 5. Verify — בודק שהכל מוגדר נכון
+npm run verify
+
+# 6. Run
 npx pm2 start ecosystem.config.js
 
-# 6. Scan QR — פתח WhatsApp → Linked Devices → Scan QR from terminal
+# 7. Scan QR — פתח WhatsApp → Linked Devices → Scan QR from terminal
 ```
 
-### Quick Start (macOS)
-דאבל-קליק על **`Start Limor.command`** — בונה, מפעיל עם PM2, מעלה dashboard, פותח דפדפן.
+### Quick Launchers — הפעלה בדאבל-קליק
 
-### Windows
-```powershell
-# אותו תהליך, רק ללא SMS features (macOS only)
-git clone https://github.com/raniop/OpenClaw-Limor.git
-cd OpenClaw-Limor
-npm install
-npm run setup
-npm run build
-npx pm2 start ecosystem.config.js
-```
+| Platform | File | מה עושה |
+|----------|------|---------|
+| **macOS** | `Start OpenClaw.command` | Build + PM2 + Dashboard + פותח דפדפן |
+| **Windows** | `Start OpenClaw.bat` | Build + PM2 + Dashboard + פותח דפדפן |
+
+### מציאת OWNER_CHAT_ID
+
+אחרי ההפעלה הראשונה, צריך לזהות את ה-Chat ID שלך:
+
+1. הפעל את הבוט: `npx pm2 start ecosystem.config.js`
+2. שלח הודעה כלשהי לבוט בוואטסאפ
+3. בדוק בלוגים: `npx pm2 logs`
+4. חפש שורה כזו: `[chat] from: XXXXXXXXX@c.us`
+5. העתק את ה-ID לקובץ `.env`: `OWNER_CHAT_ID=XXXXXXXXX@c.us`
+6. הפעל מחדש: `npx pm2 restart limor`
 
 ### מה ה-Setup Wizard שואל?
 1. **שם הבוט** — איך העוזר/ת יקרא (ברירת מחדל: לימור)
@@ -164,6 +171,20 @@ npx pm2 start ecosystem.config.js
 - `.env` — כל ההגדרות
 - `souls/[botname].json` — אישיות הבוט
 - `workspace/identity/SOUL.md` — זהות הבוט
+
+## 🔄 עדכון / Updating
+
+```bash
+npm run update
+```
+
+הפקודה:
+1. בודקת אם יש גרסה חדשה ב-GitHub
+2. מושכת את העדכון בצורה בטוחה (לא נוגעת ב-.env, WhatsApp session, זיכרון)
+3. מתקינה תלויות חדשות ובונה מחדש
+4. מדפיסה הנחיות להפעלה מחדש
+
+הבוט גם בודק אוטומטית פעם ביום אם יש עדכון, ושולח הודעה בוואטסאפ.
 
 ## ⚙️ הגדרות
 

@@ -4,18 +4,20 @@
   "description": "OpenClaw - Personal AI Assistant WhatsApp Bot powered by Claude",
   "main": "dist/index.js",
   "scripts": {
-    "clean": "rm -rf dist dist-test",
-    "build": "rm -rf dist && tsc",
+    "clean": "shx rm -rf dist dist-test",
+    "build": "shx rm -rf dist && tsc",
     "start": "node dist/index.js",
     "pm2:start": "npx pm2 start ecosystem.config.js",
     "pm2:restart": "npx pm2 restart limor",
     "pm2:stop": "npx pm2 stop limor",
     "pm2:logs": "npx pm2 logs limor --lines 50",
     "dev": "tsc && node dist/index.js",
-    "test": "rm -rf dist-test && tsc -p tsconfig.test.json && ln -sf ../souls dist-test/souls && ln -sf ../workspace dist-test/workspace && ln -sf ../.env dist-test/.env && node --require ./dist-test/tests/setup.js --test --test-concurrency=1 dist-test/tests/*.test.js",
-    "benchmark": "rm -rf dist-test && tsc -p tsconfig.test.json && ln -sf ../souls dist-test/souls && ln -sf ../workspace dist-test/workspace && ln -sf ../.env dist-test/.env && node dist-test/tests/benchmark/run-benchmarks.js",
-    "verify": "npm run build && node -e \"require('./dist/index.js')\" && echo 'entrypoint OK'",
-    "setup": "npx tsx scripts/setup.ts"
+    "test": "shx rm -rf dist-test && tsc -p tsconfig.test.json && shx cp -r souls dist-test/souls && shx cp -r workspace dist-test/workspace && shx cp .env dist-test/.env && node --require ./dist-test/tests/setup.js --test --test-concurrency=1 dist-test/tests/*.test.js",
+    "benchmark": "shx rm -rf dist-test && tsc -p tsconfig.test.json && shx cp -r souls dist-test/souls && shx cp -r workspace dist-test/workspace && shx cp .env dist-test/.env && node dist-test/tests/benchmark/run-benchmarks.js",
+    "verify": "npx tsx scripts/verify.ts",
+    "install-all": "npm install && cd dashboard && npm install",
+    "setup": "npx tsx scripts/setup.ts",
+    "update": "npx tsx scripts/update.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
@@ -48,6 +50,7 @@
     "@types/qrcode-terminal": "^0.12.2",
     "@types/ssh2": "^1.15.5",
     "@types/uuid": "^10.0.0",
+    "shx": "^0.3.4",
     "typescript": "^5.7.0"
   }
 }
