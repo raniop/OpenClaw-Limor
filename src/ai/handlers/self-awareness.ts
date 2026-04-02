@@ -1,7 +1,17 @@
 import { getRecentTraces } from "../../ops/operational-trace";
 import { computeMetrics } from "../../ops/metrics";
 import { getFailureStats } from "../../context/failure-learner";
+import { config } from "../../config";
 import type { ToolHandler } from "./types";
+import { readFileSync } from "fs";
+import { resolve } from "path";
+
+function getVersion(): string {
+  try {
+    const pkg = JSON.parse(readFileSync(resolve(__dirname, "../../../package.json"), "utf-8"));
+    return pkg.version || "unknown";
+  } catch { return "unknown"; }
+}
 
 export const selfAwarenessHandlers: Record<string, ToolHandler> = {
   get_my_status: async (input) => {
@@ -28,6 +38,7 @@ export const selfAwarenessHandlers: Record<string, ToolHandler> = {
     // Build summary
     const lines: string[] = [];
     lines.push(`📊 **סטטוס ${period}** (${report.totalTraces} שיחות)`);
+    lines.push(`🔖 גרסה: OpenClaw ${getVersion()} | מודל: ${config.model}`);
     lines.push("");
 
     // Key metrics
