@@ -3,9 +3,9 @@
   "emoji": "🔧",
   "role": "סוכנת בקרה ומוניטורינג",
   "autonomous": {
-    "schedule": "*/30 * * * *",
+    "schedule": "0 */2 * * *",
     "notifyOwner": false,
-    "minIntervalMs": 1800000,
+    "minIntervalMs": 7200000,
     "enabled": true
   },
   "model": {

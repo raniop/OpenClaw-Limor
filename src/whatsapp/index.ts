@@ -519,6 +519,10 @@ async function handleMessage(msg: Message): Promise<void> {
       }
       // Store verdict for context injection later
       (trace as any)._groupFilter = filterResult;
+      // Delay typing for ambiguous messages — only show after AI decides to respond
+      if (filterResult.verdict === "let_ai_decide") {
+        (trace as any)._delayTyping = true;
+      }
     }
 
     // --- Owner commands ---
@@ -578,7 +582,9 @@ async function handleMessage(msg: Message): Promise<void> {
     try { await chat.sendSeen(); } catch {}
     const messageForHistory = isGroup ? `[${contactName}]: ${body}` : body;
     conversationStore.addMessage(chatId, "user", messageForHistory);
-    try { await chat.sendStateTyping(); } catch {}
+    if (!(trace as any)._delayTyping) {
+      try { await chat.sendStateTyping(); } catch {}
+    }
 
     // Track per-person activity in groups
     if (isGroup) {
@@ -685,6 +691,11 @@ async function handleMessage(msg: Message): Promise<void> {
     const toolsFailedInMessage = sendResult.toolsFailed || [];
     const aiDurationMs = aiTimer.stop();
     log.aiRequestEnd(aiDurationMs, toolsUsedInMessage.length, trace);
+
+    // Send delayed typing for group let_ai_decide messages (only if AI decided to respond)
+    if ((trace as any)._delayTyping && !response.trim().startsWith("[SKIP]")) {
+      try { await chat.sendStateTyping(); } catch {}
+    }
 
     const responseTimer = startTimer();
     await handleResponse(chatId, contactName, response,

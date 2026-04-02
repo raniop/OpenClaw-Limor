@@ -89,6 +89,10 @@ export function filterGroupMessage(ctx: GroupMessageContext): GroupFilterResult 
   if (ctx.inOtherThread) {
     return { verdict: "must_skip", reason: "in_other_thread" };
   }
+  // 5. Reply to another person's message (not Limor) — skip
+  if (ctx.hasQuotedMsg && ctx.quotedSenderName && !ctx.quotedMsgFromMe && !ctx.limorMentioned) {
+    return { verdict: "must_skip", reason: "reply_to_other_person" };
+  }
 
   // ─── LET_AI_DECIDE (ambiguous) ─────────────────────────────────────
   return { verdict: "let_ai_decide", reason: "no_clear_signal" };

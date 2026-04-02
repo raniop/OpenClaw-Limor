@@ -11,6 +11,7 @@ import { getAllAgentState, setAgentState, logAgentRun, getLastRunTime } from "./
 import { getNotifyOwnerCallback } from "../../ai/callbacks";
 
 const scheduledTasks: Map<string, ScheduledTask> = new Map();
+const _lastAlertTime: Map<string, number> = new Map();
 
 /** Per-agent autonomous task prompts */
 const AUTONOMOUS_TASKS: Record<string, string> = {
@@ -149,13 +150,21 @@ export async function runAutonomousAgent(
         console.log(`[autonomous:${agent.id}] Report sent to owner`);
       }
     } else {
-      // For silent agents (like Boris) — only notify on alerts
+      // For silent agents (like Boris) — only notify on alerts, with 3h cooldown
       const isAlert = result.text.trim().toLowerCase() !== "ok" && result.text.trim() !== "";
       if (isAlert) {
-        const notify = getNotifyOwnerCallback();
-        if (notify) {
-          await notify(`${agent.emoji} ${agent.name} — התראה:\n\n${result.text}`);
-          console.log(`[autonomous:${agent.id}] Alert sent to owner`);
+        const ALERT_COOLDOWN_MS = 3 * 60 * 60 * 1000; // 3 hours
+        const lastAlertAt = _lastAlertTime.get(agent.id) || 0;
+        const now = Date.now();
+        if (now - lastAlertAt >= ALERT_COOLDOWN_MS) {
+          const notify = getNotifyOwnerCallback();
+          if (notify) {
+            await notify(`${agent.emoji} ${agent.name} — התראה:\n\n${result.text}`);
+            console.log(`[autonomous:${agent.id}] Alert sent to owner`);
+            _lastAlertTime.set(agent.id, now);
+          }
+        } else {
+          console.log(`[autonomous:${agent.id}] Alert suppressed (cooldown, last alert ${Math.round((now - lastAlertAt) / 60000)}m ago)`);
         }
       }
     }
