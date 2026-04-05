@@ -28,7 +28,7 @@ export const contractTools: Anthropic.Tool[] = [
   },
   {
     name: "add_contract",
-    description: `הוספת חוזה או מנוי ידנית. השתמשי כש${config.ownerName} אומר 'תוסיפי מנוי ל...', 'יש לי חוזה חדש עם...', 'אני משלם ל... כל חודש'`,
+    description: `הוספת חוזה או מנוי ידנית. השתמשי רק כש${config.ownerName} מבקש להוסיף חוזה חדש בטקסט. ⚠️ אם הודעה מכילה [✅ חוזה נשמר אוטומטית] אל תשתמשי בכלי הזה — החוזה כבר נשמר!`,
     input_schema: {
       type: "object" as const,
       properties: {

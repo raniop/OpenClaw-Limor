@@ -28,7 +28,7 @@ export const billTools: Anthropic.Tool[] = [
   },
   {
     name: "add_bill",
-    description: `הוספת חשבונית/חשבון ידנית. השתמשי כש${config.ownerName} אומר 'קיבלתי חשבון חשמל של 450 שקל', 'יש חשבון מים לשלם'`,
+    description: `הוספת חשבונית/חשבון ידנית. השתמשי רק כש${config.ownerName} מבקש להוסיף חשבון חדש בטקסט (למשל 'קיבלתי חשבון חשמל של 450 שקל'). ⚠️ אם הודעה מכילה [✅ חשבון נשמר אוטומטית] אל תשתמשי בכלי הזה — החשבון כבר נשמר!`,
     input_schema: {
       type: "object" as const,
       properties: {
