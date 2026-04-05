@@ -75,10 +75,12 @@ export async function processMedia(
               const catLabel = docResult.type === "bill"
                 ? (BILL_CATEGORY_LABELS as any)[docResult.category] || docResult.category
                 : (CATEGORY_LABELS as any)[docResult.category] || docResult.category;
-              if (docResult.type === "bill") {
-                body = `[קובץ: ${filename} — ✅ חשבון ${catLabel} נשמר אוטומטית: ${docResult.vendor}${amountStr}. לא צריך להוסיף שוב עם add_bill — כבר נשמר!]`;
+              if (docResult.duplicate) {
+                body = `[קובץ: ${filename} — ℹ️ ${docResult.type === "bill" ? "חשבון" : "חוזה"} ${catLabel} מ${docResult.vendor}${amountStr} כבר קיים במערכת. לא נשמר שוב.]`;
+              } else if (docResult.type === "bill") {
+                body = `[קובץ: ${filename} — ✅ חשבון ${catLabel} נשמר אוטומטית: ${docResult.vendor}${amountStr}. לא צריך להוסיף שוב — כבר נשמר!]`;
               } else {
-                body = `[קובץ: ${filename} — ✅ חוזה ${catLabel} נשמר אוטומטית: ${docResult.vendor}${amountStr}. לא צריך להוסיף שוב עם add_contract — כבר נשמר!]`;
+                body = `[קובץ: ${filename} — ✅ חוזה ${catLabel} נשמר אוטומטית: ${docResult.vendor}${amountStr}. לא צריך להוסיף שוב — כבר נשמר!]`;
               }
             } else {
               if (!body) body = `[קובץ: ${filename}]`;

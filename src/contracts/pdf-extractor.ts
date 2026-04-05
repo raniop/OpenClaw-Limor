@@ -32,7 +32,8 @@ export interface DocumentProcessResult {
   amount?: number;
   currency?: string;
   summary: string;
-  saved: Contract | Bill;
+  duplicate?: boolean;
+  saved?: Contract | Bill;
 }
 
 /**
@@ -75,7 +76,17 @@ export async function processDocumentForContract(
         saved,
       };
     }
-    return null;
+    // Duplicate
+    console.log(`[pdf] Duplicate contract: ${result.data.vendor}`);
+    return {
+      type: "contract",
+      vendor: result.data.vendor,
+      category: result.data.category,
+      amount: result.data.amount,
+      currency: result.data.currency,
+      summary: result.data.summary,
+      duplicate: true,
+    };
   }
 
   if (result.type === "bill") {
@@ -92,6 +103,17 @@ export async function processDocumentForContract(
         saved,
       };
     }
+    // Duplicate
+    console.log(`[pdf] Duplicate bill: ${result.data.vendor}`);
+    return {
+      type: "bill",
+      vendor: result.data.vendor,
+      category: result.data.category,
+      amount: result.data.amount,
+      currency: result.data.currency,
+      summary: result.data.summary,
+      duplicate: true,
+    };
     return null;
   }
 
