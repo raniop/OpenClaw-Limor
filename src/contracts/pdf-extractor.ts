@@ -31,8 +31,10 @@ export interface DocumentProcessResult {
   category: string;
   amount?: number;
   currency?: string;
+  periodEnd?: string;
   summary: string;
   duplicate?: boolean;
+  isPaid?: boolean;
   saved?: Contract | Bill;
 }
 
@@ -76,7 +78,6 @@ export async function processDocumentForContract(
         saved,
       };
     }
-    // Duplicate
     console.log(`[pdf] Duplicate contract: ${result.data.vendor}`);
     return {
       type: "contract",
@@ -99,11 +100,12 @@ export async function processDocumentForContract(
         category: saved.category,
         amount: saved.amount,
         currency: saved.currency,
+        periodEnd: saved.periodEnd,
         summary: saved.summary,
+        isPaid: saved.status === "paid",
         saved,
       };
     }
-    // Duplicate
     console.log(`[pdf] Duplicate bill: ${result.data.vendor}`);
     return {
       type: "bill",
@@ -111,7 +113,9 @@ export async function processDocumentForContract(
       category: result.data.category,
       amount: result.data.amount,
       currency: result.data.currency,
+      periodEnd: result.data.periodEnd,
       summary: result.data.summary,
+      isPaid: result.data.status === "paid",
       duplicate: true,
     };
     return null;

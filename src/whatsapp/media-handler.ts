@@ -74,18 +74,23 @@ export async function processMedia(
           try {
             const docResult = await processDocumentForContract(buffer, filename);
             if (docResult) {
-              const amountStr = docResult.amount ? `${docResult.amount} ${docResult.currency || "₪"}` : "";
               const catLabel = docResult.type === "bill"
                 ? (BILL_CATEGORY_LABELS as any)[docResult.category] || docResult.category
                 : (CATEGORY_LABELS as any)[docResult.category] || docResult.category;
-              const paidNote = (docResult.saved as any)?.status === "paid" ? " 💳 שולם אוטומטית" : "";
+              const amountStr = docResult.amount
+                ? `₪${docResult.amount.toLocaleString("he-IL")}`
+                : "";
+              const periodStr = docResult.periodEnd
+                ? new Date(docResult.periodEnd).toLocaleDateString("he-IL", { month: "long", year: "numeric" })
+                : "";
+              const paidStr = docResult.isPaid ? "\n💳 שולם אוטומטית" : "";
 
               if (docResult.duplicate) {
-                directReply = `📄 חשבון ${catLabel} מ**${docResult.vendor}** (${amountStr}) כבר קיים במערכת — לא נשמר שוב.`;
+                directReply = `📄 חשבון ${catLabel} מ-*${docResult.vendor}*${periodStr ? ` (${periodStr})` : ""} — ${amountStr} — כבר קיים במערכת, לא נשמר שוב.`;
               } else if (docResult.type === "bill") {
-                directReply = `✅ **חשבון ${catLabel} נשמר!**\n📄 ${docResult.summary || docResult.vendor}${paidNote}\n💰 סכום: ${amountStr}`;
+                directReply = `✅ *חשבון ${catLabel} נשמר!*\n🏢 ספק: ${docResult.vendor}${periodStr ? `\n📅 תקופה: ${periodStr}` : ""}\n💰 סכום: ${amountStr}${paidStr}`;
               } else {
-                directReply = `✅ **חוזה ${catLabel} נשמר!**\n📋 ${docResult.summary || docResult.vendor}\n💰 סכום: ${amountStr}`;
+                directReply = `✅ *חוזה ${catLabel} נשמר!*\n🏢 ספק: ${docResult.vendor}\n📋 ${docResult.summary || ""}${amountStr ? `\n💰 סכום: ${amountStr}` : ""}`;
               }
               // Set body to empty so AI is not called
               body = "";
