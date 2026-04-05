@@ -12,6 +12,8 @@ import { BILL_CATEGORY_LABELS } from "../bills/bill-types";
 export interface MediaResult {
   body: string;
   imageData?: { base64: string; mediaType: string };
+  /** If set, reply with this text directly and skip AI processing */
+  directReply?: string;
 }
 
 /**
@@ -66,33 +68,35 @@ export async function processMedia(
         saveFile(filename, buffer);
         log.mediaDocument(filename);
 
-        // PDF contract detection — extract billing data from PDF documents
+        // PDF contract/bill detection — respond directly without AI to avoid context contamination
+        let directReply: string | undefined;
         if (filename.toLowerCase().endsWith(".pdf")) {
           try {
             const docResult = await processDocumentForContract(buffer, filename);
             if (docResult) {
-              const amountStr = docResult.amount ? ` ${docResult.amount} ${docResult.currency || "₪"}` : "";
+              const amountStr = docResult.amount ? `${docResult.amount} ${docResult.currency || "₪"}` : "";
               const catLabel = docResult.type === "bill"
                 ? (BILL_CATEGORY_LABELS as any)[docResult.category] || docResult.category
                 : (CATEGORY_LABELS as any)[docResult.category] || docResult.category;
-              const summaryText = docResult.summary || `${docResult.vendor}${amountStr}`;
-              const paidNote = (docResult.saved as any)?.status === "paid" ? " (שולם אוטומטית)" : "";
+              const paidNote = (docResult.saved as any)?.status === "paid" ? " 💳 שולם אוטומטית" : "";
+
               if (docResult.duplicate) {
-                body = `המשתמש שלח קובץ PDF: ${filename}. זה ${docResult.type === "bill" ? "חשבון" : "חוזה"} ${catLabel} מ${docResult.vendor}${amountStr} שכבר קיים במערכת. תגידי לו בקצרה שהחשבון הזה כבר ברשימה, לא צריך לשלוח שוב.`;
+                directReply = `📄 חשבון ${catLabel} מ**${docResult.vendor}** (${amountStr}) כבר קיים במערכת — לא נשמר שוב.`;
               } else if (docResult.type === "bill") {
-                body = `המשתמש שלח קובץ PDF: ${filename}. זיהיתי ושמרתי אוטומטית חשבון ${catLabel} — ${summaryText}${paidNote}. תגידי לו בקצרה מה זיהית ושנשמר. אין צורך ב-add_bill כי כבר נשמר.`;
+                directReply = `✅ **חשבון ${catLabel} נשמר!**\n📄 ${docResult.summary || docResult.vendor}${paidNote}\n💰 סכום: ${amountStr}`;
               } else {
-                body = `המשתמש שלח קובץ PDF: ${filename}. זיהיתי ושמרתי אוטומטית חוזה ${catLabel} — ${summaryText}. תגידי לו בקצרה מה זיהית ושנשמר. אין צורך ב-add_contract כי כבר נשמר.`;
+                directReply = `✅ **חוזה ${catLabel} נשמר!**\n📋 ${docResult.summary || docResult.vendor}\n💰 סכום: ${amountStr}`;
               }
-            } else {
-              if (!body) body = `[קובץ: ${filename}]`;
+              // Set body to empty so AI is not called
+              body = "";
             }
           } catch (err) {
             console.error("[pdf] Contract detection error:", err);
-            if (!body) body = `[קובץ: ${filename}]`;
           }
-        } else {
-          if (!body) body = `[קובץ: ${filename}]`;
+        }
+        if (!body && !directReply) body = `[קובץ: ${filename}]`;
+        if (directReply) {
+          return { result: { body: body || "[קובץ מעובד]", imageData, directReply } };
         }
       }
     } catch (err) {

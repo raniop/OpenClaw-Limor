@@ -383,7 +383,15 @@ async function handleMessage(msg: Message): Promise<void> {
     await msg.reply(mediaResult.error);
     return;
   }
-  let { body, imageData } = mediaResult.result;
+  let { body, imageData, directReply } = mediaResult.result;
+
+  // --- Direct reply (PDF auto-processed) — skip AI entirely ---
+  if (directReply) {
+    await msg.reply(directReply);
+    conversationStore.addMessage(msg.from, "user", `[קובץ PDF]`);
+    conversationStore.addMessage(msg.from, "assistant", directReply);
+    return;
+  }
 
   // --- vCard (contact card) processing: ONLY from owner ---
   const chatIdForVcard = msg.from;
