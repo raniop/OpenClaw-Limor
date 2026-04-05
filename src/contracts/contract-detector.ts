@@ -134,28 +134,22 @@ const VALID_CYCLES: ContractBillingCycle[] = [
 ];
 
 /**
- * Use Claude Sonnet to extract contract details from an email.
+ * Core AI extraction — works with any text content (email, PDF, etc.)
  * Returns null if not a contract or extraction fails.
  */
-export async function detectContract(
-  email: ParsedEmail
+export async function detectContractFromText(
+  content: string,
+  source: "email" | "whatsapp_document" | "manual",
+  fallbackVendor?: string
 ): Promise<Omit<Contract, "id" | "createdAt"> | null> {
   try {
-    const emailContent = [
-      `From: ${email.from} <${email.fromAddress}>`,
-      `Subject: ${email.subject}`,
-      `Date: ${email.date}`,
-      ``,
-      email.textBody.substring(0, 1500), // Limit to save tokens
-    ].join("\n");
-
     const response = await aiClient.messages.create({
       model: SONNET,
-      max_tokens: 256,
+      max_tokens: 512,
       messages: [
         {
           role: "user",
-          content: `${EXTRACT_PROMPT}\n\n--- EMAIL ---\n${emailContent}`,
+          content: `${EXTRACT_PROMPT}\n\n--- DOCUMENT ---\n${content.substring(0, 2500)}`,
         },
       ],
     });
@@ -163,14 +157,12 @@ export async function detectContract(
     const text =
       response.content[0]?.type === "text" ? response.content[0].text : "";
 
-    // Extract JSON from response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
 
     const parsed = JSON.parse(jsonMatch[0]);
     if (!parsed.isContract) return null;
 
-    // Validate and normalize
     const category: ContractCategory = VALID_CATEGORIES.includes(parsed.category)
       ? parsed.category
       : "other";
@@ -180,7 +172,7 @@ export async function detectContract(
       : "monthly";
 
     return {
-      vendor: parsed.vendor || email.from,
+      vendor: parsed.vendor || fallbackVendor || "לא ידוע",
       category,
       amount: typeof parsed.amount === "number" ? parsed.amount : undefined,
       currency: parsed.currency || "ILS",
@@ -190,8 +182,7 @@ export async function detectContract(
       renewalDate: parsed.renewalDate || undefined,
       autoRenew: parsed.autoRenew !== false,
       status: "active",
-      lastEmailId: email.messageId,
-      lastEmailDate: email.date,
+      source,
       summary: parsed.summaryHe || `${parsed.vendor} — ${category}`,
       terms: parsed.termsHe || undefined,
     };
@@ -199,4 +190,26 @@ export async function detectContract(
     console.error("[contracts] Detection failed:", err);
     return null;
   }
+}
+
+/**
+ * Detect contract from an email (wrapper around detectContractFromText).
+ */
+export async function detectContract(
+  email: ParsedEmail
+): Promise<Omit<Contract, "id" | "createdAt"> | null> {
+  const emailContent = [
+    `From: ${email.from} <${email.fromAddress}>`,
+    `Subject: ${email.subject}`,
+    `Date: ${email.date}`,
+    ``,
+    email.textBody.substring(0, 1500),
+  ].join("\n");
+
+  const result = await detectContractFromText(emailContent, "email", email.from);
+  if (result) {
+    result.lastEmailId = email.messageId;
+    result.lastEmailDate = email.date;
+  }
+  return result;
 }

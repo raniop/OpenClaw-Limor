@@ -1,9 +1,11 @@
 /**
  * Media message processing — voice transcription, image extraction, document saving.
+ * PDF documents are automatically scanned for contract/subscription data.
  */
 import { transcribeAudio } from "../transcribe";
 import { saveFile } from "../files";
 import { log } from "../logger";
+import { processDocumentForContract } from "../contracts/pdf-extractor";
 
 export interface MediaResult {
   body: string;
@@ -60,8 +62,25 @@ export async function processMedia(
         const filename = (media as any).filename || `document_${Date.now()}`;
         const buffer = Buffer.from(media.data, "base64");
         saveFile(filename, buffer);
-        if (!body) body = `[קובץ: ${filename}]`;
         log.mediaDocument(filename);
+
+        // PDF contract detection — extract billing data from PDF documents
+        if (filename.toLowerCase().endsWith(".pdf")) {
+          try {
+            const contract = await processDocumentForContract(buffer, filename);
+            if (contract) {
+              const amountStr = contract.amount ? ` ₪${contract.amount}` : "";
+              body = `[קובץ: ${filename} — ✅ זוהה חוזה: ${contract.vendor}${amountStr}/${contract.billingCycle}]`;
+            } else {
+              if (!body) body = `[קובץ: ${filename}]`;
+            }
+          } catch (err) {
+            console.error("[pdf] Contract detection error:", err);
+            if (!body) body = `[קובץ: ${filename}]`;
+          }
+        } else {
+          if (!body) body = `[קובץ: ${filename}]`;
+        }
       }
     } catch (err) {
       log.mediaError("document", String(err));

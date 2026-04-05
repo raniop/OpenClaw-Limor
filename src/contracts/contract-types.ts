@@ -42,6 +42,7 @@ export interface Contract {
   lastEmailId?: string; // Links to source email messageId
   lastEmailDate?: string; // ISO
   notes?: string;
+  source?: "email" | "whatsapp_document" | "manual"; // How was this contract detected
   summary: string; // Hebrew one-liner for display
   terms?: string; // Hebrew summary of commercial terms (price, conditions, penalties)
   createdAt: string; // ISO

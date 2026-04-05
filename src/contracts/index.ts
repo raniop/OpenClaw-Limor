@@ -23,4 +23,10 @@ export {
 export {
   isLikelyContract,
   detectContract,
+  detectContractFromText,
 } from "./contract-detector";
+
+export {
+  extractTextFromPdf,
+  processDocumentForContract,
+} from "./pdf-extractor";
