@@ -76,9 +76,9 @@ export async function processMedia(
                 ? (BILL_CATEGORY_LABELS as any)[docResult.category] || docResult.category
                 : (CATEGORY_LABELS as any)[docResult.category] || docResult.category;
               if (docResult.type === "bill") {
-                body = `[קובץ: ${filename} — ✅ זוהה חשבון ${catLabel}: ${docResult.vendor}${amountStr}]`;
+                body = `[קובץ: ${filename} — ✅ חשבון ${catLabel} נשמר אוטומטית: ${docResult.vendor}${amountStr}. לא צריך להוסיף שוב עם add_bill — כבר נשמר!]`;
               } else {
-                body = `[קובץ: ${filename} — ✅ זוהה חוזה ${catLabel}: ${docResult.vendor}${amountStr}]`;
+                body = `[קובץ: ${filename} — ✅ חוזה ${catLabel} נשמר אוטומטית: ${docResult.vendor}${amountStr}. לא צריך להוסיף שוב עם add_contract — כבר נשמר!]`;
               }
             } else {
               if (!body) body = `[קובץ: ${filename}]`;
