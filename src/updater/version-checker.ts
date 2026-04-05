@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import { execSync } from "child_process";
 import { config } from "../config";
-import { getClient } from "../whatsapp";
+import { sendTextMessage, isSocketConnected } from "../whatsapp/baileys-client";
 
 const PROJECT_ROOT = resolve(__dirname, "..", "..");
 const STATE_FILE = resolve(PROJECT_ROOT, "workspace", "state", "last-update-check.json");
@@ -127,10 +127,9 @@ async function checkForUpdates(): Promise<void> {
   }
 
   // Send WhatsApp notification to owner
-  const client = getClient();
-  if (client && config.ownerChatId) {
+  if (isSocketConnected() && config.ownerChatId) {
     try {
-      await client.sendMessage(
+      await sendTextMessage(
         config.ownerChatId,
         `🔄 *גרסה חדשה זמינה!*\n\n` +
         `גרסה נוכחית: v${localVersion}\n` +

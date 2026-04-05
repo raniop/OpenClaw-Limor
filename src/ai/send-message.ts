@@ -8,7 +8,7 @@ import { client, withRetry } from "./client";
 import type { Message, SenderContext } from "./types";
 import {
   calendarTools, travelTools, bookingTools,
-  crmTools, instructionTools, fileTools, contactTools, smartHomeTools, capabilityTools, modelTools, codingTools, gettTools, whatsappExtraTools, smsTools, webSearchTools, agentTools, nimrodTools, healthTools, officePcTools, planTools, selfAwarenessTools, emailTools, telegramTools,
+  crmTools, instructionTools, fileTools, contactTools, smartHomeTools, capabilityTools, modelTools, codingTools, gettTools, whatsappExtraTools, smsTools, webSearchTools, agentTools, nimrodTools, healthTools, officePcTools, planTools, selfAwarenessTools, emailTools, telegramTools, operationalRuleTools, contractTools,
 } from "./tools";
 import { handleToolCall } from "./handle-tool-call";
 import { selectModel } from "./model-router";
@@ -97,7 +97,7 @@ export async function sendMessage(
           // bookingTools → hila agent only
           // nimrodTools → nimrod agent only
           ...modelTools, ...gettTools, ...whatsappExtraTools, ...smsTools, ...webSearchTools,
-          ...agentTools, ...healthTools, ...officePcTools, ...capabilityTools, ...planTools, ...selfAwarenessTools, ...emailTools, ...telegramTools,
+          ...agentTools, ...healthTools, ...officePcTools, ...capabilityTools, ...planTools, ...selfAwarenessTools, ...emailTools, ...telegramTools, ...operationalRuleTools, ...contractTools,
         ]
       : [...calendarTools, ...travelTools, ...bookingTools, ...webSearchTools, ...officePcTools];
 

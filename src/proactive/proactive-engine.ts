@@ -7,7 +7,7 @@ import { listEvents } from "../calendar";
 import { config } from "../config";
 
 export interface ProactiveMessage {
-  type: "followup_reminder" | "pre_meeting" | "morning_summary";
+  type: "followup_reminder" | "pre_meeting" | "morning_summary" | "contract_renewal";
   text: string;
   priority: "low" | "medium" | "high";
 }
@@ -146,4 +146,57 @@ export async function generateMorningSummary(): Promise<ProactiveMessage | null>
     console.error("[proactive] Morning summary failed:", err);
     return null;
   }
+}
+
+// ─── Contract Renewal Check ──────────────────────────────────────────
+
+import { getExpiringContracts } from "../contracts/contract-store";
+import { CATEGORY_LABELS, CATEGORY_EMOJIS } from "../contracts/contract-types";
+
+const REMINDED_CONTRACTS_PATH = statePath("reminded-contracts.json");
+
+function loadRemindedContractIds(): Set<string> {
+  try {
+    if (existsSync(REMINDED_CONTRACTS_PATH)) {
+      return new Set(JSON.parse(readFileSync(REMINDED_CONTRACTS_PATH, "utf-8")));
+    }
+  } catch {}
+  return new Set();
+}
+
+function saveRemindedContractId(id: string): void {
+  const ids = loadRemindedContractIds();
+  ids.add(id);
+  const arr = [...ids].slice(-100);
+  writeFileSync(REMINDED_CONTRACTS_PATH, JSON.stringify(arr), "utf-8");
+}
+
+/**
+ * Check for contracts expiring within 30 days.
+ * Each contract is only reminded ONCE.
+ */
+export function checkExpiringContracts(): ProactiveMessage | null {
+  const expiring = getExpiringContracts(30);
+  if (expiring.length === 0) return null;
+
+  const remindedIds = loadRemindedContractIds();
+  const unreminded = expiring.find((c) => !remindedIds.has(c.id));
+  if (!unreminded) return null;
+
+  saveRemindedContractId(unreminded.id);
+
+  const targetDate = unreminded.endDate || unreminded.renewalDate;
+  const daysLeft = targetDate
+    ? Math.ceil((new Date(targetDate).getTime() - Date.now()) / (24 * 60 * 60 * 1000))
+    : "?";
+
+  const emoji = CATEGORY_EMOJIS[unreminded.category] || "📋";
+  const cat = CATEGORY_LABELS[unreminded.category] || unreminded.category;
+  const amount = unreminded.amount ? ` (${unreminded.amount} ${unreminded.currency})` : "";
+
+  return {
+    type: "contract_renewal",
+    text: `${emoji} היי ${config.ownerName}, החוזה עם **${unreminded.vendor}** (${cat})${amount} מתחדש בעוד ${daysLeft} ימים.\nרוצה שאבדוק אם כדאי לחדש או לשנות?`,
+    priority: "medium",
+  };
 }

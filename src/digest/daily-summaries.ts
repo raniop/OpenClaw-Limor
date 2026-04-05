@@ -8,6 +8,7 @@ import { dirname } from "path";
 import { statePath } from "../state-dir";
 import { config } from "../config";
 import { client, withRetry } from "../ai/client";
+import { SONNET } from "../ai/model-router";
 import { getGroupNameById } from "../muted-groups";
 
 // --- Types ---
@@ -185,7 +186,7 @@ ${formattedMessages}
   try {
     const response = await withRetry(() =>
       client.messages.create({
-        model: "claude-sonnet-4-6",
+        model: SONNET,
         max_tokens: 600,
         messages: [{ role: "user", content: prompt }],
       }),

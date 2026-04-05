@@ -1,12 +1,21 @@
 /**
  * WhatsApp client setup and message routing.
+ * Uses Baileys (WebSocket) instead of Puppeteer/Chrome.
  * Sub-modules handle media, owner commands, approval gating, and response dispatch.
  */
 import { resolve } from "path";
-import { Client, LocalAuth, Message, MessageMedia } from "whatsapp-web.js";
-import qrcode from "qrcode-terminal";
-import * as QRCode from "qrcode";
-import * as http from "http";
+import {
+  connectBaileys,
+  sendTextMessage,
+  sendMediaMessage,
+  sendImageFromUrl,
+  isSocketConnected,
+  getBotJid,
+  getSocket,
+  toLegacyJid,
+  toBaileysJid,
+} from "./baileys-client";
+import type { BaileysMessage } from "./baileys-client";
 import { sendMessage, extractFacts, setNotifyOwnerCallback, setSendMessageCallback, setSendFileCallback } from "../ai";
 import { updateContact } from "../contacts";
 import { getMemoryContext, saveExtractedFacts, saveEmotionalState, savePreference } from "../memory";
@@ -43,261 +52,156 @@ import { addManualContact } from "../contacts";
 import { trackGroupPerson, getGroupPeopleContext } from "../conversation";
 import { syncContacts } from "../sync-contacts";
 
-let latestQR: string | null = null;
-let qrServer: http.Server | null = null;
-let whatsappClient: Client | null = null;
+let connected = false;
 let limorWhatsAppId: string = "";
 
-function startQRServer(): void {
-  if (qrServer) return;
-  qrServer = http.createServer(async (req, res) => {
-    if (latestQR) {
-      const svg = await QRCode.toString(latestQR, { type: "svg", width: 400 });
-      res.writeHead(200, { "Content-Type": "text/html" });
-      res.end(`<!DOCTYPE html><html><head><title>OpenClaw QR</title>
-        <style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;background:#111;color:white;font-family:sans-serif;}
-        h1{margin-bottom:20px;}</style></head>
-        <body><h1>🐾 OpenClaw - Scan with WhatsApp</h1>${svg}
-        <p>Open WhatsApp > Settings > Linked Devices > Link a Device</p>
-        <script>setTimeout(()=>location.reload(),20000)</script></body></html>`);
-    } else {
-      res.writeHead(200, { "Content-Type": "text/html" });
-      res.end(`<!DOCTYPE html><html><head><title>OpenClaw QR</title>
-        <style>body{display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#111;color:white;font-family:sans-serif;}</style></head>
-        <body><h1>✅ Connected! (or waiting for QR...)</h1>
-        <script>setTimeout(()=>location.reload(),3000)</script></body></html>`);
-    }
-  });
-  qrServer.listen(3847, () => {
-    console.log("\\n📱 QR Code page: http://localhost:3847\\n");
-  });
-}
-
-export function getClient(): Client | null {
-  return whatsappClient;
+export function getClient(): any {
+  return isSocketConnected() ? getSocket() : null;
 }
 
 async function sendToChat(chatId: string, text: string): Promise<void> {
-  if (whatsappClient) {
-    await whatsappClient.sendMessage(chatId, text);
+  if (isSocketConnected()) {
+    await sendTextMessage(chatId, text);
   }
 }
 
-function findChromePath(): string | undefined {
-  try {
-    const puppeteer = require("puppeteer");
-    return puppeteer.executablePath();
-  } catch {}
-  return undefined;
-}
+export function createWhatsAppClient(): { initialize: () => Promise<void>; destroy: () => Promise<void> } {
+  // Return a mock client interface that matches what src/index.ts expects
+  return {
+    initialize: async () => {
+      await connectBaileys({
+        onReady: () => {
+          connected = true;
+          limorWhatsAppId = toLegacyJid(getBotJid());
+          console.log(`[whatsapp] Bot ID: ${limorWhatsAppId}`);
+          log.systemReady();
 
-export function createWhatsAppClient(): Client {
-  const executablePath = findChromePath();
-  if (executablePath) {
-    console.log(`[chrome] Using: ${executablePath}`);
-  }
-
-  const client = new Client({
-    authStrategy: new LocalAuth(),
-    puppeteer: {
-      headless: true,
-      executablePath,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    },
-  });
-
-  client.on("qr", (qr: string) => {
-    latestQR = qr;
-    console.log("Scan this QR code with WhatsApp:");
-    qrcode.generate(qr, { small: true });
-    startQRServer();
-  });
-
-  client.on("ready", () => {
-    latestQR = null;
-    whatsappClient = client;
-    try {
-      limorWhatsAppId = client.info.wid._serialized;
-      console.log(`[whatsapp] Bot ID: ${limorWhatsAppId}`);
-      console.log(`[whatsapp] client.info.me:`, JSON.stringify((client.info as any).me));
-    } catch {}
-    if (qrServer) { qrServer.close(); qrServer = null; }
-    log.systemReady();
-
-    setNotifyOwnerCallback(async (message: string) => {
-      if (config.ownerChatId && whatsappClient) {
-        await whatsappClient.sendMessage(config.ownerChatId, message);
-        conversationStore.addMessage(config.ownerChatId, "assistant", message);
-      }
-    });
-
-    setSendMessageCallback(async (chatId: string, message: string) => {
-      if (whatsappClient) {
-        await whatsappClient.sendMessage(chatId, message);
-        conversationStore.addMessage(chatId, "assistant", message);
-      }
-    });
-
-    setSendFileCallback(async (chatId: string, base64: string, filename: string, mimetype: string, caption?: string) => {
-      if (whatsappClient) {
-        const media = new MessageMedia(mimetype, base64, filename);
-        await whatsappClient.sendMessage(chatId, media, { caption });
-        conversationStore.addMessage(chatId, "assistant", caption || `📎 ${filename}`);
-      }
-    });
-
-    // Process unread messages that arrived while bot was offline
-    processUnreadMessages(client).catch((err) =>
-      console.error("[unread] Failed to process unread messages:", err)
-    );
-
-    // Poll for pending notifications from dashboard (e.g., followup completion)
-    startNotificationPoller(client);
-
-    // Poll for delivery SMS alerts
-    try {
-      startDeliveryPoller(async (text: string) => {
-        if (config.ownerChatId && whatsappClient) {
-          await whatsappClient.sendMessage(config.ownerChatId, text);
-        }
-      });
-    } catch (err) {
-      console.error("[sms] Failed to start delivery poller:", err);
-    }
-
-    // SMS Sender Watcher — forwards SMS from specific senders (e.g. HAREL) to owner via WhatsApp
-    try {
-      startSmsWatcher(async (text: string) => {
-        if (config.ownerChatId && whatsappClient) {
-          await whatsappClient.sendMessage(config.ownerChatId, text);
-          conversationStore.addMessage(config.ownerChatId, "assistant", text);
-        }
-      });
-    } catch (err) {
-      console.error("[sms-watcher] Failed to start SMS watcher:", err);
-    }
-
-    // Poll iCloud email for order/booking confirmations
-    try {
-      startEmailPoller(async (text: string) => {
-        if (config.ownerChatId && whatsappClient) {
-          await whatsappClient.sendMessage(config.ownerChatId, text);
-          conversationStore.addMessage(config.ownerChatId, "assistant", text);
-        }
-      });
-    } catch (err) {
-      console.error("[email] Failed to start email poller:", err);
-    }
-
-    // Poll Telegram alert channel for rocket/missile alerts
-    try {
-      startAlertPoller(
-        // Text-only callback
-        async (text: string) => {
-          if (config.ownerChatId && whatsappClient) {
-            await whatsappClient.sendMessage(config.ownerChatId, text);
-          }
-        },
-        // Image + caption callback — uses fetch() instead of MessageMedia.fromUrl()
-        // to avoid Puppeteer "detached Frame" errors
-        async (imageUrl: string, caption: string) => {
-          if (config.ownerChatId && whatsappClient) {
-            try {
-              const imageResponse = await fetch(imageUrl);
-              if (!imageResponse.ok) throw new Error(`HTTP ${imageResponse.status}`);
-              const buffer = Buffer.from(await imageResponse.arrayBuffer());
-              const base64 = buffer.toString("base64");
-              const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
-              const media = new MessageMedia(contentType, base64, "telegram-image.jpg");
-              await whatsappClient.sendMessage(config.ownerChatId, media, { caption });
-            } catch (imgErr) {
-              // Fallback to text if image download fails
-              console.error("[telegram] Image download failed, sending text only:", imgErr);
-              await whatsappClient.sendMessage(config.ownerChatId, caption);
+          // Set up callbacks for AI system
+          setNotifyOwnerCallback(async (message: string) => {
+            if (config.ownerChatId && isSocketConnected()) {
+              await sendTextMessage(config.ownerChatId, message);
+              conversationStore.addMessage(config.ownerChatId, "assistant", message);
             }
-          }
-        }
-      );
-    } catch (err) {
-      console.error("[telegram] Failed to start alert poller:", err);
-    }
+          });
 
-    // Start proactive messaging scheduler
-    try {
-      startProactiveScheduler();
-    } catch (err) {
-      console.error("[proactive] Failed to start scheduler:", err);
-    }
-  });
+          setSendMessageCallback(async (chatId: string, message: string) => {
+            if (isSocketConnected()) {
+              await sendTextMessage(chatId, message);
+              conversationStore.addMessage(chatId, "assistant", message);
+            }
+          });
 
-  client.on("authenticated", () => { console.log("WhatsApp authenticated successfully."); });
-  client.on("auth_failure", (msg: string) => { console.error("Authentication failed:", msg); });
-  client.on("disconnected", (reason: string) => {
-    console.error(`[whatsapp] ⚠️ Disconnected: ${reason}. Restarting in 10 seconds...`);
-    whatsappClient = null;
-    setTimeout(() => {
-      console.log("[whatsapp] Attempting reconnect...");
-      client.initialize().catch((err) => {
-        console.error("[whatsapp] Reconnect failed, exiting for PM2 restart:", err);
-        process.exit(1); // PM2 will restart us
+          setSendFileCallback(async (chatId: string, base64: string, filename: string, mimetype: string, caption?: string) => {
+            if (isSocketConnected()) {
+              await sendMediaMessage(chatId, base64, filename, mimetype, caption);
+              conversationStore.addMessage(chatId, "assistant", caption || `📎 ${filename}`);
+            }
+          });
+
+          // ─── Gradual startup ─────────────────────────────────────────
+          const STARTUP_DELAY_MS = 3 * 60 * 1000;
+          const UNREAD_DELAY_MS = 2 * 60 * 1000;
+
+          console.log("[startup] Connected! Delaying automated services to avoid detection...");
+
+          // Notification poller (safe — low volume)
+          startNotificationPoller();
+
+          // Start all external pollers AFTER startup delay
+          setTimeout(() => {
+            console.log("[startup] Starting external pollers...");
+
+            try {
+              startDeliveryPoller(async (text: string) => {
+                if (config.ownerChatId && isSocketConnected()) {
+                  await sendTextMessage(config.ownerChatId, text);
+                }
+              });
+            } catch (err) {
+              console.error("[sms] Failed to start delivery poller:", err);
+            }
+
+            try {
+              startSmsWatcher(async (text: string) => {
+                if (config.ownerChatId && isSocketConnected()) {
+                  await sendTextMessage(config.ownerChatId, text);
+                  conversationStore.addMessage(config.ownerChatId, "assistant", text);
+                }
+              });
+            } catch (err) {
+              console.error("[sms-watcher] Failed to start SMS watcher:", err);
+            }
+
+            try {
+              startEmailPoller(async (text: string) => {
+                if (config.ownerChatId && isSocketConnected()) {
+                  await sendTextMessage(config.ownerChatId, text);
+                  conversationStore.addMessage(config.ownerChatId, "assistant", text);
+                }
+              });
+            } catch (err) {
+              console.error("[email] Failed to start email poller:", err);
+            }
+
+            try {
+              startAlertPoller(
+                async (text: string) => {
+                  if (config.ownerChatId && isSocketConnected()) {
+                    await sendTextMessage(config.ownerChatId, text);
+                  }
+                },
+                async (imageUrl: string, caption: string) => {
+                  if (config.ownerChatId && isSocketConnected()) {
+                    await sendImageFromUrl(config.ownerChatId, imageUrl, caption);
+                  }
+                }
+              );
+            } catch (err) {
+              console.error("[telegram] Failed to start alert poller:", err);
+            }
+
+            try {
+              startProactiveScheduler();
+            } catch (err) {
+              console.error("[proactive] Failed to start scheduler:", err);
+            }
+
+            console.log("[startup] All services started.");
+          }, STARTUP_DELAY_MS);
+        },
+
+        onMessage: (msg: BaileysMessage) => {
+          const chatId = msg.from;
+          // Emit event for autonomous agents
+          try {
+            const { agentEventBus } = require("../agents/autonomous");
+            agentEventBus.emitTyped("message:received", {
+              chatId,
+              isGroup: chatId.includes("@g.us"),
+              senderName: msg.author || chatId,
+              timestamp: Date.now(),
+            });
+          } catch {}
+          withChatLock(chatId, () => handleMessage(msg));
+        },
+
+        onDisconnected: (reason: string) => {
+          connected = false;
+          console.error(`[whatsapp] Disconnected: ${reason}`);
+        },
       });
-    }, 10000);
-  });
+    },
 
-  // Detect stale connection — if no WhatsApp activity for 5 minutes, health check
-  let lastActivity = Date.now();
-  const originalEmit = client.emit.bind(client);
-  client.emit = function (event: string, ...args: any[]) {
-    lastActivity = Date.now();
-    return originalEmit(event, ...args);
-  } as any;
-
-  setInterval(() => {
-    const silenceMs = Date.now() - lastActivity;
-    // If no activity for 10 minutes and we think we're connected, check
-    if (silenceMs > 10 * 60 * 1000 && whatsappClient) {
-      console.warn(`[whatsapp] No activity for ${Math.round(silenceMs / 60000)} minutes. Testing connection...`);
-      client.getState().then((state) => {
-        if (state !== "CONNECTED") {
-          console.error(`[whatsapp] State is ${state}, not CONNECTED. Exiting for PM2 restart.`);
-          process.exit(1);
-        } else {
-          console.log(`[whatsapp] Health check OK — state: ${state}`);
-        }
-      }).catch((err) => {
-        console.error("[whatsapp] Health check failed, exiting for PM2 restart:", err);
-        process.exit(1);
-      });
-    }
-  }, 5 * 60 * 1000); // Check every 5 minutes
-
-  client.on("message", async (msg: Message) => {
-    const chatId = msg.from;
-    // Emit event for autonomous agents
-    try {
-      const { agentEventBus } = require("../agents/autonomous");
-      const chat = await msg.getChat();
-      agentEventBus.emitTyped("message:received", {
-        chatId,
-        isGroup: chat.isGroup,
-        senderName: msg.author || chatId,
-        timestamp: Date.now(),
-      });
-    } catch {}
-    await withChatLock(chatId, () => handleMessage(msg));
-  });
-
-  return client;
+    destroy: async () => {
+      // Baileys cleanup is handled internally
+      connected = false;
+    },
+  };
 }
 
-/**
- * Process unread messages that arrived while the bot was offline.
- * Fetches all chats with unread messages and processes each one.
- */
-/**
- * Poll for pending notifications from the dashboard (e.g., followup completed → notify requester).
- */
-function startNotificationPoller(client: Client): void {
+// ─── Notification Poller ──────────────────────────────────────────────
+
+function startNotificationPoller(): void {
   const notifyPath = statePath("pending-notifications.json");
 
   setInterval(() => {
@@ -309,70 +213,25 @@ function startNotificationPoller(client: Client): void {
       const notifications = JSON.parse(content);
       if (!Array.isArray(notifications) || notifications.length === 0) return;
 
-      // Send each notification
       for (const n of notifications) {
         if (n.chatId && n.message) {
-          client.sendMessage(n.chatId, n.message).catch((err: any) =>
+          sendTextMessage(n.chatId, n.message).catch((err: any) =>
             console.error(`[notify] Failed to send to ${n.chatId}:`, err.message)
           );
           console.log(`[notify] Sent completion notification to ${n.chatId}`);
         }
       }
 
-      // Clear the file
       writeFileSync(notifyPath, "[]", "utf-8");
     } catch {}
-  }, 5000); // Check every 5 seconds
+  }, 5000);
 
   console.log("[notify] Notification poller started");
 }
 
-async function processUnreadMessages(client: Client): Promise<void> {
-  console.log("[unread] Checking for unread messages...");
-  try {
-    const chats = await client.getChats();
-    const unreadChats = chats.filter((chat) => chat.unreadCount > 0);
+// ─── Message Handler ──────────────────────────────────────────────────
 
-    if (unreadChats.length === 0) {
-      console.log("[unread] No unread messages found");
-      return;
-    }
-
-    console.log(`[unread] Found ${unreadChats.length} chats with unread messages`);
-
-    for (const chat of unreadChats) {
-      try {
-        // Fetch unread messages from this chat
-        const messages = await chat.fetchMessages({ limit: chat.unreadCount });
-        const unreadFromOthers = messages.filter((m) => !m.fromMe);
-
-        if (unreadFromOthers.length === 0) continue;
-
-        console.log(`[unread] Processing ${unreadFromOthers.length} unread messages from ${chat.name || chat.id._serialized}`);
-
-        // Process each unread message through the normal flow
-        for (const msg of unreadFromOthers) {
-          try {
-            await withChatLock(msg.from, () => handleMessage(msg));
-          } catch (err) {
-            console.error(`[unread] Error processing message from ${msg.from}:`, err);
-          }
-        }
-
-        // Mark chat as read
-        await chat.sendSeen();
-      } catch (err) {
-        console.error(`[unread] Error processing chat ${chat.name}:`, err);
-      }
-    }
-
-    console.log("[unread] Finished processing unread messages");
-  } catch (err) {
-    console.error("[unread] Error fetching chats:", err);
-  }
-}
-
-async function handleMessage(msg: Message): Promise<void> {
+async function handleMessage(msg: BaileysMessage): Promise<void> {
   if (msg.fromMe) return;
 
   // --- Media processing ---
@@ -388,8 +247,8 @@ async function handleMessage(msg: Message): Promise<void> {
   // --- vCard (contact card) processing: ONLY from owner ---
   const chatIdForVcard = msg.from;
   const isOwnerVcard = !msg.from.includes("@g.us") && chatIdForVcard === config.ownerChatId;
-  if (isOwnerVcard && msg.type === "vcard" && (msg as any).vCards?.length > 0) {
-    const vcards: string[] = (msg as any).vCards;
+  if (isOwnerVcard && msg.type === "vcard" && msg.vCards?.length > 0) {
+    const vcards: string[] = msg.vCards;
     const parsed = vcards.map(parseVCard).filter(Boolean) as Array<{ name: string; phone: string }>;
     if (parsed.length > 0) {
       const results: string[] = [];
@@ -408,14 +267,13 @@ async function handleMessage(msg: Message): Promise<void> {
   const mediaDurationMs = mediaTimer.stop();
 
   // --- Quoted message context ---
-  let quotedSenderName = ""; // Track who was replied to (for thread tracking)
-  let quotedMsgFromMe = false; // Was the quoted message from Limor herself?
+  let quotedSenderName = "";
+  let quotedMsgFromMe = false;
   if (msg.hasQuotedMsg) {
     try {
       const quotedMsg = await msg.getQuotedMessage();
       quotedMsgFromMe = !!quotedMsg.fromMe;
       const quotedText = quotedMsg.body || "(מדיה)";
-      // Include quoted message sender name so AI knows who the reply is directed at
       try {
         const quotedContact = await quotedMsg.getContact();
         quotedSenderName = quotedContact.pushname || quotedContact.name || "";
@@ -439,17 +297,14 @@ async function handleMessage(msg: Message): Promise<void> {
   if (isGroup) registerGroup(chat.name, chatId);
   const isOwner = !isGroup && chatId === config.ownerChatId;
 
-  // In groups, also track the individual sender (msg.author) as a contact
-  // This links group participants to their personal chatId so we recognize them everywhere
+  // In groups, track the individual sender
   if (isGroup && msg.author) {
     try {
       const authorContact = await msg.getContact();
       const authorPhone = authorContact.number || msg.author.replace(/@.*$/, "");
       const authorName = authorContact.pushname || authorContact.name || authorPhone;
       updateContact(msg.author, authorName, authorPhone);
-    } catch (err) {
-      // Silently ignore — author tracking is best-effort
-    }
+    } catch {}
   }
 
   // --- Update relationship memory ---
@@ -480,21 +335,18 @@ async function handleMessage(msg: Message): Promise<void> {
 
     // --- Muted groups ---
     if (isGroup && isGroupMuted(chatId)) {
-      // Still save to history so owner can ask "what happened in the group" later
       const messageForHistory = `[${contactName}]: ${body}`;
       conversationStore.addMessage(chatId, "user", messageForHistory);
-      try {
-        trackGroupPerson(chatId, contactName, body);
-      } catch {}
+      try { trackGroupPerson(chatId, contactName, body); } catch {}
       log.traceEnd(trace, "muted_group", elapsed(trace));
       return;
     }
 
-    // --- Group pre-filter: deterministic skip before AI call ---
+    // --- Group pre-filter ---
     if (isGroup) {
       const mentionsLimor = new RegExp(`(^|\\s)${config.botName}($|\\s|[?.!,])`, "i").test(body) || new RegExp(`\\b${config.botNameEn}\\b`, "i").test(body);
       const inOtherThread = isPartOfOtherThread(chatId, contactName);
-      const mentionedIds: string[] = (msg as any).mentionedIds || [];
+      const mentionedIds: string[] = msg.mentionedIds || [];
 
       const filterResult = filterGroupMessage({
         body, contactName, chatId,
@@ -509,7 +361,6 @@ async function handleMessage(msg: Message): Promise<void> {
       });
 
       if (filterResult.verdict === "must_skip") {
-        // Save to history for context, but skip AI call
         const messageForHistory = `[${contactName}]: ${body}`;
         conversationStore.addMessage(chatId, "user", messageForHistory);
         try { trackGroupPerson(chatId, contactName, body); } catch {}
@@ -517,9 +368,7 @@ async function handleMessage(msg: Message): Promise<void> {
         log.traceEnd(trace, "group_filtered", elapsed(trace));
         return;
       }
-      // Store verdict for context injection later
       (trace as any)._groupFilter = filterResult;
-      // Delay typing for ambiguous messages — only show after AI decides to respond
       if (filterResult.verdict === "let_ai_decide") {
         (trace as any)._delayTyping = true;
       }
@@ -529,7 +378,7 @@ async function handleMessage(msg: Message): Promise<void> {
     if (!isGroup && config.ownerChatId && chatId === config.ownerChatId) {
       const handled = await handleOwnerCommand({
         chatId, body,
-        reply: (text) => msg.reply(text).then(() => {}),
+        reply: (text) => msg.reply(text),
         sendToChat,
         trace,
       });
@@ -543,7 +392,7 @@ async function handleMessage(msg: Message): Promise<void> {
     if (!isGroup && chatId !== config.ownerChatId) {
       const blocked = await checkApprovalGate({
         chatId, phone, contactName, body,
-        reply: (text) => msg.reply(text).then(() => {}),
+        reply: (text) => msg.reply(text),
         sendToChat,
         trace,
       });
@@ -578,7 +427,6 @@ async function handleMessage(msg: Message): Promise<void> {
     }
 
     // --- AI conversation ---
-    // Mark as read (blue checkmarks) and show typing indicator
     try { await chat.sendSeen(); } catch {}
     const messageForHistory = isGroup ? `[${contactName}]: ${body}` : body;
     conversationStore.addMessage(chatId, "user", messageForHistory);
@@ -586,11 +434,8 @@ async function handleMessage(msg: Message): Promise<void> {
       try { await chat.sendStateTyping(); } catch {}
     }
 
-    // Track per-person activity in groups
     if (isGroup) {
-      try {
-        trackGroupPerson(chatId, contactName, body);
-      } catch {}
+      try { trackGroupPerson(chatId, contactName, body); } catch {}
     }
 
     const memoryContext = getMemoryContext(chatId);
@@ -598,7 +443,6 @@ async function handleMessage(msg: Message): Promise<void> {
     const fullHistory = conversationStore.getHistory(chatId);
     const sender = { chatId, name: contactName, isOwner };
 
-    // Smart history selection — pick most relevant messages instead of sending all 200
     const history = selectRelevantHistory(fullHistory, body);
 
     if (imageData && history.length > 0) {
@@ -612,18 +456,15 @@ async function handleMessage(msg: Message): Promise<void> {
     let allowedToolNames: string[] | undefined;
     let resolvedCtx: ResolvedContext | undefined;
 
-    // Inject conversation summary if history was trimmed
     if (conversationSummary) {
       extraContext += `\n\n⚠️ שים לב: יש היסטוריה ישנה שלא נראית בשיחה הנוכחית. סיכום: ${conversationSummary}`;
     }
 
-    // Inject relevant topic segments from past conversations
     try {
       const topicContext = getRelevantTopicSegments(chatId, body);
       if (topicContext) extraContext += "\n\n" + topicContext;
     } catch {}
 
-    // Restore context snapshot after restart (if available and recent)
     try {
       const savedSnapshot = getContextSnapshot(chatId);
       if (savedSnapshot) {
@@ -647,7 +488,6 @@ async function handleMessage(msg: Message): Promise<void> {
     }
 
     if (isGroup) {
-      // Add per-person group memory
       try {
         const groupPeopleCtx = getGroupPeopleContext(chatId);
         if (groupPeopleCtx) extraContext += "\n\n" + groupPeopleCtx;
@@ -656,7 +496,6 @@ async function handleMessage(msg: Message): Promise<void> {
       const filterResult = (trace as any)._groupFilter as { verdict: string; reason: string } | undefined;
       const recentlyResponded = hasRecentGroupResponse(chatId);
 
-      // Thread context — show active conversations
       const threadCtx = formatThreadContext(chatId, contactName);
       if (threadCtx) extraContext += "\n\n" + threadCtx;
 
@@ -669,7 +508,6 @@ async function handleMessage(msg: Message): Promise<void> {
       extraContext += ` תגיבי (טקסט בלבד, 1-2 משפטים) אם: (1) פונים אלייך בשם (${config.botName}/${config.botNameEn}) (2) מגיבים (reply) להודעה שלך. תחזירי [SKIP] אם: ההודעה שייכת לשיחה בין אנשים אחרים, reply למישהו אחר, או לא קשורה אלייך.`;
     }
 
-    // Build model routing params from resolved context
     const modelRouting = resolvedCtx ? {
       isOwner,
       isGroup,
@@ -677,7 +515,6 @@ async function handleMessage(msg: Message): Promise<void> {
       toolIntentType: resolvedCtx.toolIntent.type,
     } : undefined;
 
-    // Save context snapshot for restart recovery
     if (resolvedCtx) {
       try { saveContextSnapshot(chatId, resolvedCtx.debugTrace.summary); } catch {}
     }
@@ -692,41 +529,35 @@ async function handleMessage(msg: Message): Promise<void> {
     const aiDurationMs = aiTimer.stop();
     log.aiRequestEnd(aiDurationMs, toolsUsedInMessage.length, trace);
 
-    // Send delayed typing for group let_ai_decide messages (only if AI decided to respond)
     if ((trace as any)._delayTyping && !response.trim().startsWith("[SKIP]")) {
       try { await chat.sendStateTyping(); } catch {}
     }
 
     const responseTimer = startTimer();
     await handleResponse(chatId, contactName, response,
-      (text) => msg.reply(text).then(() => {}),
+      (text) => msg.reply(text),
       (emoji) => msg.react(emoji),
       trace,
       {
         isVoice: isVoiceMessage,
-        sendVoice: isVoiceMessage && whatsappClient ? async (base64: string, mimetype: string) => {
-          const voiceMedia = new MessageMedia(mimetype, base64, "voice.mp3");
-          await whatsappClient!.sendMessage(chatId, voiceMedia, { sendAudioAsVoice: true });
+        sendVoice: isVoiceMessage && isSocketConnected() ? async (base64: string, mimetype: string) => {
+          await sendMediaMessage(chatId, base64, "voice.mp3", mimetype);
         } : undefined,
       }
     );
     const responseDurationMs = responseTimer.stop();
 
-    // Determine outcome
     const outcome = response.trim() === "[SKIP]" ? "skip" :
       response.startsWith("[REACT:") ? "react" : "text";
     log.traceEnd(trace, outcome, elapsed(trace));
 
-    // Track group response for conversation continuation
     if (isGroup && outcome !== "skip") {
       recordGroupResponse(chatId);
     }
 
-    // --- Update persisted conversation state based on resolved context ---
+    // --- Persisted conversation state ---
     if (resolvedCtx) {
       const resolvedState = resolvedCtx.conversationState;
-      // After AI responds, if the response asks a clarification question, the next state
-      // should be "awaiting_user_detail". Otherwise, persist the resolved state.
       const askingClarification = response.includes("?") && resolvedState.type === "awaiting_user_detail";
       if (askingClarification) {
         setPersistedState(chatId, "awaiting_user_detail", `AI asked clarification: ${response.substring(0, 80)}`);
@@ -748,7 +579,6 @@ async function handleMessage(msg: Message): Promise<void> {
           userInput: body,
         });
 
-        // Fill execution results with actual tool usage data from sendMessage
         opTrace.toolsUsed = toolsUsedInMessage;
         opTrace.toolsSucceeded = toolsSucceededInMessage;
         opTrace.toolsFailed = toolsFailedInMessage;
@@ -758,17 +588,11 @@ async function handleMessage(msg: Message): Promise<void> {
         const actionClaimPattern = /שולחת בקשה|שלחתי בקשה|שולחת לרני|העברתי לרני|קבעתי|שלחתי זימון|שולחת זימון|שלחתי הודעה|שלחתי ל|העברתי ל|בדקתי את|מצאתי (מסעדה|טיסה|מלון)|הזמנתי|ביטלתי|יצרתי|נוצרה|הוספתי|מחקתי/;
         opTrace.hadHallucination = actionClaimPattern.test(response) && toolsUsedInMessage.length === 0;
 
-        // Run self-check
         const selfCheckResult = runSelfCheck(opTrace, response, toolsUsedInMessage);
         opTrace.selfCheck = selfCheckResult;
-
-        // Save trace
         saveOperationalTrace(opTrace);
-
-        // Log summary
         console.log(formatTraceSummary(opTrace));
 
-        // Log critical alerts — don't spam owner with raw ops data via WhatsApp
         if (selfCheckResult.alertLevel === "critical") {
           console.error(`[ops:critical] ${contactName}: ${selfCheckResult.summary}`);
         }
@@ -791,7 +615,7 @@ async function handleMessage(msg: Message): Promise<void> {
       }
     }
 
-    // Background fact + preference extraction (owner only to save API costs)
+    // Background fact + preference extraction (owner only)
     if (isOwner) extractFacts(history).then(({ name, facts, preferences }) => {
       if (name || facts.length > 0) saveExtractedFacts(chatId, facts, name || undefined);
       if (preferences && Object.keys(preferences).length > 0) {
@@ -803,7 +627,7 @@ async function handleMessage(msg: Message): Promise<void> {
       }
     }).catch((err) => log.memorySaveError(String(err)));
 
-    // Background followup extraction (skip for owner chats and if create_reminder tool was already used)
+    // Background followup extraction
     try {
       if (!isOwner && !response.includes("תזכורת נוצרה")) {
         extractFollowups(response, chatId, contactName, body);
@@ -812,7 +636,7 @@ async function handleMessage(msg: Message): Promise<void> {
       console.error("[followup] Extraction error:", err);
     }
 
-    // Background emotional state logging — save mood to memory when detected
+    // Background emotional state logging
     if (resolvedCtx && !isGroup) {
       const { mood } = resolvedCtx.bundle.mood;
       if (mood !== "neutral" && resolvedCtx.bundle.mood.confidence >= 0.7) {
@@ -825,7 +649,7 @@ async function handleMessage(msg: Message): Promise<void> {
       }
     }
 
-    // Background correction learning — when user corrects Limor, extract and save the lesson
+    // Background correction learning
     if (resolvedCtx?.bundle.turnIntent.category === "correction" && isOwner) {
       const lastAssistant = resolvedCtx.bundle.conversation.lastAssistantMessage;
       if (lastAssistant) {
@@ -833,13 +657,6 @@ async function handleMessage(msg: Message): Promise<void> {
           console.error("[correction-learner] Error:", err)
         );
       }
-    }
-
-    // Background contact sync disabled — contacts now in SQLite
-    try {
-      // syncContacts();
-    } catch (err) {
-      console.error("[sync] Contact sync error:", err);
     }
 
   } catch (error) {
@@ -852,7 +669,6 @@ async function handleMessage(msg: Message): Promise<void> {
 function parseVCard(vcard: string): { name: string; phone: string } | null {
   try {
     const fnMatch = vcard.match(/FN[;:](.+)/i);
-    // Try waid= first (WhatsApp ID — cleanest source), then TEL line
     const waidMatch = vcard.match(/waid=(\d+)/i);
     const telMatch = vcard.match(/TEL[^:]*:([^\n]+)/i);
     const name = fnMatch?.[1]?.trim();

@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { resolve, join } from "path";
 import { client as aiClient } from "./ai/client";
+import { SONNET } from "./ai/model-router";
 
 const USERS_DIR = resolve(__dirname, "..", "workspace", "memory", "users");
 // Fallback: old path for migration
@@ -368,7 +369,7 @@ async function cleanupFactsWithAI(chatId: string, mem: UserMemory): Promise<void
     const factsText = mem.facts.map(f => `- ${f.text}`).join("\n");
 
     const response = await aiClient.messages.create({
-      model: "claude-sonnet-4-6",
+      model: SONNET,
       max_tokens: 512,
       system: `אתה עוזר לנקות רשימת עובדות על אדם. מחק כפילויות, אחד עובדות דומות, ושמור רק מידע חשוב ורלוונטי.
 החזר JSON בלבד: {"facts": ["עובדה 1", "עובדה 2", ...]}

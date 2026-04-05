@@ -9,8 +9,8 @@
  *  4. Groups                                                                              → Sonnet
  */
 
-const OPUS  = "claude-opus-4-6";
-const SONNET = "claude-sonnet-4-6";
+export const OPUS  = "claude-opus-4-6";
+export const SONNET = "claude-sonnet-4-6";
 
 /** Intent categories that count as "complex" for owner routing. */
 const COMPLEX_INTENTS = new Set([

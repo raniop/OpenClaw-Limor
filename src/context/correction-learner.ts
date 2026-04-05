@@ -5,6 +5,7 @@
  * Uses Sonnet for cheap extraction.
  */
 import { client } from "../ai/client";
+import { SONNET } from "../ai/model-router";
 import { config } from "../config";
 import { saveInstruction } from "../instructions";
 
@@ -40,7 +41,7 @@ export async function learnFromCorrection(
     ].join("\n");
 
     const response = await client.messages.create({
-      model: "claude-sonnet-4-6",
+      model: SONNET,
       max_tokens: 256,
       system: CORRECTION_PROMPT,
       messages: [{ role: "user", content: conversation }],
