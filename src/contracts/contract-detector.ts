@@ -149,6 +149,7 @@ If BILL, return:
   "periodStart": "YYYY-MM-DD" or null,
   "periodEnd": "YYYY-MM-DD" or null,
   "dueDate": "YYYY-MM-DD" or null,
+  "isPaid": true if the document indicates payment was already made or will be auto-charged (look for: "שולם", "לא לתשלום", "ישולם באמצעות כרטיס אשראי", "חויב", "נגבה", "paid", "auto-pay", "direct debit", "הוראת קבע"). false if unpaid.,
   "summaryHe": "one-line Hebrew summary (e.g., חשבון חשמל ינואר 2026 — 450 ₪)"
 }
 
@@ -239,7 +240,8 @@ export async function detectDocumentFromText(
           periodStart: parsed.periodStart || undefined,
           periodEnd: parsed.periodEnd || undefined,
           dueDate: parsed.dueDate || undefined,
-          status: "unpaid",
+          status: parsed.isPaid ? "paid" : "unpaid",
+          paidAt: parsed.isPaid ? new Date().toISOString() : undefined,
           source,
           summary: parsed.summaryHe || `חשבון ${parsed.vendor}`,
         },
