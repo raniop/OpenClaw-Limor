@@ -204,6 +204,29 @@ export function getOverdueBills(): Bill[] {
   return getBills({ status: "overdue" });
 }
 
+/** Check if a bill amount is anomalous compared to previous bills from same vendor */
+export function detectBillAnomaly(bill: Bill): { isAnomaly: boolean; avgAmount: number; changePercent: number; direction: "up" | "down" } | null {
+  const entries = readStore();
+  const previousBills = entries.filter(
+    (b) =>
+      b.vendor.toLowerCase() === bill.vendor.toLowerCase() &&
+      b.category === bill.category &&
+      b.id !== bill.id &&
+      b.amount > 0
+  );
+
+  if (previousBills.length < 2) return null; // Need at least 2 previous bills for comparison
+
+  const avg = previousBills.reduce((s, b) => s + b.amount, 0) / previousBills.length;
+  if (avg === 0) return null;
+
+  const changePercent = Math.round(((bill.amount - avg) / avg) * 100);
+  const direction = changePercent > 0 ? "up" as const : "down" as const;
+  const isAnomaly = Math.abs(changePercent) >= 15; // 15% threshold
+
+  return { isAnomaly, avgAmount: Math.round(avg), changePercent, direction };
+}
+
 /** Find bill by vendor name (fuzzy) for mark-paid convenience */
 export function findBillByVendor(vendor: string): Bill | null {
   const lower = vendor.toLowerCase();

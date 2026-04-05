@@ -8,6 +8,8 @@ import { log } from "../logger";
 import { processDocumentForContract } from "../contracts/pdf-extractor";
 import { CATEGORY_LABELS } from "../contracts/contract-types";
 import { BILL_CATEGORY_LABELS } from "../bills/bill-types";
+import { detectBillAnomaly } from "../bills/bill-store";
+import type { Bill } from "../bills/bill-types";
 
 export interface MediaResult {
   body: string;
@@ -89,6 +91,16 @@ export async function processMedia(
                 directReply = `📄 חשבון ${catLabel} מ-*${docResult.vendor}*${periodStr ? ` (${periodStr})` : ""} — ${amountStr} — כבר קיים במערכת, לא נשמר שוב.`;
               } else if (docResult.type === "bill") {
                 directReply = `✅ *חשבון ${catLabel} נשמר!*\n🏢 ספק: ${docResult.vendor}${periodStr ? `\n📅 תקופה: ${periodStr}` : ""}\n💰 סכום: ${amountStr}${paidStr}`;
+
+                // Anomaly detection — alert on significant price changes
+                if (docResult.saved && docResult.amount) {
+                  const anomaly = detectBillAnomaly(docResult.saved as Bill);
+                  if (anomaly?.isAnomaly) {
+                    const arrow = anomaly.direction === "up" ? "📈" : "📉";
+                    const verb = anomaly.direction === "up" ? "עלה" : "ירד";
+                    directReply += `\n\n${arrow} *שים לב!* החשבון ${verb} ב-${Math.abs(anomaly.changePercent)}% מהממוצע (₪${anomaly.avgAmount.toLocaleString("he-IL")}). שווה לבדוק למה!`;
+                  }
+                }
               } else {
                 directReply = `✅ *חוזה ${catLabel} נשמר!*\n🏢 ספק: ${docResult.vendor}\n📋 ${docResult.summary || ""}${amountStr ? `\n💰 סכום: ${amountStr}` : ""}`;
               }
