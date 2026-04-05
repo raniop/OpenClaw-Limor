@@ -9,6 +9,7 @@ import type { AgentConfig } from "../agent-types";
 import { agentEventBus } from "./agent-event-bus";
 import { getAllAgentState, setAgentState, logAgentRun, getLastRunTime } from "./agent-state-store";
 import { getNotifyOwnerCallback } from "../../ai/callbacks";
+import { shouldRunAgent } from "../../operational-rules";
 
 const scheduledTasks: Map<string, ScheduledTask> = new Map();
 const _lastAlertTime: Map<string, number> = new Map();
@@ -97,6 +98,12 @@ export async function runAutonomousAgent(
   const ac = agent.autonomousConfig;
   if (!ac?.enabled) return;
 
+  // Check operational rules — owner can block specific agents dynamically
+  if (!shouldRunAgent(agent.id)) {
+    console.log(`[autonomous:${agent.id}] Blocked by operational rule`);
+    return;
+  }
+
   // Rate limit check
   if (ac.minIntervalMs) {
     const lastRun = getLastRunTime(agent.id);
@@ -148,12 +155,21 @@ export async function runAutonomousAgent(
     setAgentState(agent.id, "lastResult", summary);
     setAgentState(agent.id, "lastStatus", "success");
 
-    // Notify owner if configured and result is meaningful
+    // Notify owner if configured and result is meaningful (skip "nothing to report" messages)
     if (ac.notifyOwner) {
       const notify = getNotifyOwnerCallback();
-      if (notify && result.text) {
-        await notify(result.text);
+      const text = result.text?.trim() || "";
+      const isEmptyReport = !text || text === "ok" ||
+        text.includes("אין פעילות") ||
+        text.includes("אין פעילות משמעותית") ||
+        text.includes("אפס הודעות") ||
+        text.includes("לא נמצאו") ||
+        text.includes("No activity");
+      if (notify && text && !isEmptyReport) {
+        await notify(text);
         console.log(`[autonomous:${agent.id}] Report sent to owner`);
+      } else if (isEmptyReport) {
+        console.log(`[autonomous:${agent.id}] Skipped empty report: "${text.substring(0, 50)}"`);
       }
     } else {
       // For silent agents (like Boris) — only notify on alerts, with 3h cooldown
