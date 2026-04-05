@@ -222,7 +222,7 @@ export function detectBillAnomaly(bill: Bill): { isAnomaly: boolean; avgAmount: 
 
   const changePercent = Math.round(((bill.amount - avg) / avg) * 100);
   const direction = changePercent > 0 ? "up" as const : "down" as const;
-  const isAnomaly = Math.abs(changePercent) >= 15; // 15% threshold
+  const isAnomaly = changePercent !== 0; // Any change from average
 
   return { isAnomaly, avgAmount: Math.round(avg), changePercent, direction };
 }
