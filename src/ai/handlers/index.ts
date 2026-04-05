@@ -23,8 +23,6 @@ import { planHandlers } from "./plans";
 import { selfAwarenessHandlers } from "./self-awareness";
 import { emailHandlers } from "./email";
 import { telegramHandlers } from "./telegram";
-import { operationalRulesHandlers } from "./operational-rules";
-import { contractHandlers } from "./contracts";
 
 export type { ToolHandler } from "./types";
 
@@ -53,6 +51,4 @@ export const allHandlers: Record<string, ToolHandler> = {
   ...selfAwarenessHandlers,
   ...emailHandlers,
   ...telegramHandlers,
-  ...operationalRulesHandlers,
-  ...contractHandlers,
 };

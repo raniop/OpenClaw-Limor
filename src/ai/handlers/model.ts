@@ -1,12 +1,11 @@
 import { config } from "../../config";
-import { OPUS, SONNET } from "../model-router";
 import type { ToolHandler } from "./types";
 
 export const modelHandlers: Record<string, ToolHandler> = {
   switch_model: async (input) => {
     const MODEL_MAP: Record<string, string> = {
-      sonnet: SONNET,
-      opus: OPUS,
+      sonnet: "claude-sonnet-4-6",
+      opus: "claude-opus-4-6",
     };
     const target = input.model?.toLowerCase();
     const modelId = MODEL_MAP[target];

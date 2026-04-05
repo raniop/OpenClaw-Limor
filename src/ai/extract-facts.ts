@@ -4,7 +4,6 @@
  * Extracted from ai-core.ts — exact same logic, no behavior changes.
  */
 import { client } from "./client";
-import { SONNET } from "./model-router";
 import { config } from "../config";
 import type { Message } from "./types";
 import { log } from "../logger";
@@ -51,7 +50,7 @@ export async function extractFacts(
       .join("\n");
 
     const response = await client.messages.create({
-      model: SONNET,
+      model: "claude-sonnet-4-6",
       max_tokens: 256,
       system: [{ type: "text", text: EXTRACT_PROMPT, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: conversation }],

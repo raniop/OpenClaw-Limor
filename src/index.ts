@@ -1,7 +1,8 @@
 import { validateConfig } from "./config";
 import { createWhatsAppClient } from "./whatsapp";
 import { log } from "./logger";
-import { existsSync, readdirSync } from "fs";
+import { existsSync, readdirSync, unlinkSync, rmSync } from "fs";
+import { execSync } from "child_process";
 import { resolve } from "path";
 import { startDigestScheduler } from "./digest";
 import { startAmitScheduler } from "./agents/amit/amit-scheduler";
@@ -44,11 +45,50 @@ if (syncResult.added > 0 || syncResult.updated > 0) {
 
 const client = createWhatsAppClient();
 
-// Initialize Baileys WhatsApp connection
-client.initialize().catch((err: any) => {
-  console.error("[init] WhatsApp initialization failed:", err);
-  process.exit(1);
-});
+// Initialize with auto-retry on session corruption
+async function initWithRetry(maxRetries = 2) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await client.initialize();
+      return; // Success
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      console.error(`[init] Attempt ${attempt}/${maxRetries} failed: ${msg}`);
+
+      // If session is corrupted, clean it and retry
+      if (msg.includes("already running") || msg.includes("Execution context") || msg.includes("Protocol error")) {
+        console.log("[init] Cleaning corrupted session...");
+        const sessionDir = resolve(__dirname, "..", ".wwebjs_auth", "session");
+        const lockFile = resolve(sessionDir, "SingletonLock");
+        try { unlinkSync(lockFile); } catch {}
+
+        if (attempt < maxRetries) {
+          console.log("[init] Retrying in 3 seconds...");
+          await new Promise(r => setTimeout(r, 3000));
+          continue;
+        }
+
+        // Last resort: delete session entirely
+        console.log("[init] Deleting session for fresh QR scan...");
+        try { rmSync(sessionDir, { recursive: true, force: true }); } catch {}
+        await new Promise(r => setTimeout(r, 2000));
+        try {
+          await client.initialize();
+          return;
+        } catch (e: any) {
+          console.error("[init] Final attempt failed:", e.message);
+        }
+      }
+
+      if (attempt === maxRetries) {
+        console.error("[init] All attempts failed. Bot will not start.");
+        process.exit(1);
+      }
+    }
+  }
+}
+
+initWithRetry();
 
 // Start daily digest scheduler
 startDigestScheduler();
@@ -79,19 +119,28 @@ startAutonomousAgents();
 // Start update checker — checks GitHub for new versions daily
 startUpdateChecker();
 
-// Graceful shutdown — no Chrome/Puppeteer to clean up (Baileys uses WebSocket)
+// Graceful shutdown — close WhatsApp session and kill Chrome cleanly
 let isShuttingDown = false;
 function gracefulShutdown(signal: string) {
   if (isShuttingDown) return;
   isShuttingDown = true;
-  console.log(`[shutdown] Received ${signal}, closing cleanly...`);
+  console.log(`[shutdown] Received ${signal}, closing WhatsApp session cleanly...`);
   log.systemShutdown();
+
+  const timeout = new Promise<void>(r => setTimeout(() => {
+    console.error("[shutdown] Timeout waiting for client.destroy(), forcing exit");
+    r();
+  }, 8000));
 
   stopHealthWebhook();
 
-  Promise.resolve(client.destroy())
+  Promise.race([client.destroy(), timeout])
     .catch(err => console.error("[shutdown] Error during destroy:", err))
     .finally(() => {
+      // Kill any leftover Chromium processes spawned by puppeteer
+      try {
+        execSync("pkill -f '.wwebjs_auth.*chrome' 2>/dev/null || true", { timeout: 3000 });
+      } catch {}
       console.log("[shutdown] Done, exiting.");
       process.exit(0);
     });

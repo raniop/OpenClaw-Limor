@@ -2,7 +2,6 @@ import { writeFileSync, readFileSync, existsSync } from "fs";
 import { config } from "./config";
 import { statePath } from "./state-dir";
 import { client as aiClient } from "./ai/client";
-import { SONNET } from "./ai/model-router";
 import { getDb } from "./stores/sqlite-init";
 import { extractTopicSegments } from "./context/topic-segmenter";
 
@@ -64,7 +63,7 @@ ${conversation}
 - כתוב בעברית`;
 
     const response = await aiClient.messages.create({
-      model: SONNET,
+      model: "claude-sonnet-4-6",
       max_tokens: 800,
       messages: [{ role: "user", content: prompt }],
     });

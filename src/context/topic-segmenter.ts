@@ -8,7 +8,6 @@
  * Uses Claude Sonnet for extraction (same cost as existing summarization).
  */
 import { client as aiClient } from "../ai/client";
-import { SONNET } from "../ai/model-router";
 import { config } from "../config";
 import { getDb } from "../stores/sqlite-init";
 
@@ -69,7 +68,7 @@ ${conversation}
 - כתוב בעברית`;
 
     const response = await aiClient.messages.create({
-      model: SONNET,
+      model: "claude-sonnet-4-6",
       max_tokens: 600,
       messages: [{ role: "user", content: prompt }],
     });

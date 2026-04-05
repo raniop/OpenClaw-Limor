@@ -6,7 +6,6 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { dirname } from "path";
 import { statePath } from "../state-dir";
-import { shouldForwardEmail } from "../operational-rules";
 import {
   connectImap,
   isImapConnected,
@@ -16,8 +15,6 @@ import {
 } from "./imap-client";
 import { detectEmailOrder } from "./order-detector";
 import { addEmailOrder } from "./email-order-store";
-import { isLikelyContract, detectContract } from "../contracts/contract-detector";
-import { addContract } from "../contracts/contract-store";
 import type { EmailPollerState, EmailOrder } from "./email-types";
 
 const STATE_FILE = "email-poller-state.json";
@@ -142,12 +139,6 @@ async function pollEmails(): Promise<void> {
       const orderData = detectEmailOrder(email);
       if (!orderData) continue;
 
-      // Check operational rules before forwarding
-      if (!shouldForwardEmail(orderData.vendor || "", orderData.type || "")) {
-        console.log(`[email] Blocked by operational rule: ${orderData.vendor}/${orderData.type}`);
-        continue;
-      }
-
       const saved = addEmailOrder(orderData);
       if (!saved) continue; // Duplicate
 
@@ -164,22 +155,6 @@ async function pollEmails(): Promise<void> {
         } catch (err) {
           console.error("[email] Failed to send order notification:", err);
         }
-      }
-    }
-
-    // Detect contracts/subscriptions in new emails (silent — no notification)
-    for (const email of newEmails) {
-      if (!isLikelyContract(email)) continue;
-      try {
-        const contractData = await detectContract(email);
-        if (contractData) {
-          const saved = addContract(contractData);
-          if (saved) {
-            console.log(`[email] Contract detected: ${saved.vendor} (${saved.category}) — ${saved.summary}`);
-          }
-        }
-      } catch (err) {
-        console.error("[email] Contract detection error:", err);
       }
     }
 
