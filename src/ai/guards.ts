@@ -30,9 +30,16 @@ const AGENT_REFERENCE_PATTERN = /בוריס (בדק|מצא|דיווח|זיהה|�
 export function checkHallucination(
   response: string,
   hadToolCalls: boolean,
-  toolsAvailable: boolean
+  toolsAvailable: boolean,
+  userMessage?: string
 ): HallucinationCheckResult {
   if (hadToolCalls || !toolsAvailable) {
+    return { isHallucination: false, claimedAction: null };
+  }
+
+  // Skip hallucination check when the system already performed an action
+  // (e.g., PDF bill/contract was auto-saved by media-handler before AI)
+  if (userMessage && userMessage.includes("[מערכת:")) {
     return { isHallucination: false, claimedAction: null };
   }
 

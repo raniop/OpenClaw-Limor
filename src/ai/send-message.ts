@@ -164,7 +164,7 @@ export async function sendMessage(
   const hadToolCalls = toolsUsed.length > 0 || response.content.some((b) => b.type === "tool_use") ||
     messages.some((m) => m.role === "user" && Array.isArray(m.content) && m.content.some((c: any) => c.type === "tool_result"));
 
-  const hallCheck = checkHallucination(finalText, hadToolCalls, tools.length > 0);
+  const hallCheck = checkHallucination(finalText, hadToolCalls, tools.length > 0, lastUserMsg);
 
   if (hallCheck.isHallucination) {
     console.error(`[hallucination-guard] ⚠️ AI claimed action but no tool was called! Retrying once. Text: ${finalText.substring(0, 200)}`);

@@ -75,12 +75,14 @@ export async function processMedia(
               const catLabel = docResult.type === "bill"
                 ? (BILL_CATEGORY_LABELS as any)[docResult.category] || docResult.category
                 : (CATEGORY_LABELS as any)[docResult.category] || docResult.category;
+              const summaryText = docResult.summary || `${docResult.vendor}${amountStr}`;
+              const paidNote = (docResult.saved as any)?.status === "paid" ? " (שולם אוטומטית)" : "";
               if (docResult.duplicate) {
-                body = `[קובץ: ${filename} — ℹ️ ${docResult.type === "bill" ? "חשבון" : "חוזה"} ${catLabel} מ${docResult.vendor}${amountStr} כבר קיים במערכת. לא נשמר שוב.]`;
+                body = `[מערכת: ${docResult.type === "bill" ? "חשבון" : "חוזה"} ${catLabel} מ${docResult.vendor}${amountStr} כבר קיים במערכת. לא נשמר שוב. פשוט אשר למשתמש שהחשבון כבר ברשימה.]`;
               } else if (docResult.type === "bill") {
-                body = `[קובץ: ${filename} — ✅ חשבון ${catLabel} נשמר אוטומטית: ${docResult.vendor}${amountStr}. לא צריך להוסיף שוב — כבר נשמר!]`;
+                body = `[מערכת: חשבון ${catLabel} נשמר אוטומטית במסד הנתונים — ${summaryText}${paidNote}. אשר למשתמש בקצרה עם הפרטים. אין צורך להשתמש ב-add_bill.]`;
               } else {
-                body = `[קובץ: ${filename} — ✅ חוזה ${catLabel} נשמר אוטומטית: ${docResult.vendor}${amountStr}. לא צריך להוסיף שוב — כבר נשמר!]`;
+                body = `[מערכת: חוזה ${catLabel} נשמר אוטומטית במסד הנתונים — ${summaryText}. אשר למשתמש בקצרה עם הפרטים. אין צורך להשתמש ב-add_contract.]`;
               }
             } else {
               if (!body) body = `[קובץ: ${filename}]`;
