@@ -47,10 +47,36 @@ function generateId(): string {
  * - If same vendor+category exists → update it (new email data)
  * - Otherwise → create new entry
  */
+/** Normalize vendor names to prevent duplicates from AI variations */
+const VENDOR_ALIASES: Record<string, string> = {
+  "בזק ג'ן": "בזק-ג'ן",
+  "בזק-ג'ן (חשמל)": "בזק-ג'ן",
+  "חברת החשמל": "בזק-ג'ן",
+  "הוט": "HOT",
+  "hot": "HOT",
+  "פרטנר": "Partner",
+  "סלקום": "Cellcom",
+  "נטפליקס": "Netflix",
+  "ספוטיפיי": "Spotify",
+};
+
+function normalizeVendor(vendor: string): string {
+  const lower = vendor.toLowerCase().trim();
+  for (const [alias, normalized] of Object.entries(VENDOR_ALIASES)) {
+    if (lower === alias.toLowerCase() || lower.includes(alias.toLowerCase())) {
+      return normalized;
+    }
+  }
+  return vendor.trim();
+}
+
 export function addContract(
   data: Omit<Contract, "id" | "createdAt">
 ): Contract | null {
   const entries = readStore();
+
+  // Normalize vendor name
+  data.vendor = normalizeVendor(data.vendor);
 
   // Check for existing contract with same vendor + category
   const vendorLower = data.vendor.toLowerCase();

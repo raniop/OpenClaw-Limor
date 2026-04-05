@@ -37,6 +37,56 @@ function generateId(): string {
   return `bill-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
 }
 
+/** Normalize vendor names to prevent duplicates from AI variations */
+const VENDOR_ALIASES: Record<string, string> = {
+  "בזק ג'ן": "בזק-ג'ן",
+  "בזק-ג'ן (חשמל)": "בזק-ג'ן",
+  "בזק ג'ן (חשמל)": "בזק-ג'ן",
+  "bezeq hashmal": "בזק-ג'ן",
+  "חברת החשמל": "בזק-ג'ן",
+  "הוט": "HOT",
+  "hot": "HOT",
+  "הוט מובייל": "HOT Mobile",
+  "פרטנר": "Partner",
+  "partner": "Partner",
+  "סלקום": "Cellcom",
+  "cellcom": "Cellcom",
+  "בזק": "בזק",
+  "פלאפון": "פלאפון",
+  "גולן טלקום": "גולן טלקום",
+  "yes": "YES",
+  "נטפליקס": "Netflix",
+  "netflix": "Netflix",
+  "ספוטיפיי": "Spotify",
+  "spotify": "Spotify",
+};
+
+/** Category overrides for known vendors */
+const VENDOR_CATEGORY_OVERRIDES: Record<string, BillCategory> = {
+  "HOT": "tv",
+  "HOT Mobile": "phone",
+  "Partner": "phone",
+  "Cellcom": "phone",
+  "בזק": "internet",
+  "פלאפון": "phone",
+  "גולן טלקום": "phone",
+  "YES": "tv",
+};
+
+function normalizeVendor(vendor: string): string {
+  const lower = vendor.toLowerCase().trim();
+  for (const [alias, normalized] of Object.entries(VENDOR_ALIASES)) {
+    if (lower === alias.toLowerCase() || lower.includes(alias.toLowerCase())) {
+      return normalized;
+    }
+  }
+  return vendor.trim();
+}
+
+function overrideCategory(vendor: string, category: BillCategory): BillCategory {
+  return VENDOR_CATEGORY_OVERRIDES[vendor] || category;
+}
+
 /** Compute status based on due date and paid state */
 function computeStatus(bill: Pick<Bill, "status" | "dueDate" | "paidAt">): BillStatus {
   if (bill.paidAt || bill.status === "paid") return "paid";
@@ -56,6 +106,11 @@ function computeStatus(bill: Pick<Bill, "status" | "dueDate" | "paidAt">): BillS
  */
 export function addBill(data: Omit<Bill, "id" | "createdAt">): Bill | null {
   const entries = readStore();
+
+  // Normalize vendor name and category
+  data.vendor = normalizeVendor(data.vendor);
+  data.category = overrideCategory(data.vendor, data.category);
+
   const vendorLower = data.vendor.toLowerCase();
 
   // Dedup by invoice number
