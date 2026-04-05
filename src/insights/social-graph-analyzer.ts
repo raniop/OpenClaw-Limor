@@ -1,3 +1,5 @@
+import { SONNET } from "../ai/model-router";
+
 /**
  * Social Graph Analyzer — nightly relationship inference.
  * Analyzes interaction patterns to automatically update relationship
@@ -111,7 +113,7 @@ async function analyzeContact(contact: ContactConversation): Promise<{
   try {
     const response = await withRetry(() =>
       aiClient.messages.create({
-        model: "claude-sonnet-4-6-20250514",
+        model: SONNET,
         max_tokens: 256,
         system: ANALYSIS_PROMPT,
         messages: [

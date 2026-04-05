@@ -23,3 +23,5 @@ export { planTools } from "./plans";
 export { selfAwarenessTools } from "./self-awareness";
 export { emailTools } from "./email";
 export { telegramTools } from "./telegram";
+export { operationalRuleTools } from "./operational-rules";
+export { contractTools } from "./contracts";

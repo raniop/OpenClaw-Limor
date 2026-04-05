@@ -8,6 +8,7 @@
  * instead of user corrections.
  */
 import { client } from "../ai/client";
+import { SONNET } from "../ai/model-router";
 import { config } from "../config";
 import { saveInstruction, getInstructionsContext } from "../instructions";
 import { readFileSync, writeFileSync, existsSync } from "fs";
@@ -128,7 +129,7 @@ async function analyzeFailurePattern(
 
   try {
     const response = await client.messages.create({
-      model: "claude-sonnet-4-6",
+      model: SONNET,
       max_tokens: 256,
       system: ANALYSIS_PROMPT,
       messages: [

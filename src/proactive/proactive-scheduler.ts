@@ -3,16 +3,32 @@
  * Uses node-cron for scheduling, coordinates with rate limiter.
  */
 import { schedule, ScheduledTask } from "node-cron";
-import { checkOverdueFollowups, checkUpcomingEvents, generateMorningSummary } from "./proactive-engine";
+import { checkOverdueFollowups, checkUpcomingEvents, generateMorningSummary, checkExpiringContracts } from "./proactive-engine";
 import { canSendProactive, recordProactiveSent } from "./rate-limiter";
 import { getNotifyOwnerCallback } from "../ai/callbacks";
+import { shouldSendProactive } from "../operational-rules";
 
 const tasks: ScheduledTask[] = [];
+
+// Map scheduler source names to proactive rule types
+const SOURCE_TO_PROACTIVE_TYPE: Record<string, string> = {
+  followup: "followup_reminder",
+  calendar: "pre_meeting",
+  morning: "morning_summary",
+  contracts: "contract_renewal",
+};
 
 async function trySendProactive(
   generator: () => ProactiveResult | Promise<ProactiveResult>,
   source: string
 ): Promise<void> {
+  // Check operational rules — owner can block specific proactive message types
+  const proactiveType = SOURCE_TO_PROACTIVE_TYPE[source];
+  if (proactiveType && !shouldSendProactive(proactiveType)) {
+    console.log(`[proactive:${source}] Blocked by operational rule`);
+    return;
+  }
+
   const check = canSendProactive();
   if (!check.allowed) {
     console.log(`[proactive:${source}] Blocked: ${check.reason}`);
@@ -71,7 +87,14 @@ export function startProactiveScheduler(): void {
     }, tz)
   );
 
-  console.log("[proactive] Scheduler started (followups:15m, calendar:30m, morning:07:30)");
+  // Daily at 10:00: check expiring contracts
+  tasks.push(
+    schedule("0 10 * * *", () => {
+      trySendProactive(checkExpiringContracts, "contracts");
+    }, tz)
+  );
+
+  console.log("[proactive] Scheduler started (followups:15m, calendar:30m, morning:07:30, contracts:10:00)");
 }
 
 /**

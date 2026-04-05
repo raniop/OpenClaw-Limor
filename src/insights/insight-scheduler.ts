@@ -1,3 +1,5 @@
+import { SONNET } from "../ai/model-router";
+
 /**
  * Insight Scheduler — nightly analysis of owner conversations.
  * Generates behavioral patterns and insights using Claude,
@@ -86,7 +88,7 @@ export async function runInsightAnalysis(): Promise<void> {
   try {
     const response = await withRetry(() =>
       aiClient.messages.create({
-        model: "claude-sonnet-4-6-20250514",
+        model: SONNET,
         max_tokens: 1024,
         system: prompt,
         messages: [
