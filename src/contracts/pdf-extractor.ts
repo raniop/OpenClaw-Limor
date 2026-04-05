@@ -28,6 +28,7 @@ export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
 export interface DocumentProcessResult {
   type: "contract" | "bill";
   vendor: string;
+  category: string;
   amount?: number;
   currency?: string;
   summary: string;
@@ -67,6 +68,7 @@ export async function processDocumentForContract(
       return {
         type: "contract",
         vendor: saved.vendor,
+        category: saved.category,
         amount: saved.amount,
         currency: saved.currency,
         summary: saved.summary,
@@ -83,6 +85,7 @@ export async function processDocumentForContract(
       return {
         type: "bill",
         vendor: saved.vendor,
+        category: saved.category,
         amount: saved.amount,
         currency: saved.currency,
         summary: saved.summary,

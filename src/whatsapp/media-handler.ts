@@ -6,7 +6,8 @@ import { transcribeAudio } from "../transcribe";
 import { saveFile } from "../files";
 import { log } from "../logger";
 import { processDocumentForContract } from "../contracts/pdf-extractor";
-import type { DocumentProcessResult } from "../contracts/pdf-extractor";
+import { CATEGORY_LABELS } from "../contracts/contract-types";
+import { BILL_CATEGORY_LABELS } from "../bills/bill-types";
 
 export interface MediaResult {
   body: string;
@@ -71,10 +72,13 @@ export async function processMedia(
             const docResult = await processDocumentForContract(buffer, filename);
             if (docResult) {
               const amountStr = docResult.amount ? ` ${docResult.amount} ${docResult.currency || "₪"}` : "";
+              const catLabel = docResult.type === "bill"
+                ? (BILL_CATEGORY_LABELS as any)[docResult.category] || docResult.category
+                : (CATEGORY_LABELS as any)[docResult.category] || docResult.category;
               if (docResult.type === "bill") {
-                body = `[קובץ: ${filename} — ✅ זוהה חשבון: ${docResult.vendor}${amountStr}]`;
+                body = `[קובץ: ${filename} — ✅ זוהה חשבון ${catLabel}: ${docResult.vendor}${amountStr}]`;
               } else {
-                body = `[קובץ: ${filename} — ✅ זוהה חוזה: ${docResult.vendor}${amountStr}]`;
+                body = `[קובץ: ${filename} — ✅ זוהה חוזה ${catLabel}: ${docResult.vendor}${amountStr}]`;
               }
             } else {
               if (!body) body = `[קובץ: ${filename}]`;
