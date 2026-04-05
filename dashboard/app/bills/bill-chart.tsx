@@ -1,6 +1,6 @@
 "use client";
 
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell, Legend } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 interface Bill {
   id: string;
@@ -138,14 +138,7 @@ interface SpendingOverviewProps {
 export function SpendingOverviewChart({ vendorData }: SpendingOverviewProps) {
   if (vendorData.length === 0) return null;
 
-  const data = vendorData
-    .sort((a, b) => b.total - a.total)
-    .map((v) => ({
-      name: v.vendor,
-      total: Math.round(v.total),
-      avg: Math.round(v.total / v.count),
-      color: v.color,
-    }));
+  const sorted = vendorData.sort((a, b) => b.total - a.total);
 
   return (
     <div style={{
@@ -156,42 +149,48 @@ export function SpendingOverviewChart({ vendorData }: SpendingOverviewProps) {
       marginBottom: "24px",
     }}>
       <h3 style={{ margin: "0 0 20px", fontSize: "20px" }}>💰 סה״כ הוצאות לפי ספק</h3>
-      <ResponsiveContainer width="100%" height={Math.max(150, vendorData.length * 60)}>
-        <BarChart data={data} layout="vertical" margin={{ top: 5, right: 20, left: 80, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" horizontal={false} />
-          <XAxis
-            type="number"
-            tick={{ fill: "#888", fontSize: 12 }}
-            tickFormatter={(v) => `₪${v.toLocaleString("he-IL")}`}
-            axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
-          />
-          <YAxis
-            type="category"
-            dataKey="name"
-            tick={{ fill: "#ddd", fontSize: 14, fontWeight: 600 }}
-            axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
-            width={70}
-          />
-          <Tooltip
-            contentStyle={{
-              background: "rgba(30,30,40,0.95)",
-              border: "1px solid rgba(255,255,255,0.15)",
-              borderRadius: "8px",
-              color: "#fff",
-              direction: "rtl",
-            }}
-            formatter={(value: any, name: any) => {
-              const label = name === "total" ? "סה״כ" : "ממוצע";
-              return [`₪${Number(value).toLocaleString("he-IL")}`, label];
-            }}
-          />
-          <Bar dataKey="total" radius={[0, 6, 6, 0]} barSize={30}>
-            {data.map((entry, index) => (
-              <Cell key={index} fill={entry.color} fillOpacity={0.8} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+      <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+        {sorted.map((v) => {
+          const maxTotal = sorted[0].total;
+          const pct = maxTotal > 0 ? (v.total / maxTotal) * 100 : 0;
+          return (
+            <div key={v.vendor}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                <span style={{ fontWeight: 700, fontSize: "15px" }}>
+                  {v.emoji} {v.vendor}
+                  <span style={{ fontWeight: 400, color: "#888", fontSize: "13px", marginRight: "8px" }}>
+                    {v.count} חשבוניות
+                  </span>
+                </span>
+                <span style={{ fontWeight: 700, fontSize: "15px" }}>
+                  ₪{Math.round(v.total).toLocaleString("he-IL")}
+                </span>
+              </div>
+              <div style={{
+                height: "28px",
+                background: "rgba(255,255,255,0.05)",
+                borderRadius: "8px",
+                overflow: "hidden",
+              }}>
+                <div style={{
+                  height: "100%",
+                  width: `${pct}%`,
+                  background: `linear-gradient(90deg, ${v.color}dd, ${v.color}88)`,
+                  borderRadius: "8px",
+                  transition: "width 0.5s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  paddingRight: "10px",
+                }}>
+                  <span style={{ color: "#fff", fontSize: "12px", fontWeight: 600, whiteSpace: "nowrap" }}>
+                    ממוצע ₪{Math.round(v.total / v.count).toLocaleString("he-IL")}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -135,7 +135,7 @@ export default function BillsPage() {
         </div>
         <div className="stat-card" style={{ borderBottom: `3px solid ${unpaid.length > 0 ? "#f59e0b" : "#10b981"}` }}>
           <div className="stat-value" style={{ color: unpaid.length > 0 ? "#f59e0b" : "#10b981" }}>
-            {unpaid.length > 0 ? `${unpaid.length} לתשלום` : "הכל שולם ✅"}
+            {unpaid.length > 0 ? `${unpaid.length} לתשלום` : "הכל שולם"}
           </div>
           <div className="stat-label">
             {overdue.length > 0 ? <span style={{ color: "#ef4444" }}>{overdue.length} באיחור!</span> : "סטטוס"}
