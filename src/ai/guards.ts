@@ -157,10 +157,8 @@ export async function retryOnHallucination(
  */
 export function notifyHallucinationEvent(sender?: SenderContext): void {
   try {
-    const notify = getNotifyOwnerCallback();
-    if (notify) {
-      const who = sender?.isOwner ? "בשיחה איתך" : `צ'אט: ${sender?.name || "unknown"}`;
-      notify(`⚠️ [hallucination] ${config.botName} טענה שביצעה פעולה בלי tool! (retry triggered)\n${who}`).catch(() => {});
-    }
+    // Log only — don't send WhatsApp notification to owner (it's confusing and the retry handles it)
+    const who = sender?.isOwner ? "בשיחה עם הבעלים" : `צ'אט: ${sender?.name || "unknown"}`;
+    console.warn(`[hallucination-guard] ⚠️ ${config.botName} טענה שביצעה פעולה בלי tool (retry triggered) | ${who}`);
   } catch {}
 }
