@@ -6,6 +6,7 @@ import { transcribeAudio } from "../transcribe";
 import { saveFile } from "../files";
 import { log } from "../logger";
 import { processDocumentForContract } from "../contracts/pdf-extractor";
+import type { DocumentProcessResult } from "../contracts/pdf-extractor";
 
 export interface MediaResult {
   body: string;
@@ -67,10 +68,14 @@ export async function processMedia(
         // PDF contract detection — extract billing data from PDF documents
         if (filename.toLowerCase().endsWith(".pdf")) {
           try {
-            const contract = await processDocumentForContract(buffer, filename);
-            if (contract) {
-              const amountStr = contract.amount ? ` ₪${contract.amount}` : "";
-              body = `[קובץ: ${filename} — ✅ זוהה חוזה: ${contract.vendor}${amountStr}/${contract.billingCycle}]`;
+            const docResult = await processDocumentForContract(buffer, filename);
+            if (docResult) {
+              const amountStr = docResult.amount ? ` ${docResult.amount} ${docResult.currency || "₪"}` : "";
+              if (docResult.type === "bill") {
+                body = `[קובץ: ${filename} — ✅ זוהה חשבון: ${docResult.vendor}${amountStr}]`;
+              } else {
+                body = `[קובץ: ${filename} — ✅ זוהה חוזה: ${docResult.vendor}${amountStr}]`;
+              }
             } else {
               if (!body) body = `[קובץ: ${filename}]`;
             }

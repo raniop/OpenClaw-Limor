@@ -1,12 +1,14 @@
 /**
- * PDF Bill Extractor — parses PDF documents and extracts contract/subscription data.
- * Used when owner sends a PDF bill via WhatsApp.
+ * PDF Document Processor — parses PDF documents and extracts contract OR bill data.
+ * Routes to the appropriate store based on AI classification.
  */
-import { detectContractFromText } from "./contract-detector";
+import { detectDocumentFromText } from "./contract-detector";
+import type { DocumentDetectionResult } from "./contract-detector";
 import { addContract } from "./contract-store";
+import { addBill } from "../bills/bill-store";
 import type { Contract } from "./contract-types";
+import type { Bill } from "../bills/bill-types";
 
-// Use require for pdf-parse (no TS types)
 const pdfParse = require("pdf-parse");
 
 /**
@@ -22,14 +24,23 @@ export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
   }
 }
 
+/** Result of processing a document */
+export interface DocumentProcessResult {
+  type: "contract" | "bill";
+  vendor: string;
+  amount?: number;
+  currency?: string;
+  summary: string;
+  saved: Contract | Bill;
+}
+
 /**
- * Process a PDF document: extract text, detect contract, save if found.
- * Returns the saved contract or null.
+ * Process a PDF document: extract text, classify as contract or bill, save accordingly.
  */
 export async function processDocumentForContract(
   buffer: Buffer,
   filename: string
-): Promise<Contract | null> {
+): Promise<DocumentProcessResult | null> {
   const text = await extractTextFromPdf(buffer);
   if (!text || text.length < 20) {
     console.log(`[pdf] Too little text extracted from ${filename} (${text.length} chars)`);
@@ -38,20 +49,48 @@ export async function processDocumentForContract(
 
   console.log(`[pdf] Extracted ${text.length} chars from ${filename}`);
 
-  const contractData = await detectContractFromText(
+  const result = await detectDocumentFromText(
     text,
     "whatsapp_document",
     filename.replace(/\.pdf$/i, "")
   );
 
-  if (!contractData) {
-    console.log(`[pdf] No contract detected in ${filename}`);
+  if (!result) {
+    console.log(`[pdf] No contract/bill detected in ${filename}`);
     return null;
   }
 
-  const saved = addContract(contractData);
-  if (saved) {
-    console.log(`[pdf] Contract saved: ${saved.vendor} (${saved.category}) — ${saved.summary}`);
+  if (result.type === "contract") {
+    const saved = addContract(result.data);
+    if (saved) {
+      console.log(`[pdf] Contract saved: ${saved.vendor} (${saved.category}) — ${saved.summary}`);
+      return {
+        type: "contract",
+        vendor: saved.vendor,
+        amount: saved.amount,
+        currency: saved.currency,
+        summary: saved.summary,
+        saved,
+      };
+    }
+    return null;
   }
-  return saved;
+
+  if (result.type === "bill") {
+    const saved = addBill(result.data);
+    if (saved) {
+      console.log(`[pdf] Bill saved: ${saved.vendor} ${saved.amount} ${saved.currency} — ${saved.summary}`);
+      return {
+        type: "bill",
+        vendor: saved.vendor,
+        amount: saved.amount,
+        currency: saved.currency,
+        summary: saved.summary,
+        saved,
+      };
+    }
+    return null;
+  }
+
+  return null;
 }

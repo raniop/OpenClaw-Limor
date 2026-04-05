@@ -8,6 +8,17 @@ import { client as aiClient } from "../ai/client";
 import { SONNET } from "../ai/model-router";
 import type { ParsedEmail } from "../email/email-types";
 import type { Contract, ContractCategory, ContractBillingCycle } from "./contract-types";
+import type { Bill, BillCategory } from "../bills/bill-types";
+
+/** Result of document classification — either a contract, a bill, or nothing */
+export type DocumentDetectionResult =
+  | { type: "contract"; data: Omit<Contract, "id" | "createdAt"> }
+  | { type: "bill"; data: Omit<Bill, "id" | "createdAt"> }
+  | null;
+
+const VALID_BILL_CATEGORIES: BillCategory[] = [
+  "electricity", "water", "tax", "gas", "phone", "internet", "insurance", "rent", "other",
+];
 
 // ─── Stage 1: Regex Pre-Filter ────────────────────────────────────────
 
@@ -105,10 +116,16 @@ export function isLikelyContract(email: ParsedEmail): boolean {
 
 // ─── Stage 2: AI Extraction ───────────────────────────────────────────
 
-const EXTRACT_PROMPT = `You are analyzing an email to determine if it relates to a recurring subscription, utility bill, or contract.
-If it IS a contract/subscription/bill, extract the following as JSON:
+const EXTRACT_PROMPT = `You are analyzing a document to classify it and extract financial data.
+
+Classify the document into ONE of these types:
+1. CONTRACT — ongoing subscription/commitment (e.g., internet plan, insurance policy, Netflix, rent agreement). Has recurring billing, terms, renewal dates.
+2. BILL — specific invoice/payment for a period (e.g., electricity bill for January, water bill Q1, municipal tax). Has a specific amount for a specific period with a due date.
+3. NEITHER — marketing, spam, one-time purchase receipt, etc.
+
+If CONTRACT, return:
 {
-  "isContract": true,
+  "type": "contract",
   "vendor": "vendor name (use common Hebrew name if Israeli company)",
   "category": "internet|electricity|rent|insurance|water|tax|tv|gas|streaming|phone|other",
   "amount": number or null,
@@ -116,12 +133,28 @@ If it IS a contract/subscription/bill, extract the following as JSON:
   "billingCycle": "monthly" or "bimonthly" or "quarterly" or "yearly",
   "renewalDate": "YYYY-MM-DD" or null,
   "endDate": "YYYY-MM-DD" or null,
-  "autoRenew": true or false (default true for utilities),
-  "summaryHe": "one-line Hebrew summary of this contract/subscription",
-  "termsHe": "Hebrew summary of key commercial terms: price breakdown, commitment period, cancellation fee, special conditions. 2-3 short lines. If no terms visible, null."
+  "autoRenew": true or false,
+  "summaryHe": "one-line Hebrew summary",
+  "termsHe": "Hebrew summary of key terms (2-3 lines) or null"
 }
-If NOT a contract/subscription/bill (e.g., marketing email, one-time purchase, spam), return:
-{"isContract": false}
+
+If BILL, return:
+{
+  "type": "bill",
+  "vendor": "vendor name (use common Hebrew name if Israeli company)",
+  "category": "electricity|water|tax|gas|phone|internet|insurance|rent|other",
+  "invoiceNumber": "invoice number string or null",
+  "amount": number,
+  "currency": "ILS" or "USD" or "EUR",
+  "periodStart": "YYYY-MM-DD" or null,
+  "periodEnd": "YYYY-MM-DD" or null,
+  "dueDate": "YYYY-MM-DD" or null,
+  "summaryHe": "one-line Hebrew summary (e.g., חשבון חשמל ינואר 2026 — 450 ₪)"
+}
+
+If NEITHER, return:
+{"type": "neither"}
+
 Return ONLY valid JSON, nothing else.`;
 
 const VALID_CATEGORIES: ContractCategory[] = [
@@ -134,14 +167,14 @@ const VALID_CYCLES: ContractBillingCycle[] = [
 ];
 
 /**
- * Core AI extraction — works with any text content (email, PDF, etc.)
- * Returns null if not a contract or extraction fails.
+ * Core AI extraction — classifies document as contract, bill, or neither.
+ * Works with any text content (email, PDF, etc.)
  */
-export async function detectContractFromText(
+export async function detectDocumentFromText(
   content: string,
   source: "email" | "whatsapp_document" | "manual",
   fallbackVendor?: string
-): Promise<Omit<Contract, "id" | "createdAt"> | null> {
+): Promise<DocumentDetectionResult> {
   try {
     const response = await aiClient.messages.create({
       model: SONNET,
@@ -161,35 +194,75 @@ export async function detectContractFromText(
     if (!jsonMatch) return null;
 
     const parsed = JSON.parse(jsonMatch[0]);
-    if (!parsed.isContract) return null;
 
-    const category: ContractCategory = VALID_CATEGORIES.includes(parsed.category)
-      ? parsed.category
-      : "other";
+    if (parsed.type === "contract") {
+      const category: ContractCategory = VALID_CATEGORIES.includes(parsed.category)
+        ? parsed.category
+        : "other";
+      const billingCycle: ContractBillingCycle = VALID_CYCLES.includes(parsed.billingCycle)
+        ? parsed.billingCycle
+        : "monthly";
 
-    const billingCycle: ContractBillingCycle = VALID_CYCLES.includes(parsed.billingCycle)
-      ? parsed.billingCycle
-      : "monthly";
+      return {
+        type: "contract",
+        data: {
+          vendor: parsed.vendor || fallbackVendor || "לא ידוע",
+          category,
+          amount: typeof parsed.amount === "number" ? parsed.amount : undefined,
+          currency: parsed.currency || "ILS",
+          billingCycle,
+          startDate: undefined,
+          endDate: parsed.endDate || undefined,
+          renewalDate: parsed.renewalDate || undefined,
+          autoRenew: parsed.autoRenew !== false,
+          status: "active",
+          source,
+          summary: parsed.summaryHe || `${parsed.vendor} — ${category}`,
+          terms: parsed.termsHe || undefined,
+        },
+      };
+    }
 
-    return {
-      vendor: parsed.vendor || fallbackVendor || "לא ידוע",
-      category,
-      amount: typeof parsed.amount === "number" ? parsed.amount : undefined,
-      currency: parsed.currency || "ILS",
-      billingCycle,
-      startDate: undefined,
-      endDate: parsed.endDate || undefined,
-      renewalDate: parsed.renewalDate || undefined,
-      autoRenew: parsed.autoRenew !== false,
-      status: "active",
-      source,
-      summary: parsed.summaryHe || `${parsed.vendor} — ${category}`,
-      terms: parsed.termsHe || undefined,
-    };
+    if (parsed.type === "bill") {
+      const category: BillCategory = VALID_BILL_CATEGORIES.includes(parsed.category)
+        ? parsed.category
+        : "other";
+
+      return {
+        type: "bill",
+        data: {
+          vendor: parsed.vendor || fallbackVendor || "לא ידוע",
+          category,
+          invoiceNumber: parsed.invoiceNumber || undefined,
+          amount: typeof parsed.amount === "number" ? parsed.amount : 0,
+          currency: parsed.currency || "ILS",
+          periodStart: parsed.periodStart || undefined,
+          periodEnd: parsed.periodEnd || undefined,
+          dueDate: parsed.dueDate || undefined,
+          status: "unpaid",
+          source,
+          summary: parsed.summaryHe || `חשבון ${parsed.vendor}`,
+        },
+      };
+    }
+
+    // "neither" or unrecognized
+    return null;
   } catch (err) {
     console.error("[contracts] Detection failed:", err);
     return null;
   }
+}
+
+/** Legacy wrapper — detects contracts only (used by email poller) */
+export async function detectContractFromText(
+  content: string,
+  source: "email" | "whatsapp_document" | "manual",
+  fallbackVendor?: string
+): Promise<Omit<Contract, "id" | "createdAt"> | null> {
+  const result = await detectDocumentFromText(content, source, fallbackVendor);
+  if (result?.type === "contract") return result.data;
+  return null;
 }
 
 /**

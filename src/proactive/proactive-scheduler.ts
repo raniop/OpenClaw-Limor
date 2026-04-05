@@ -3,7 +3,7 @@
  * Uses node-cron for scheduling, coordinates with rate limiter.
  */
 import { schedule, ScheduledTask } from "node-cron";
-import { checkOverdueFollowups, checkUpcomingEvents, generateMorningSummary, checkExpiringContracts } from "./proactive-engine";
+import { checkOverdueFollowups, checkUpcomingEvents, generateMorningSummary, checkExpiringContracts, checkOverdueBills } from "./proactive-engine";
 import { canSendProactive, recordProactiveSent } from "./rate-limiter";
 import { getNotifyOwnerCallback } from "../ai/callbacks";
 import { shouldSendProactive } from "../operational-rules";
@@ -16,6 +16,7 @@ const SOURCE_TO_PROACTIVE_TYPE: Record<string, string> = {
   calendar: "pre_meeting",
   morning: "morning_summary",
   contracts: "contract_renewal",
+  bills: "bill_overdue",
 };
 
 async function trySendProactive(
@@ -94,7 +95,14 @@ export function startProactiveScheduler(): void {
     }, tz)
   );
 
-  console.log("[proactive] Scheduler started (followups:15m, calendar:30m, morning:07:30, contracts:10:00)");
+  // Daily at 09:00: check overdue/due bills
+  tasks.push(
+    schedule("0 9 * * *", () => {
+      trySendProactive(checkOverdueBills, "bills");
+    }, tz)
+  );
+
+  console.log("[proactive] Scheduler started (followups:15m, calendar:30m, morning:07:30, bills:09:00, contracts:10:00)");
 }
 
 /**

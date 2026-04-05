@@ -7,7 +7,7 @@ import { listEvents } from "../calendar";
 import { config } from "../config";
 
 export interface ProactiveMessage {
-  type: "followup_reminder" | "pre_meeting" | "morning_summary" | "contract_renewal";
+  type: "followup_reminder" | "pre_meeting" | "morning_summary" | "contract_renewal" | "bill_overdue";
   text: string;
   priority: "low" | "medium" | "high";
 }
@@ -152,6 +152,8 @@ export async function generateMorningSummary(): Promise<ProactiveMessage | null>
 
 import { getExpiringContracts } from "../contracts/contract-store";
 import { CATEGORY_LABELS, CATEGORY_EMOJIS } from "../contracts/contract-types";
+import { getOverdueBills, getUnpaidBills } from "../bills/bill-store";
+import { BILL_CATEGORY_EMOJIS } from "../bills/bill-types";
 
 const REMINDED_CONTRACTS_PATH = statePath("reminded-contracts.json");
 
@@ -199,4 +201,71 @@ export function checkExpiringContracts(): ProactiveMessage | null {
     text: `${emoji} היי ${config.ownerName}, החוזה עם **${unreminded.vendor}** (${cat})${amount} מתחדש בעוד ${daysLeft} ימים.\nרוצה שאבדוק אם כדאי לחדש או לשנות?`,
     priority: "medium",
   };
+}
+
+// ─── Overdue Bills Check ─────────────────────────────────────────────
+
+const REMINDED_BILLS_PATH = statePath("reminded-bills.json");
+
+function loadRemindedBillIds(): Set<string> {
+  try {
+    if (existsSync(REMINDED_BILLS_PATH)) {
+      return new Set(JSON.parse(readFileSync(REMINDED_BILLS_PATH, "utf-8")));
+    }
+  } catch {}
+  return new Set();
+}
+
+function saveRemindedBillId(id: string): void {
+  const ids = loadRemindedBillIds();
+  ids.add(id);
+  const arr = [...ids].slice(-200);
+  writeFileSync(REMINDED_BILLS_PATH, JSON.stringify(arr), "utf-8");
+}
+
+/**
+ * Check for overdue or soon-due bills.
+ * Each bill is only reminded ONCE.
+ */
+export function checkOverdueBills(): ProactiveMessage | null {
+  // Check overdue first
+  const overdue = getOverdueBills();
+  const remindedIds = loadRemindedBillIds();
+
+  const overdueUnreminded = overdue.find((b) => !remindedIds.has(b.id));
+  if (overdueUnreminded) {
+    saveRemindedBillId(overdueUnreminded.id);
+    const emoji = BILL_CATEGORY_EMOJIS[overdueUnreminded.category] || "📄";
+    return {
+      type: "bill_overdue",
+      text: `🔴 ${emoji} ${config.ownerName}, יש חשבון **${overdueUnreminded.vendor}** של ${overdueUnreminded.amount} ${overdueUnreminded.currency} שעבר את מועד התשלום${overdueUnreminded.dueDate ? ` (${new Date(overdueUnreminded.dueDate).toLocaleDateString("he-IL")})` : ""}!\nרוצה שאסמן כשולם?`,
+      priority: "high",
+    };
+  }
+
+  // Then check bills due within 3 days
+  const unpaid = getUnpaidBills().filter((b) => {
+    if (!b.dueDate || remindedIds.has(b.id)) return false;
+    const daysUntil = Math.ceil(
+      (new Date(b.dueDate).getTime() - Date.now()) / (24 * 60 * 60 * 1000)
+    );
+    return daysUntil >= 0 && daysUntil <= 3;
+  });
+
+  if (unpaid.length > 0) {
+    const bill = unpaid[0];
+    saveRemindedBillId(bill.id);
+    const daysLeft = Math.ceil(
+      (new Date(bill.dueDate!).getTime() - Date.now()) / (24 * 60 * 60 * 1000)
+    );
+    const emoji = BILL_CATEGORY_EMOJIS[bill.category] || "📄";
+    const urgency = daysLeft === 0 ? "היום" : `בעוד ${daysLeft} ימים`;
+    return {
+      type: "bill_overdue",
+      text: `⚠️ ${emoji} ${config.ownerName}, חשבון **${bill.vendor}** של ${bill.amount} ${bill.currency} לתשלום ${urgency}!`,
+      priority: "high",
+    };
+  }
+
+  return null;
 }
