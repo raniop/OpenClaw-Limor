@@ -17,7 +17,7 @@ export type DocumentDetectionResult =
   | null;
 
 const VALID_BILL_CATEGORIES: BillCategory[] = [
-  "electricity", "water", "tax", "gas", "phone", "internet", "insurance", "rent", "other",
+  "electricity", "water", "tax", "gas", "phone", "internet", "tv", "streaming", "insurance", "rent", "other",
 ];
 
 // ─── Stage 1: Regex Pre-Filter ────────────────────────────────────────
@@ -142,7 +142,7 @@ If BILL, return:
 {
   "type": "bill",
   "vendor": "vendor name (use common Hebrew name if Israeli company)",
-  "category": "electricity|water|tax|gas|phone|internet|insurance|rent|other",
+  "category": "electricity|water|tax|gas|phone|internet|tv|streaming|insurance|rent|other",
   "invoiceNumber": "invoice number string or null",
   "amount": number,
   "currency": "ILS" or "USD" or "EUR",

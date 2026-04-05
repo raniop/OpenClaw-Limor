@@ -10,6 +10,8 @@ export type BillCategory =
   | "gas"
   | "phone"
   | "internet"
+  | "tv"        // טלוויזיה
+  | "streaming" // סטרימינג
   | "insurance"
   | "rent"
   | "other";
@@ -40,6 +42,8 @@ export const BILL_CATEGORY_LABELS: Record<BillCategory, string> = {
   gas: "גז",
   phone: "טלפון",
   internet: "אינטרנט",
+  tv: "טלוויזיה",
+  streaming: "סטרימינג",
   insurance: "ביטוח",
   rent: "שכירות",
   other: "אחר",
@@ -52,6 +56,8 @@ export const BILL_CATEGORY_EMOJIS: Record<BillCategory, string> = {
   gas: "🔥",
   phone: "📱",
   internet: "🌐",
+  tv: "📺",
+  streaming: "🎬",
   insurance: "🛡️",
   rent: "🏠",
   other: "📄",
