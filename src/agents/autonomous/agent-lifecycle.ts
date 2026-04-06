@@ -16,33 +16,32 @@ const _lastAlertTime: Map<string, number> = new Map();
 
 /** Per-agent autonomous task prompts */
 const AUTONOMOUS_TASKS: Record<string, string> = {
-  amit: `בצע בדיקת עדכוני dependencies מלאה לפי הפרוטוקול הבא:
+  amit: `בצע בדיקת עדכוני dependencies לפי הפרוטוקול הבא:
 
-1. הרץ: npm outdated --json כדי לקבל רשימת dependencies מיושנות
-2. נתח את הפלט — חלק לשתי קבוצות:
-   - SAFE: חבילות שה-wanted version שלהן שומרת על אותו major (לדוגמה: 1.2.3 → 1.9.0)
-   - SKIP: חבילות שה-wanted version שלהן מעלה את ה-major (לדוגמה: 1.2.3 → 2.0.0)
-3. אם אין חבילות ב-SAFE — דווח "הכל עדכני" וסיים
-4. עדכן רק חבילות SAFE: הרץ npm update
-5. הרץ build: npm run build
-6. אם build נכשל:
+1. הרץ: npm outdated --json
+2. נתח — חלק לשתי קבוצות:
+   - SAFE: wanted version באותו major (1.2.3 → 1.9.0)
+   - SKIP: wanted version מעלה major (1.2.3 → 2.0.0)
+3. אם אין SAFE — דווח "הכל עדכני" וסיים
+4. ⚠️ חשוב מאוד: לעדכן כל חבילה בנפרד! לא להשתמש ב-"npm update" כי זה שובר את shx!
+   במקום זה: npm install package1@wanted package2@wanted (חבילות ספציפיות עם גרסאות ספציפיות)
+   לדוגמה: npm install @types/node@22.19.17 dotenv@17.4.1
+5. אחרי ההתקנה — ודא ש-shx קיים: npx shx --version
+   אם shx חסר — הרץ npm install ותדווח כשל
+6. הרץ build: npm run build
+7. אם build נכשל:
    a. שחזר: git checkout -- package.json package-lock.json
    b. הרץ npm install לשחזור
-   c. דווח על הכשל עם פרטים מלאים — אל תפרוס!
-7. הרץ טסטים: npm test
-8. אם טסטים נכשלו:
-   a. שחזר: git checkout -- package.json package-lock.json
-   b. הרץ npm install לשחזור
-   c. דווח על הכשל עם פרטים מלאים — אל תפרוס!
-9. אם הכל עבר — עשה commit: git add package.json package-lock.json && git commit -m "chore: update minor/patch dependencies (auto by Amit)"
-10. פרוס: restart_and_deploy
-11. דווח סיכום מלא בפורמט:
-📦 *דוח עדכון dependencies — עמית*
-✅ עודכנו: [רשימת חבילות + גרסאות]
-⏭️ דולגו (major): [רשימת חבילות + גרסאות]
-🚀 סטטוס: פרוס בהצלחה
+   c. דווח כשל — אל תפרוס!
+8. אם build עבר — עשה commit: git add package.json package-lock.json && git commit -m "chore: update dependencies (auto by Amit)"
+9. פרוס: restart_and_deploy
+10. דווח סיכום:
+📦 *עדכון dependencies — עמית*
+✅ עודכנו: [רשימה]
+⏭️ דולגו: [רשימה]
+🚀 סטטוס: פרוס
 
-**חשוב:** אם שלב כלשהו נכשל — דווח בפירוט ואל תפרוס!`,
+**אם משהו נכשל — שחזר, דווח, ואל תפרוס!**`,
 
   boris: `בצע בדיקת בריאות מהירה:
 1. הרץ full_system_report
