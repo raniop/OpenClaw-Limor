@@ -119,12 +119,9 @@ export async function runInsightAnalysis(): Promise<void> {
     replacePatterns(ownerChatId, result.patterns);
     console.log(`[insights] Saved ${result.patterns.length} patterns for owner`);
 
-    // 8. Notify owner
-    const notify = getNotifyOwnerCallback();
-    if (notify && result.changes && result.changes !== "אין שינוי") {
-      const patternList = result.patterns.map((p) => `• ${p}`).join("\n");
-      await notify(`🧠 *תובנות שזיהיתי עליך:*\n${patternList}\n\n_${result.changes}_`);
-      console.log("[insights] Report sent to owner");
+    // 8. Log only — don't send insights to owner via WhatsApp (they find it intrusive)
+    if (result.changes && result.changes !== "אין שינוי") {
+      console.log(`[insights] New patterns detected: ${result.patterns.length} patterns. Changes: ${result.changes}`);
     }
   } catch (err: any) {
     console.error("[insights] Analysis failed:", err.message);
