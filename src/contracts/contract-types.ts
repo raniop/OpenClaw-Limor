@@ -13,6 +13,8 @@ export type ContractCategory =
   | "gas"
   | "streaming"
   | "phone"
+  | "pension"
+  | "vehicle"
   | "other";
 
 export type ContractBillingCycle =
@@ -60,6 +62,8 @@ export const CATEGORY_LABELS: Record<ContractCategory, string> = {
   gas: "גז",
   streaming: "סטרימינג",
   phone: "טלפון",
+  pension: "פנסיה/גמל",
+  vehicle: "רכב",
   other: "אחר",
 };
 
@@ -74,6 +78,8 @@ export const CATEGORY_EMOJIS: Record<ContractCategory, string> = {
   gas: "🔥",
   streaming: "🎬",
   phone: "📱",
+  pension: "🏦",
+  vehicle: "🚗",
   other: "📋",
 };
 

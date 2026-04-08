@@ -13,6 +13,7 @@
 
 import { getBasePrompt, getRelevantContext } from "../workspace-loader";
 import { getInstructionsContext } from "../instructions";
+import { getActiveRulesContext } from "../operational-rules";
 
 export interface PolicySource {
   level: number;
@@ -68,6 +69,18 @@ export function resolvePolicies(params: {
       source: "state/instructions.json",
       content: instructionsCtx,
       reason: "Owner-defined rules that override defaults",
+    });
+  }
+
+  // Level 2.5: Active operational rules (so AI knows what's currently active)
+  const rulesCtx = getActiveRulesContext();
+  if (rulesCtx) {
+    sources.push({
+      level: 2,
+      name: "operational rules",
+      source: "state/operational-rules.json",
+      content: rulesCtx,
+      reason: "Active system behavior rules that affect autonomous subsystems",
     });
   }
 

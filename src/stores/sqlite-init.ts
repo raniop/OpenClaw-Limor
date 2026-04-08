@@ -152,6 +152,14 @@ export function getDb(): Database.Database {
       updated_at TEXT DEFAULT (datetime('now')),
       PRIMARY KEY (agent_id, key)
     );
+
+    CREATE TABLE IF NOT EXISTS contact_tool_permissions (
+      chat_id TEXT NOT NULL,
+      tool_pattern TEXT NOT NULL,
+      granted_by TEXT DEFAULT 'owner',
+      created_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (chat_id, tool_pattern)
+    );
   `);
 
   console.log(`[sqlite] Database initialized at ${dbPath}`);

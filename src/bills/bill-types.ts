@@ -14,6 +14,8 @@ export type BillCategory =
   | "streaming" // סטרימינג
   | "insurance"
   | "rent"
+  | "pension"   // פנסיה / קופת גמל
+  | "vehicle"   // רכב
   | "other";
 
 export type BillStatus = "unpaid" | "paid" | "overdue";
@@ -46,6 +48,8 @@ export const BILL_CATEGORY_LABELS: Record<BillCategory, string> = {
   streaming: "סטרימינג",
   insurance: "ביטוח",
   rent: "שכירות",
+  pension: "פנסיה/גמל",
+  vehicle: "רכב",
   other: "אחר",
 };
 
@@ -60,6 +64,8 @@ export const BILL_CATEGORY_EMOJIS: Record<BillCategory, string> = {
   streaming: "🎬",
   insurance: "🛡️",
   rent: "🏠",
+  pension: "🏦",
+  vehicle: "🚗",
   other: "📄",
 };
 

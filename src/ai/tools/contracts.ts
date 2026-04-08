@@ -13,7 +13,7 @@ export const contractTools: Anthropic.Tool[] = [
           type: "string",
           enum: [
             "internet", "electricity", "rent", "insurance", "water",
-            "tax", "tv", "gas", "streaming", "phone", "other",
+            "tax", "tv", "gas", "streaming", "phone", "pension", "vehicle", "other",
           ],
           description: "סינון לפי קטגוריה (אופציונלי)",
         },
@@ -37,7 +37,7 @@ export const contractTools: Anthropic.Tool[] = [
           type: "string",
           enum: [
             "internet", "electricity", "rent", "insurance", "water",
-            "tax", "tv", "gas", "streaming", "phone", "other",
+            "tax", "tv", "gas", "streaming", "phone", "pension", "vehicle", "other",
           ],
           description: "קטגוריה",
         },
@@ -72,7 +72,7 @@ export const contractTools: Anthropic.Tool[] = [
           type: "string",
           enum: [
             "internet", "electricity", "rent", "insurance", "water",
-            "tax", "tv", "gas", "streaming", "phone", "other",
+            "tax", "tv", "gas", "streaming", "phone", "pension", "vehicle", "other",
           ],
         },
         amount: { type: "number", description: "סכום חדש" },

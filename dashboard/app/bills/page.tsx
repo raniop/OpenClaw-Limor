@@ -28,13 +28,13 @@ interface Bill {
 const CATEGORY_LABELS: Record<string, string> = {
   electricity: "חשמל", water: "מים", tax: "ארנונה", gas: "גז",
   phone: "טלפון", internet: "אינטרנט", tv: "טלוויזיה", streaming: "סטרימינג",
-  insurance: "ביטוח", rent: "שכירות", other: "אחר",
+  insurance: "ביטוח", rent: "שכירות", pension: "פנסיה/גמל", vehicle: "רכב", other: "אחר",
 };
 
 const CATEGORY_EMOJIS: Record<string, string> = {
   electricity: "⚡", water: "💧", tax: "🏛️", gas: "🔥",
   phone: "📱", internet: "🌐", tv: "📺", streaming: "🎬",
-  insurance: "🛡️", rent: "🏠", other: "📄",
+  insurance: "🛡️", rent: "🏠", pension: "🏦", vehicle: "🚗", other: "📄",
 };
 
 const VENDOR_COLORS: Record<string, string> = {
@@ -146,8 +146,8 @@ export default function BillsPage() {
           <div className="stat-label">ממתין לתשלום</div>
         </div>
         <div className="stat-card" style={{ borderBottom: "3px solid #8b5cf6" }}>
-          <div className="stat-value">₪{Math.round(avgMonthly).toLocaleString("he-IL")}</div>
-          <div className="stat-label">ממוצע חודשי</div>
+          <div className="stat-value">₪{Math.round(totalAll).toLocaleString("he-IL")}</div>
+          <div className="stat-label">סה״כ הוצאות</div>
         </div>
       </div>
 

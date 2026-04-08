@@ -107,8 +107,48 @@ export const contactTools: Anthropic.Tool[] = [
     },
   },
   {
+    name: "grant_tool_access",
+    description: `הענקת גישה לכלים ספציפיים לאיש קשר. השתמשי כש${config.ownerName} מבקש לתת למישהו הרשאה לכלי מסוים. למשל: 'תני לאלי גישה ל-CRM' → tool_patterns: ["crm_"]`,
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        contact_name: {
+          type: "string",
+          description: "שם איש הקשר שמקבל גישה",
+        },
+        tool_patterns: {
+          type: "array",
+          items: { type: "string" },
+          description: 'רשימת כלים או תבניות כלים. לדוגמה: ["crm_"] לכל כלי ה-CRM, או ["list_events"] לכלי ספציפי',
+        },
+      },
+      required: ["contact_name", "tool_patterns"],
+    },
+  },
+  {
+    name: "revoke_tool_access",
+    description: `ביטול גישה לכלים מאיש קשר. השתמשי כש${config.ownerName} מבקש להסיר הרשאה. אם לא צוינו כלים ספציפיים — מסירה את כל ההרשאות המיוחדות.`,
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        contact_name: {
+          type: "string",
+          description: "שם איש הקשר",
+        },
+        tool_patterns: {
+          type: "array",
+          items: { type: "string" },
+          description: "רשימת כלים/תבניות להסרה (אופציונלי — אם ריק, מסיר הכל)",
+        },
+      },
+      required: ["contact_name"],
+    },
+  },
+  {
     name: "create_reminder",
-    description: `יצירת תזכורת/מעקב. השתמשי כשמישהו מבקש לתזכר את ${config.ownerName}, או כש${config.ownerName} מבקש תזכורת, או כשיש משימה שצריך לעקוב אחריה. חובה לציין מי ביקש (from_name) ומה בדיוק הבקשה (task).`,
+    description: `יצירת תזכורת/מעקב. השתמשי כשמישהו מבקש לתזכר את ${config.ownerName} או מישהו אחר, או כשיש משימה שצריך לעקוב אחריה.
+**חשוב:** כש${config.ownerName} מציין שעה (למשל "ב-20:05", "בשעה 21:00") — חובה להשתמש ב-due_at עם הפורמט "HH:MM" ולא ב-due_hours!
+אם ${config.ownerName} אומר "תזכירי לעמית גולן ב-21:00 לקחת את החסות" — שימי target_contact="עמית גולן" ו-message="היי עמית! תזכורת — לקחת את החסות 💪"`,
     input_schema: {
       type: "object" as const,
       properties: {
@@ -122,10 +162,49 @@ export const contactTools: Anthropic.Tool[] = [
         },
         due_hours: {
           type: "number",
-          description: "בעוד כמה שעות להזכיר (ברירת מחדל: 24)",
+          description: "בעוד כמה שעות להזכיר (ברירת מחדל: 24). **אל תשתמשי אם יש due_at!**",
+        },
+        due_at: {
+          type: "string",
+          description: 'זמן מדויק לתזכורת. פורמטים: "HH:MM" (היום, שעון ישראל), "YYYY-MM-DD HH:MM", או ISO. **עדיף על due_hours כשיש שעה ספציפית!**',
+        },
+        target_contact: {
+          type: "string",
+          description: "שם איש קשר שצריך לקבל את התזכורת (אם לא צוין — התזכורת נשלחת לרני). למשל: 'עמית גולן'",
+        },
+        message: {
+          type: "string",
+          description: "הודעה מותאמת אישית לשלוח לאיש הקשר. למשל: 'היי עמית! תזכורת — לקחת את החסות 💪'",
         },
       },
       required: ["task", "from_name"],
+    },
+  },
+  {
+    name: "list_reminders",
+    description: `הצגת כל התזכורות הממתינות. השתמשי כש${config.ownerName} שואל 'מה התזכורות שלי?', 'יש תזכורות?', 'מה ממתין?'`,
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "delete_reminder",
+    description: `מחיקת תזכורת. השתמשי כש${config.ownerName} מבקש למחוק/לבטל תזכורת. אפשר לפי ID או לפי מילת חיפוש מתוך תוכן התזכורת.`,
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        id: {
+          type: "string",
+          description: "מזהה התזכורת (אם ידוע)",
+        },
+        keyword: {
+          type: "string",
+          description: "מילת חיפוש למחיקה — למשל 'חסות' או 'עמית'. מוחק את התזכורת הראשונה שמכילה את המילה.",
+        },
+      },
+      required: [],
     },
   },
 ];

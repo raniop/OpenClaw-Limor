@@ -2,7 +2,7 @@
  * Proactive Engine — generates context-aware proactive messages.
  * Checks various triggers and produces natural Hebrew messages.
  */
-import { getDueFollowups } from "../followups";
+import { getDueFollowups, completeFollowup } from "../followups";
 import { listEvents } from "../calendar";
 import { config } from "../config";
 
@@ -10,6 +10,8 @@ export interface ProactiveMessage {
   type: "followup_reminder" | "pre_meeting" | "morning_summary" | "contract_renewal" | "bill_overdue";
   text: string;
   priority: "low" | "medium" | "high";
+  targetChatId?: string;   // If set, send to this contact instead of owner
+  targetMessage?: string;  // Custom message for target contact
 }
 
 // Track which followup IDs were already reminded — persisted to disk
@@ -60,12 +62,40 @@ export function checkOverdueFollowups(): ProactiveMessage | null {
   if (!unreminded) return null;
 
   saveRemindedId(unreminded.id);
-  const reason = unreminded.reason.substring(0, 80);
+  // Mark as completed so it doesn't linger in pending list
+  completeFollowup(unreminded.id);
+  // Extract the task from reason — strip the "[מ-Name] " prefix
+  const task = unreminded.reason.replace(/^\[מ-[^\]]*\]\s*/, "").substring(0, 80);
   const name = unreminded.contactName || "מישהו";
+  const isOwnerReminder = unreminded.requesterName === config.ownerName
+    || unreminded.requesterName === "רני"
+    || unreminded.requesterName === "רני אופיר"
+    || name === config.ownerName;
 
+  // If this followup has a target contact, route the message to them
+  if (unreminded.targetChatId && unreminded.targetMessage) {
+    return {
+      type: "followup_reminder",
+      text: `📨 שלחתי תזכורת ל-${unreminded.targetName || "איש קשר"}: "${unreminded.targetMessage.substring(0, 60)}"`,
+      priority: "high",
+      targetChatId: unreminded.targetChatId,
+      targetMessage: unreminded.targetMessage,
+    };
+  }
+
+  // Self-reminder: natural and concise
+  if (isOwnerReminder) {
+    return {
+      type: "followup_reminder",
+      text: `⏰ ${config.ownerName}, תזכורת: ${task}`,
+      priority: "high",
+    };
+  }
+
+  // Reminder from someone else
   return {
     type: "followup_reminder",
-    text: `היי ${config.ownerName} 👋\nיש משהו שעבר הזמן שלו: "${reason}" (${name}).\nרוצה שאטפל בזה?`,
+    text: `⏰ ${config.ownerName}, ${name} ביקש/ה להזכיר לך: ${task}`,
     priority: "high",
   };
 }

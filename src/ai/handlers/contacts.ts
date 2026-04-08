@@ -5,6 +5,7 @@ import { getHistory } from "../../conversation";
 import { findGroupChatId } from "../../muted-groups";
 import { getSendMessageCallback } from "../callbacks";
 import { logAudit } from "../../audit/audit-log";
+import { grantContactTools, revokeContactTools, getContactGrants } from "../../permissions/permission-service";
 import type { ToolHandler } from "./types";
 
 export const contactsHandlers: Record<string, ToolHandler> = {
@@ -87,6 +88,49 @@ export const contactsHandlers: Record<string, ToolHandler> = {
     const lastN = input.last_n || 20;
     const recent = history.slice(-lastN);
     return recent.map((m: any) => m.content).join("\n");
+  },
+
+  grant_tool_access: async (input, sender) => {
+    const actor = sender?.name || "unknown";
+    const contact = findContactByName(input.contact_name);
+    if (!contact) return `❌ לא מצאתי איש קשר בשם "${input.contact_name}"`;
+
+    const patterns: string[] = input.tool_patterns;
+    if (!patterns || patterns.length === 0) return "❌ צריך לציין לפחות כלי אחד";
+
+    // Resolve chatId — if manual, use phone-based chatId
+    let chatId = contact.chatId;
+    if (chatId.startsWith("manual_")) {
+      const phone = contact.phone?.replace(/\D/g, "");
+      if (phone) chatId = `${phone}@c.us`;
+      else return `❌ אין ל-${contact.name} מזהה WhatsApp. הוא צריך לשלוח הודעה ל${config.botName} קודם.`;
+    }
+
+    grantContactTools(chatId, patterns);
+    logAudit(actor, "tool_access_granted", `${contact.name}: ${patterns.join(", ")}`, "success");
+    return `✅ נתתי ל-${contact.name} גישה ל: ${patterns.join(", ")}`;
+  },
+
+  revoke_tool_access: async (input, sender) => {
+    const actor = sender?.name || "unknown";
+    const contact = findContactByName(input.contact_name);
+    if (!contact) return `❌ לא מצאתי איש קשר בשם "${input.contact_name}"`;
+
+    let chatId = contact.chatId;
+    if (chatId.startsWith("manual_")) {
+      const phone = contact.phone?.replace(/\D/g, "");
+      if (phone) chatId = `${phone}@c.us`;
+      else return `❌ אין ל-${contact.name} מזהה WhatsApp.`;
+    }
+
+    const patterns: string[] | undefined = input.tool_patterns;
+    const currentGrants = getContactGrants(chatId);
+    if (currentGrants.length === 0) return `${contact.name} לא מחזיק בהרשאות מיוחדות.`;
+
+    revokeContactTools(chatId, patterns);
+    const label = patterns && patterns.length > 0 ? patterns.join(", ") : "כל ההרשאות";
+    logAudit(actor, "tool_access_revoked", `${contact.name}: ${label}`, "success");
+    return `✅ הסרתי מ-${contact.name} גישה ל: ${label}`;
   },
 
   summarize_group_activity: async (input) => {

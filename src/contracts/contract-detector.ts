@@ -17,7 +17,7 @@ export type DocumentDetectionResult =
   | null;
 
 const VALID_BILL_CATEGORIES: BillCategory[] = [
-  "electricity", "water", "tax", "gas", "phone", "internet", "tv", "streaming", "insurance", "rent", "other",
+  "electricity", "water", "tax", "gas", "phone", "internet", "tv", "streaming", "insurance", "rent", "pension", "vehicle", "other",
 ];
 
 // ─── Stage 1: Regex Pre-Filter ────────────────────────────────────────
@@ -46,6 +46,20 @@ const CONTRACT_SENDER_DOMAINS = [
   "phoenix.co.il", "the-phoenix.co.il",
   "ayalon-ins.co.il",
   "shirbit.co.il",
+  // Pension / Provident funds
+  "meitav.co.il", "meitavdash.co.il",     // מיטב דש
+  "psagot.co.il",                           // פסגות
+  "altshuler.co.il",                        // אלטשולר שחם
+  "more-invest.co.il",                      // מור
+  "analyst.co.il",                          // אנליסט
+  "ibi.co.il",                              // IBI
+  "gemel-net.co.il",                        // גמל-נט (מסלקה פנסיונית)
+  // Vehicle
+  "misrad-harishui.gov.il", "gov.il",       // רישוי רכב
+  "carsure.co.il",                          // ביטוח רכב
+  "bituachravit.co.il",                     // ביטוח רכב ישיר
+  "9001.co.il",                             // ביטוח ישיר
+  "shlomo-bit.co.il",                       // שלמה ביטוח
   // Streaming
   "netflix.com",
   "spotify.com",
@@ -84,6 +98,8 @@ const CONTRACT_SUBJECT_PATTERNS = [
   /תשלום\s*חודשי|monthly\s*payment|recurring/i,
   /פוליסת?|policy|insurance|ביטוח/i,
   /ארנונה|מים|חשמל|גז|אינטרנט/i,
+  /פנסי|גמל|provident|pension|קופת?\s*גמל|קרן\s*פנסי/i,
+  /רכב|טסט|רישוי|vehicle|car\s*insurance|ביטוח\s*רכב|ביטוח\s*חובה|ביטוח\s*מקיף/i,
   /your\s*(monthly|annual|yearly)\s*(plan|subscription|bill)/i,
   /payment\s*(confirmation|received|processed)/i,
   /דמי\s*שכירות|שכ"ד|rent/i,
@@ -106,7 +122,7 @@ export function isLikelyContract(email: ParsedEmail): boolean {
 
   // Check body for billing keywords (first 500 chars)
   const bodySnippet = email.textBody.substring(0, 500).toLowerCase();
-  const billingKeywords = ["חשבון חודשי", "תשלום חודשי", "מנוי", "monthly bill", "subscription", "recurring payment", "ארנונה", "חברת חשמל"];
+  const billingKeywords = ["חשבון חודשי", "תשלום חודשי", "מנוי", "monthly bill", "subscription", "recurring payment", "ארנונה", "חברת חשמל", "קופת גמל", "פנסיה", "ביטוח רכב", "טסט", "רישוי רכב"];
   if (billingKeywords.some((k) => bodySnippet.includes(k))) {
     return true;
   }
@@ -127,7 +143,7 @@ If CONTRACT, return:
 {
   "type": "contract",
   "vendor": "vendor name (use common Hebrew name if Israeli company)",
-  "category": "internet|electricity|rent|insurance|water|tax|tv|gas|streaming|phone|other",
+  "category": "internet|electricity|rent|insurance|water|tax|tv|gas|streaming|phone|pension|vehicle|other",
   "amount": number or null,
   "currency": "ILS" or "USD" or "EUR",
   "billingCycle": "monthly" or "bimonthly" or "quarterly" or "yearly",
@@ -142,7 +158,7 @@ If BILL, return:
 {
   "type": "bill",
   "vendor": "vendor name (use common Hebrew name if Israeli company)",
-  "category": "electricity|water|tax|gas|phone|internet|tv|streaming|insurance|rent|other",
+  "category": "electricity|water|tax|gas|phone|internet|tv|streaming|insurance|rent|pension|vehicle|other",
   "invoiceNumber": "invoice number string or null",
   "amount": number,
   "currency": "ILS" or "USD" or "EUR",
@@ -160,7 +176,7 @@ Return ONLY valid JSON, nothing else.`;
 
 const VALID_CATEGORIES: ContractCategory[] = [
   "internet", "electricity", "rent", "insurance", "water",
-  "tax", "tv", "gas", "streaming", "phone", "other",
+  "tax", "tv", "gas", "streaming", "phone", "pension", "vehicle", "other",
 ];
 
 const VALID_CYCLES: ContractBillingCycle[] = [

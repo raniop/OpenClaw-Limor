@@ -10,7 +10,7 @@ export const billTools: Anthropic.Tool[] = [
       properties: {
         category: {
           type: "string",
-          enum: ["electricity", "water", "tax", "gas", "phone", "internet", "insurance", "rent", "other"],
+          enum: ["electricity", "water", "tax", "gas", "phone", "internet", "insurance", "rent", "pension", "vehicle", "other"],
           description: "סינון לפי קטגוריה (אופציונלי)",
         },
         status: {
@@ -35,7 +35,7 @@ export const billTools: Anthropic.Tool[] = [
         vendor: { type: "string", description: "שם הספק" },
         category: {
           type: "string",
-          enum: ["electricity", "water", "tax", "gas", "phone", "internet", "insurance", "rent", "other"],
+          enum: ["electricity", "water", "tax", "gas", "phone", "internet", "insurance", "rent", "pension", "vehicle", "other"],
         },
         amount: { type: "number", description: "סכום" },
         currency: { type: "string", enum: ["ILS", "USD", "EUR"], description: "מטבע (ברירת מחדל: ILS)" },

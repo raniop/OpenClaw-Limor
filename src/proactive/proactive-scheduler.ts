@@ -5,7 +5,7 @@
 import { schedule, ScheduledTask } from "node-cron";
 import { checkOverdueFollowups, checkUpcomingEvents, generateMorningSummary, checkExpiringContracts, checkOverdueBills } from "./proactive-engine";
 import { canSendProactive, recordProactiveSent } from "./rate-limiter";
-import { getNotifyOwnerCallback } from "../ai/callbacks";
+import { getNotifyOwnerCallback, getSendMessageCallback } from "../ai/callbacks";
 import { shouldSendProactive } from "../operational-rules";
 
 const tasks: ScheduledTask[] = [];
@@ -40,15 +40,32 @@ async function trySendProactive(
     const message = await generator();
     if (!message) return;
 
-    const notify = getNotifyOwnerCallback();
-    if (!notify) {
-      console.log(`[proactive:${source}] No notify callback`);
-      return;
-    }
+    // Route to target contact if specified, otherwise to owner
+    if (message.targetChatId && message.targetMessage) {
+      const sendMessage = getSendMessageCallback();
+      if (!sendMessage) {
+        console.log(`[proactive:${source}] No sendMessage callback for target`);
+        return;
+      }
+      await sendMessage(message.targetChatId, message.targetMessage);
+      recordProactiveSent();
+      console.log(`[proactive:${source}] Sent to contact ${message.targetChatId}: ${message.type}`);
 
-    await notify(message.text);
-    recordProactiveSent();
-    console.log(`[proactive:${source}] Sent: ${message.type}`);
+      // Also notify owner that the reminder was sent
+      const notify = getNotifyOwnerCallback();
+      if (notify) {
+        await notify(message.text);
+      }
+    } else {
+      const notify = getNotifyOwnerCallback();
+      if (!notify) {
+        console.log(`[proactive:${source}] No notify callback`);
+        return;
+      }
+      await notify(message.text);
+      recordProactiveSent();
+      console.log(`[proactive:${source}] Sent: ${message.type}`);
+    }
   } catch (err) {
     console.error(`[proactive:${source}] Error:`, err);
   }
@@ -67,9 +84,9 @@ export function startProactiveScheduler(): void {
 
   const tz = { timezone: "Asia/Jerusalem" as const };
 
-  // Every 15 minutes: check overdue followups
+  // Every 2 minutes: check overdue followups (needs to be frequent for exact-time reminders)
   tasks.push(
-    schedule("*/15 * * * *", () => {
+    schedule("*/2 * * * *", () => {
       trySendProactive(checkOverdueFollowups, "followup");
     }, tz)
   );
@@ -102,7 +119,7 @@ export function startProactiveScheduler(): void {
     }, tz)
   );
 
-  console.log("[proactive] Scheduler started (followups:15m, calendar:30m, morning:07:30, bills:09:00, contracts:10:00)");
+  console.log("[proactive] Scheduler started (followups:2m, calendar:30m, morning:07:30, bills:09:00, contracts:10:00)");
 }
 
 /**

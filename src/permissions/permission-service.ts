@@ -5,6 +5,7 @@
  */
 import type { SenderContext } from "../ai/types";
 import { config } from "../config";
+import { getDb } from "../stores/sqlite-init";
 
 export type Role = "owner" | "approved_contact" | "group" | "unknown";
 
@@ -35,6 +36,8 @@ const TOOL_PERMISSIONS: Record<string, Role[]> = {
   "crm_": ["owner"],
 
   // Contact management
+  grant_tool_access: ["owner"],
+  revoke_tool_access: ["owner"],
   add_contact: ["owner"],
   list_contacts: ["owner"],
   delete_contact: ["owner"],
@@ -111,15 +114,114 @@ const APPROVED_CONTACT_TOOLS = new Set([
   "send_calendar_invite",
 ]);
 
+// ─── Per-contact tool grants ────────────────────────────────────────────────
+
+/**
+ * Check if a contact has a per-contact grant for a specific tool.
+ * Supports exact matches ("list_events") and prefix matches ("crm_").
+ */
+function hasContactGrant(chatId: string, toolName: string): boolean {
+  try {
+    const db = getDb();
+    const grants = db
+      .prepare("SELECT tool_pattern FROM contact_tool_permissions WHERE chat_id = ?")
+      .all(chatId) as Array<{ tool_pattern: string }>;
+
+    for (const { tool_pattern } of grants) {
+      // Prefix match: "crm_" matches "crm_search_policy"
+      if (tool_pattern.endsWith("_") && toolName.startsWith(tool_pattern)) return true;
+      // Exact match
+      if (tool_pattern === toolName) return true;
+    }
+  } catch (err) {
+    console.error("[permissions] Failed to check contact grants:", err);
+  }
+  return false;
+}
+
+/**
+ * Grant tool access patterns to a contact.
+ */
+export function grantContactTools(chatId: string, patterns: string[]): void {
+  const db = getDb();
+  const stmt = db.prepare(
+    "INSERT OR IGNORE INTO contact_tool_permissions (chat_id, tool_pattern) VALUES (?, ?)"
+  );
+  const tx = db.transaction(() => {
+    for (const pattern of patterns) {
+      stmt.run(chatId, pattern);
+    }
+  });
+  tx();
+}
+
+/**
+ * Revoke tool access patterns from a contact.
+ * If no patterns specified, revokes ALL grants for the contact.
+ */
+export function revokeContactTools(chatId: string, patterns?: string[]): void {
+  const db = getDb();
+  if (!patterns || patterns.length === 0) {
+    db.prepare("DELETE FROM contact_tool_permissions WHERE chat_id = ?").run(chatId);
+  } else {
+    const stmt = db.prepare(
+      "DELETE FROM contact_tool_permissions WHERE chat_id = ? AND tool_pattern = ?"
+    );
+    const tx = db.transaction(() => {
+      for (const pattern of patterns) {
+        stmt.run(chatId, pattern);
+      }
+    });
+    tx();
+  }
+}
+
+/**
+ * List all per-contact tool grants (for admin/debug).
+ */
+export function listContactGrants(): Array<{ chatId: string; toolPattern: string; createdAt: string }> {
+  try {
+    const db = getDb();
+    const rows = db
+      .prepare("SELECT chat_id, tool_pattern, created_at FROM contact_tool_permissions ORDER BY chat_id")
+      .all() as Array<{ chat_id: string; tool_pattern: string; created_at: string }>;
+    return rows.map((r) => ({ chatId: r.chat_id, toolPattern: r.tool_pattern, createdAt: r.created_at }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Get grants for a specific contact.
+ */
+export function getContactGrants(chatId: string): string[] {
+  try {
+    const db = getDb();
+    const rows = db
+      .prepare("SELECT tool_pattern FROM contact_tool_permissions WHERE chat_id = ?")
+      .all(chatId) as Array<{ tool_pattern: string }>;
+    return rows.map((r) => r.tool_pattern);
+  } catch {
+    return [];
+  }
+}
+
+// ─── Core permission check ──────────────────────────────────────────────────
+
 /**
  * Check if a sender can use a specific tool.
- * Owner can use all tools. Others checked against permission map.
+ * Owner can use all tools. Others checked against per-contact grants, then role map.
  */
 export function canUseTool(toolName: string, sender?: SenderContext): boolean {
   const role = getRole(sender);
 
   // Owner can use everything
   if (role === "owner") return true;
+
+  // Per-contact grants override role-based restrictions
+  if (sender?.chatId && hasContactGrant(sender.chatId, toolName)) {
+    return true;
+  }
 
   // Check for prefix-matched permissions (e.g., "crm_" matches "crm_search_policy")
   for (const [key, roles] of Object.entries(TOOL_PERMISSIONS)) {

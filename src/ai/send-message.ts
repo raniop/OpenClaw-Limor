@@ -11,6 +11,7 @@ import {
   crmTools, instructionTools, fileTools, contactTools, smartHomeTools, capabilityTools, modelTools, codingTools, gettTools, whatsappExtraTools, smsTools, webSearchTools, agentTools, nimrodTools, healthTools, officePcTools, planTools, selfAwarenessTools, emailTools, telegramTools, operationalRuleTools, contractTools, billTools,
 } from "./tools";
 import { handleToolCall } from "./handle-tool-call";
+import { getContactGrants } from "../permissions/permission-service";
 import { selectModel } from "./model-router";
 import type { ModelRouterParams } from "./model-router";
 import { log } from "../logger";
@@ -84,6 +85,11 @@ export async function sendMessage(
     return { role: m.role, content: m.content };
   });
 
+  // Helper: check if contact has a specific tool grant
+  const hasContactToolGrant = (chatId: string, pattern: string): boolean => {
+    try { return getContactGrants(chatId).includes(pattern); } catch { return false; }
+  };
+
   // --- Assemble tools based on permissions ---
   const toolsEnabled = options?.allowTools !== false;
   let tools = !toolsEnabled
@@ -92,14 +98,18 @@ export async function sendMessage(
       ? [
           ...calendarTools, ...travelTools, ...crmTools, ...instructionTools,
           ...fileTools,
-          ...contactTools.filter(t => !["get_group_history", "summarize_group_activity", "create_reminder"].includes(t.name)),
+          ...contactTools.filter(t => !["get_group_history", "summarize_group_activity"].includes(t.name)),
           // smartHomeTools → maya agent only
           // bookingTools → hila agent only
           // nimrodTools → nimrod agent only
           ...modelTools, ...gettTools, ...whatsappExtraTools, ...smsTools, ...webSearchTools,
           ...agentTools, ...healthTools, ...officePcTools, ...capabilityTools, ...planTools, ...selfAwarenessTools, ...emailTools, ...telegramTools, ...operationalRuleTools, ...contractTools, ...billTools,
         ]
-      : [...calendarTools, ...travelTools, ...bookingTools, ...webSearchTools, ...officePcTools];
+      : [
+          ...calendarTools, ...travelTools, ...bookingTools, ...webSearchTools, ...officePcTools,
+          // Add tools based on per-contact grants
+          ...(sender?.chatId && hasContactToolGrant(sender.chatId, "crm_") ? crmTools : []),
+        ];
 
   if (toolsEnabled && options?.allowedToolNames && options.allowedToolNames.length > 0) {
     const allowed = new Set(options.allowedToolNames);

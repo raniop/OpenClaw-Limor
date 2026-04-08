@@ -14,6 +14,7 @@
 import { isAvailable, getMessagesSince, getLatestMessageId } from "./sms-reader";
 import type { SmsMessage } from "./sms-reader";
 import { readFileSync, writeFileSync, existsSync } from "fs";
+import { shouldForwardSMS } from "../operational-rules";
 import { statePath } from "../state-dir";
 
 // ─── Watcher configuration ────────────────────────────────────────────────────
@@ -71,9 +72,27 @@ const WATCHED_SENDERS: SmsWatcherConfig[] = [
       "more time for",
     ],
   },
-  // Add more senders here, for example:
-  // { sender: "Maccabi", label: "מכבי שירותי בריאות", emoji: "💊" },
-  // { sender: "Leumi", label: "בנק לאומי", emoji: "🏦", keywords: ["חיוב", "הפקדה", "יתרה"] },
+  {
+    sender: "AMEX",
+    label: "אמריקן אקספרס",
+    emoji: "💳",
+    keywords: ["חיוב", "עסקה", "עסקאות", "יתרה", "תשלום", "אישור", "קוד", "חשבונית", "סכום", "₪", "NIS"],
+    excludeKeywords: ["הטבה", "מבצע", "הצטרף", "שדרוג"],
+  },
+  {
+    sender: "Isracard",
+    label: "ישראכרט",
+    emoji: "💳",
+    keywords: ["חיוב", "עסקה", "עסקאות", "יתרה", "תשלום", "אישור", "קוד", "חשבונית", "סכום", "₪", "NIS"],
+    excludeKeywords: ["הטבה", "מבצע", "הצטרף", "שדרוג"],
+  },
+  {
+    sender: "bit",
+    label: "ביט",
+    emoji: "💸",
+    keywords: ["העברה", "קיבלת", "שלחת", "תשלום", "חיוב", "קוד", "אימות", "₪", "NIS", "שולם"],
+    excludeKeywords: ["הטבה", "מבצע", "הצטרף"],
+  },
 ];
 
 // ─── State persistence ─────────────────────────────────────────────────────────
@@ -180,6 +199,11 @@ async function pollOnce(): Promise<void> {
 
     // Check each watched sender
     for (const watchConfig of WATCHED_SENDERS) {
+      // Check operational rules — owner can mute/block senders dynamically
+      if (!shouldForwardSMS(watchConfig.sender)) {
+        continue;
+      }
+
       const matching = newMessages.filter((m) => shouldForward(m, watchConfig));
 
       for (const msg of matching) {

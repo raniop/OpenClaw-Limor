@@ -29,13 +29,13 @@ interface Contract {
 const CATEGORY_LABELS: Record<string, string> = {
   internet: "אינטרנט", electricity: "חשמל", rent: "שכירות", insurance: "ביטוח",
   water: "מים", tax: "ארנונה", tv: "טלוויזיה", gas: "גז",
-  streaming: "סטרימינג", phone: "טלפון", other: "אחר",
+  streaming: "סטרימינג", phone: "טלפון", pension: "פנסיה/גמל", vehicle: "רכב", other: "אחר",
 };
 
 const CATEGORY_EMOJIS: Record<string, string> = {
   internet: "🌐", electricity: "⚡", rent: "🏠", insurance: "🛡️",
   water: "💧", tax: "🏛️", tv: "📺", gas: "🔥",
-  streaming: "🎬", phone: "📱", other: "📋",
+  streaming: "🎬", phone: "📱", pension: "🏦", vehicle: "🚗", other: "📋",
 };
 
 const CYCLE_LABELS: Record<string, string> = {

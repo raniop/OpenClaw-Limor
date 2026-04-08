@@ -113,7 +113,7 @@ export function extractFollowups(
       // Quality filter: skip junk or too-short reasons
       if (!isJunkReason(reason)) {
         const entry = addFollowup(chatId, contactName, reason, dueAt);
-        created.push(entry);
+        if (entry) created.push(entry);
       }
       break;
     }
@@ -130,7 +130,7 @@ export function extractFollowups(
         // Quality filter: skip junk or too-short reasons
         if (!isJunkReason(reason)) {
           const entry = addFollowup(chatId, contactName, reason, dueAt);
-          created.push(entry);
+          if (entry) created.push(entry);
         }
         break;
       }

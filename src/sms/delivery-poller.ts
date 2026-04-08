@@ -4,6 +4,7 @@
  */
 import { isAvailable, getMessagesSince, getLatestMessageId } from "./sms-reader";
 import { findDeliveryAlerts } from "./delivery-detector";
+import { shouldForwardDelivery } from "../operational-rules";
 import { addDelivery } from "./delivery-store";
 import { findOrderByTracking, findOrderByVendor, linkOrderToDelivery } from "../email/email-order-store";
 
@@ -44,8 +45,13 @@ async function checkForDeliveries(): Promise<void> {
     const alerts = findDeliveryAlerts(newMessages);
     if (alerts.length === 0) return;
 
-    // Save to store and alert owner
+    // Save to store and alert owner (check operational rules first)
     for (const alert of alerts) {
+      if (!shouldForwardDelivery(alert.carrier, alert.summary)) {
+        console.log(`[sms] Delivery alert blocked by operational rule: ${alert.carrier}`);
+        continue;
+      }
+
       const saved = addDelivery(
         alert.message.id,
         alert.carrier,
