@@ -50,6 +50,12 @@ export const config = {
   telegramApiId: process.env.TELEGRAM_API_ID || "",
   telegramApiHash: process.env.TELEGRAM_API_HASH || "",
   telegramPhone: process.env.TELEGRAM_PHONE || "",
+
+  // OpenClaw gateway (alternative WhatsApp transport via MyClaw.ai)
+  openclawEnabled: process.env.OPENCLAW_ENABLED === "true",
+  openclawGatewayUrl: process.env.OPENCLAW_GATEWAY_URL || "",
+  openclawGatewayToken: process.env.OPENCLAW_GATEWAY_TOKEN || "",
+  openclawWhatsAppAccountId: process.env.OPENCLAW_WA_ACCOUNT_ID || "",
 };
 
 export function validateConfig(): void {

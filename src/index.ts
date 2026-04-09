@@ -1,4 +1,4 @@
-import { validateConfig } from "./config";
+import { validateConfig, config } from "./config";
 import { createWhatsAppClient } from "./whatsapp";
 import { log } from "./logger";
 import { existsSync, readdirSync, unlinkSync, rmSync } from "fs";
@@ -43,52 +43,68 @@ if (syncResult.added > 0 || syncResult.updated > 0) {
   console.log(`[sync] Contacts synced: ${syncResult.added} added, ${syncResult.updated} updated`);
 }
 
-const client = createWhatsAppClient();
+// Transport selection: OpenClaw gateway or direct whatsapp-web.js
+let client: ReturnType<typeof createWhatsAppClient> | null = null;
 
-// Initialize with auto-retry on session corruption
-async function initWithRetry(maxRetries = 2) {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      await client.initialize();
-      return; // Success
-    } catch (err: any) {
-      const msg = err?.message || String(err);
-      console.error(`[init] Attempt ${attempt}/${maxRetries} failed: ${msg}`);
+if (config.openclawEnabled) {
+  // Use OpenClaw/MyClaw.ai as WhatsApp transport (Baileys-based, cloud IP)
+  console.log("[transport] Using OpenClaw gateway (MyClaw.ai)");
+  import("./openclaw").then(({ createOpenClawClient }) =>
+    createOpenClawClient().catch((err: any) => {
+      console.error("[openclaw] Fatal: Failed to start OpenClaw transport:", err.message);
+      process.exit(1);
+    })
+  );
+} else {
+  // Use direct whatsapp-web.js (Puppeteer-based, local)
+  console.log("[transport] Using whatsapp-web.js (local)");
+  client = createWhatsAppClient();
 
-      // If session is corrupted, clean it and retry
-      if (msg.includes("already running") || msg.includes("Execution context") || msg.includes("Protocol error")) {
-        console.log("[init] Cleaning corrupted session...");
-        const sessionDir = resolve(__dirname, "..", ".wwebjs_auth", "session");
-        const lockFile = resolve(sessionDir, "SingletonLock");
-        try { unlinkSync(lockFile); } catch {}
+  // Initialize with auto-retry on session corruption
+  async function initWithRetry(maxRetries = 2) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await client!.initialize();
+        return; // Success
+      } catch (err: any) {
+        const msg = err?.message || String(err);
+        console.error(`[init] Attempt ${attempt}/${maxRetries} failed: ${msg}`);
 
-        if (attempt < maxRetries) {
-          console.log("[init] Retrying in 3 seconds...");
-          await new Promise(r => setTimeout(r, 3000));
-          continue;
+        // If session is corrupted, clean it and retry
+        if (msg.includes("already running") || msg.includes("Execution context") || msg.includes("Protocol error")) {
+          console.log("[init] Cleaning corrupted session...");
+          const sessionDir = resolve(__dirname, "..", ".wwebjs_auth", "session");
+          const lockFile = resolve(sessionDir, "SingletonLock");
+          try { unlinkSync(lockFile); } catch {}
+
+          if (attempt < maxRetries) {
+            console.log("[init] Retrying in 3 seconds...");
+            await new Promise(r => setTimeout(r, 3000));
+            continue;
+          }
+
+          // Last resort: delete session entirely
+          console.log("[init] Deleting session for fresh QR scan...");
+          try { rmSync(sessionDir, { recursive: true, force: true }); } catch {}
+          await new Promise(r => setTimeout(r, 2000));
+          try {
+            await client!.initialize();
+            return;
+          } catch (e: any) {
+            console.error("[init] Final attempt failed:", e.message);
+          }
         }
 
-        // Last resort: delete session entirely
-        console.log("[init] Deleting session for fresh QR scan...");
-        try { rmSync(sessionDir, { recursive: true, force: true }); } catch {}
-        await new Promise(r => setTimeout(r, 2000));
-        try {
-          await client.initialize();
-          return;
-        } catch (e: any) {
-          console.error("[init] Final attempt failed:", e.message);
+        if (attempt === maxRetries) {
+          console.error("[init] All attempts failed. Bot will not start.");
+          process.exit(1);
         }
-      }
-
-      if (attempt === maxRetries) {
-        console.error("[init] All attempts failed. Bot will not start.");
-        process.exit(1);
       }
     }
   }
-}
 
-initWithRetry();
+  initWithRetry();
+}
 
 // Start daily digest scheduler
 startDigestScheduler();
@@ -124,26 +140,39 @@ let isShuttingDown = false;
 function gracefulShutdown(signal: string) {
   if (isShuttingDown) return;
   isShuttingDown = true;
-  console.log(`[shutdown] Received ${signal}, closing WhatsApp session cleanly...`);
+  console.log(`[shutdown] Received ${signal}, closing session cleanly...`);
   log.systemShutdown();
 
   const timeout = new Promise<void>(r => setTimeout(() => {
-    console.error("[shutdown] Timeout waiting for client.destroy(), forcing exit");
+    console.error("[shutdown] Timeout, forcing exit");
     r();
   }, 8000));
 
   stopHealthWebhook();
 
-  Promise.race([client.destroy(), timeout])
-    .catch(err => console.error("[shutdown] Error during destroy:", err))
+  if (config.openclawEnabled) {
+    // OpenClaw shutdown
+    import("./openclaw").then(({ shutdownOpenClaw }) =>
+      Promise.race([shutdownOpenClaw(), timeout])
+    )
+    .catch(err => console.error("[shutdown] Error during OpenClaw shutdown:", err))
     .finally(() => {
-      // Kill any leftover Chromium processes spawned by puppeteer
-      try {
-        execSync("pkill -f '.wwebjs_auth.*chrome' 2>/dev/null || true", { timeout: 3000 });
-      } catch {}
       console.log("[shutdown] Done, exiting.");
       process.exit(0);
     });
+  } else {
+    // whatsapp-web.js shutdown
+    Promise.race([client!.destroy(), timeout])
+      .catch(err => console.error("[shutdown] Error during destroy:", err))
+      .finally(() => {
+        // Kill any leftover Chromium processes spawned by puppeteer
+        try {
+          execSync("pkill -f '.wwebjs_auth.*chrome' 2>/dev/null || true", { timeout: 3000 });
+        } catch {}
+        console.log("[shutdown] Done, exiting.");
+        process.exit(0);
+      });
+  }
 }
 
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
