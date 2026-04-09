@@ -53,8 +53,9 @@ export function initGateway(): IGatewayClient {
   const opts: Record<string, unknown> = {
     url: config.openclawGatewayUrl,
     token: config.openclawGatewayToken || undefined,
-    clientName: "external" as any,
+    clientName: "gateway-client",
     clientDisplayName: `${config.botNameEn}-bridge`,
+    mode: "backend",
     onEvent: (evt: { type: string; event: string; payload?: unknown }) => {
       if (eventHandler) {
         eventHandler(evt);
