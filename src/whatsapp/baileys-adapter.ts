@@ -19,6 +19,40 @@ export async function loadBaileys(): Promise<BaileysModule> {
   return baileys;
 }
 
+// ─── LID ↔ Phone Number mapping ──────────────────────────────────────
+// Baileys v7 uses LID (Local ID) instead of phone numbers for privacy.
+// We maintain a mapping so the rest of the codebase can work with phone numbers.
+
+const lidToPhone = new Map<string, string>();
+const phoneToLid = new Map<string, string>();
+
+export function storeLidMapping(lid: string, phone: string): void {
+  const cleanLid = lid.replace(/@.*/, "");
+  const cleanPhone = phone.replace(/@.*/, "");
+  lidToPhone.set(cleanLid, cleanPhone);
+  phoneToLid.set(cleanPhone, cleanLid);
+}
+
+export function getPhoneFromLid(lid: string): string | undefined {
+  return lidToPhone.get(lid.replace(/@.*/, ""));
+}
+
+export function getLidFromPhone(phone: string): string | undefined {
+  return phoneToLid.get(phone.replace(/@.*/, ""));
+}
+
+/** Resolve a JID to a phone number. Returns the phone if it's already a phone JID. */
+export function resolvePhone(jid: string): string {
+  if (!jid) return "";
+  // Already a phone-based JID
+  if (jid.endsWith("@s.whatsapp.net") || jid.endsWith("@c.us")) {
+    return jid.replace(/@.*/, "");
+  }
+  // LID — try to resolve
+  const phone = getPhoneFromLid(jid);
+  return phone || jid.replace(/@.*/, "");
+}
+
 // ─── Adapter interfaces ───────────────────────────────────────────────
 
 export interface AdaptedMessage {
@@ -232,7 +266,7 @@ export function adaptMessage(sock: WASocket, rawMsg: WAMessage): AdaptedMessage 
 
     async getContact(): Promise<AdaptedContact> {
       const senderJid = isGroup ? (rawMsg.key.participant || jid) : jid;
-      const number = senderJid.replace(/@.*/, "");
+      const number = resolvePhone(senderJid);
       return {
         number,
         pushname: rawMsg.pushName || "",

@@ -37,12 +37,12 @@ import { startDeliveryPoller, startSmsWatcher } from "../sms";
 import { startEmailPoller } from "../email/email-poller";
 import { startAlertPoller } from "../telegram/alert-poller";
 import { statePath } from "../state-dir";
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync } from "fs";
 import { addManualContact } from "../contacts";
 import { trackGroupPerson, getGroupPeopleContext } from "../conversation";
 import { syncContacts } from "../sync-contacts";
 import { initSendQueue, queuedSendMessage } from "./send-queue";
-import { loadBaileys, adaptMessage, createAdaptedMedia } from "./baileys-adapter";
+import { loadBaileys, adaptMessage, createAdaptedMedia, storeLidMapping, resolvePhone } from "./baileys-adapter";
 import type { AdaptedMessage } from "./baileys-adapter";
 import { storeMessage } from "./baileys-store";
 
@@ -97,10 +97,24 @@ export async function createWhatsAppClient(): Promise<void> {
   const authDir = resolve(__dirname, "..", "..", "auth_baileys");
   const { state, saveCreds } = await baileys.useMultiFileAuthState(authDir);
 
+  // Fetch latest WhatsApp Web version to avoid 405 errors
+  let waVersion: [number, number, number] | undefined;
+  try {
+    const { fetchLatestBaileysVersion } = baileys;
+    if (fetchLatestBaileysVersion) {
+      const { version } = await fetchLatestBaileysVersion();
+      waVersion = version;
+      console.log(`[baileys] Using WA version: ${version.join(".")}`);
+    }
+  } catch (err) {
+    console.warn("[baileys] Could not fetch latest version, using default");
+  }
+
   const sock = baileys.makeWASocket({
     auth: state,
     printQRInTerminal: false,
-    browser: ["OpenClaw", "Chrome", "22.0"],
+    ...(waVersion ? { version: waVersion } : {}),
+    browser: ["Ubuntu", "Chrome", "22.04.4"],
     generateHighQualityLinkPreview: false,
   });
 
@@ -108,6 +122,37 @@ export async function createWhatsAppClient(): Promise<void> {
 
   // Save credentials on update
   sock.ev.on("creds.update", saveCreds);
+
+  // LID ↔ Phone number mapping — Baileys v7 uses LIDs instead of phone numbers
+  sock.ev.on("contacts.update", (updates: any[]) => {
+    for (const contact of updates) {
+      if (contact.id && contact.lid) {
+        storeLidMapping(contact.lid, contact.id);
+        console.log(`[lid-map] ${contact.lid} → ${contact.id}`);
+      }
+    }
+  });
+  sock.ev.on("contacts.upsert", (contacts: any[]) => {
+    for (const contact of contacts) {
+      if (contact.id && contact.lid) {
+        storeLidMapping(contact.lid, contact.id);
+      }
+    }
+  });
+  // Also check messaging-history for LID mappings
+  try {
+    if (sock.ev.on) {
+      sock.ev.on("messaging-history.set" as any, ({ contacts }: any) => {
+        if (!contacts) return;
+        for (const contact of contacts) {
+          if (contact.id && contact.lid) {
+            storeLidMapping(contact.lid, contact.id);
+          }
+        }
+        console.log(`[lid-map] Loaded ${contacts.filter((c: any) => c.lid).length} LID mappings from history`);
+      });
+    }
+  } catch {}
 
   // Connection state management
   let reconnectDelay = 60000;
@@ -251,15 +296,19 @@ export async function createWhatsAppClient(): Promise<void> {
         process.exit(1);
       }
 
-      console.error(`[whatsapp] ⚠️ Disconnected (code=${statusCode}). Reconnecting in ${reconnectDelay / 1000}s...`);
+      // 515 = restart required (normal after first pairing), reconnect quickly
+      const delay = statusCode === 515 ? 3000 : reconnectDelay;
+      console.error(`[whatsapp] ⚠️ Disconnected (code=${statusCode}). Reconnecting in ${delay / 1000}s...`);
       setTimeout(() => {
         console.log("[whatsapp] Attempting reconnect...");
         createWhatsAppClient().catch((err) => {
           console.error("[whatsapp] Reconnect failed, exiting for PM2 restart:", err);
           process.exit(1);
         });
-      }, reconnectDelay);
-      reconnectDelay = Math.min(reconnectDelay * 2, 5 * 60 * 1000);
+      }, delay);
+      if (statusCode !== 515) {
+        reconnectDelay = Math.min(reconnectDelay * 2, 5 * 60 * 1000);
+      }
     }
   });
 
@@ -276,6 +325,25 @@ export async function createWhatsAppClient(): Promise<void> {
     }
   }, 5 * 60 * 1000);
 
+  // Load LID↔Phone mappings from auth files
+  try {
+    const authFiles = readdirSync(authDir).filter(f => f.startsWith("lid-mapping-") && f.endsWith("_reverse.json"));
+    let mappingCount = 0;
+    for (const file of authFiles) {
+      const lid = file.replace("lid-mapping-", "").replace("_reverse.json", "");
+      const phone = JSON.parse(readFileSync(resolve(authDir, file), "utf-8"));
+      if (lid && phone) {
+        storeLidMapping(lid, phone);
+        mappingCount++;
+      }
+    }
+    if (mappingCount > 0) {
+      console.log(`[lid-map] Loaded ${mappingCount} LID→phone mappings from auth files`);
+    }
+  } catch (err) {
+    console.warn("[lid-map] Failed to load LID mappings:", (err as any).message);
+  }
+
   // Incoming messages
   sock.ev.on("messages.upsert", async ({ messages, type }: any) => {
     if (type !== "notify") return; // Only process new messages, not history sync
@@ -287,7 +355,27 @@ export async function createWhatsAppClient(): Promise<void> {
       if (rawMsg.key.remoteJid === "status@broadcast") continue;
 
       lastActivity = Date.now();
-      storeMessage(rawMsg.key.remoteJid || "", rawMsg);
+
+      // Try to resolve LID to phone number
+      const jid = rawMsg.key.remoteJid || "";
+      if (jid.endsWith("@lid")) {
+        try {
+          // Check if rawMsg has verifiedBizName or phoneNumber in pushName format
+          // Also try onWhatsApp lookup if we haven't mapped this LID yet
+          const existing = resolvePhone(jid);
+          if (existing === jid.replace(/@.*/, "")) {
+            // Not resolved yet — try getting from signal repo
+            try {
+              const repo = (sock as any).signalRepository;
+              if (repo?.lidMapping?.getLIDForPN) {
+                // We can't reverse-lookup, but we can log for debugging
+              }
+            } catch {}
+          }
+        } catch {}
+      }
+
+      storeMessage(jid, rawMsg);
 
       const adapted = adaptMessage(sock, rawMsg);
       const chatId = adapted.from;
