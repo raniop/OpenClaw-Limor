@@ -1,9 +1,8 @@
 /**
- * WhatsApp client setup and message routing.
+ * WhatsApp client setup and message routing (Baileys transport).
  * Sub-modules handle media, owner commands, approval gating, and response dispatch.
  */
 import { resolve } from "path";
-import { Client, LocalAuth, Message, MessageMedia } from "whatsapp-web.js";
 import qrcode from "qrcode-terminal";
 import * as QRCode from "qrcode";
 import * as http from "http";
@@ -43,10 +42,14 @@ import { addManualContact } from "../contacts";
 import { trackGroupPerson, getGroupPeopleContext } from "../conversation";
 import { syncContacts } from "../sync-contacts";
 import { initSendQueue, queuedSendMessage } from "./send-queue";
+import { loadBaileys, adaptMessage, createAdaptedMedia } from "./baileys-adapter";
+import type { AdaptedMessage } from "./baileys-adapter";
+import { storeMessage } from "./baileys-store";
 
 let latestQR: string | null = null;
 let qrServer: http.Server | null = null;
-let whatsappClient: Client | null = null;
+let baileysSock: any = null; // Baileys WASocket
+let connected = false;
 let limorWhatsAppId: string = "";
 
 function startQRServer(): void {
@@ -74,240 +77,244 @@ function startQRServer(): void {
   });
 }
 
-export function getClient(): Client | null {
-  return whatsappClient;
+export function getClient(): any {
+  return baileysSock;
+}
+
+export function getSock(): any {
+  return baileysSock;
 }
 
 async function sendToChat(chatId: string, text: string): Promise<void> {
-  if (whatsappClient) {
+  if (connected) {
     await queuedSendMessage(chatId, text);
   }
 }
 
-function findChromePath(): string | undefined {
-  try {
-    const puppeteer = require("puppeteer");
-    return puppeteer.executablePath();
-  } catch {}
-  return undefined;
-}
+export async function createWhatsAppClient(): Promise<void> {
+  console.log("[transport] Using Baileys (WebSocket, no browser)");
+  const baileys = await loadBaileys();
+  const authDir = resolve(__dirname, "..", "..", "auth_baileys");
+  const { state, saveCreds } = await baileys.useMultiFileAuthState(authDir);
 
-export function createWhatsAppClient(): Client {
-  const executablePath = findChromePath();
-  if (executablePath) {
-    console.log(`[chrome] Using: ${executablePath}`);
-  }
-
-  const client = new Client({
-    authStrategy: new LocalAuth(),
-    puppeteer: {
-      headless: true,
-      executablePath,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-blink-features=AutomationControlled",
-        "--disable-dev-shm-usage",
-        "--no-first-run",
-        "--disable-extensions",
-        "--disable-default-apps",
-        "--disable-infobars",
-        "--disable-gpu",
-        "--lang=he-IL,he,en-US,en",
-        "--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
-      ],
-    },
+  const sock = baileys.makeWASocket({
+    auth: state,
+    printQRInTerminal: false,
+    browser: ["OpenClaw", "Chrome", "22.0"],
+    generateHighQualityLinkPreview: false,
   });
 
-  client.on("qr", (qr: string) => {
-    latestQR = qr;
-    console.log("Scan this QR code with WhatsApp:");
-    qrcode.generate(qr, { small: true });
-    startQRServer();
-  });
+  baileysSock = sock;
 
-  client.on("ready", () => {
-    latestQR = null;
-    whatsappClient = client;
-    try {
-      limorWhatsAppId = client.info.wid._serialized;
-      console.log(`[whatsapp] Bot ID: ${limorWhatsAppId}`);
-      console.log(`[whatsapp] client.info.me:`, JSON.stringify((client.info as any).me));
-    } catch {}
-    if (qrServer) { qrServer.close(); qrServer = null; }
-    log.systemReady();
-    initSendQueue(client);
+  // Save credentials on update
+  sock.ev.on("creds.update", saveCreds);
 
-    setNotifyOwnerCallback(async (message: string) => {
-      if (config.ownerChatId && whatsappClient) {
-        await queuedSendMessage(config.ownerChatId, message);
-        conversationStore.addMessage(config.ownerChatId, "assistant", message);
-      }
-    });
+  // Connection state management
+  let reconnectDelay = 60000;
+  let lastActivity = Date.now();
 
-    setSendMessageCallback(async (chatId: string, message: string) => {
-      if (whatsappClient) {
-        await queuedSendMessage(chatId, message);
-        conversationStore.addMessage(chatId, "assistant", message);
-      }
-    });
+  sock.ev.on("connection.update", async (update: any) => {
+    const { connection, lastDisconnect, qr } = update;
 
-    setSendFileCallback(async (chatId: string, base64: string, filename: string, mimetype: string, caption?: string) => {
-      if (whatsappClient) {
-        const media = new MessageMedia(mimetype, base64, filename);
-        await queuedSendMessage(chatId, media, { caption });
-        conversationStore.addMessage(chatId, "assistant", caption || `📎 ${filename}`);
-      }
-    });
-
-    // Process unread messages that arrived while bot was offline
-    processUnreadMessages(client).catch((err) =>
-      console.error("[unread] Failed to process unread messages:", err)
-    );
-
-    // Poll for pending notifications from dashboard (e.g., followup completion)
-    startNotificationPoller(client);
-
-    // Poll for delivery SMS alerts
-    try {
-      startDeliveryPoller(async (text: string) => {
-        if (config.ownerChatId && whatsappClient) {
-          await queuedSendMessage(config.ownerChatId, text);
-        }
-      });
-    } catch (err) {
-      console.error("[sms] Failed to start delivery poller:", err);
+    if (qr) {
+      latestQR = qr;
+      console.log("Scan this QR code with WhatsApp:");
+      qrcode.generate(qr, { small: true });
+      startQRServer();
     }
 
-    // SMS Sender Watcher — forwards SMS from specific senders (e.g. HAREL) to owner via WhatsApp
-    try {
-      startSmsWatcher(async (text: string) => {
-        if (config.ownerChatId && whatsappClient) {
-          await queuedSendMessage(config.ownerChatId, text);
-          conversationStore.addMessage(config.ownerChatId, "assistant", text);
+    if (connection === "open") {
+      latestQR = null;
+      connected = true;
+      reconnectDelay = 60000;
+      lastActivity = Date.now();
+
+      try {
+        limorWhatsAppId = sock.user?.id || "";
+        console.log(`[whatsapp] Bot ID: ${limorWhatsAppId}`);
+      } catch {}
+      if (qrServer) { qrServer.close(); qrServer = null; }
+      log.systemReady();
+      initSendQueue({ sendMessage: (chatId: string, content: any, options?: any) => {
+        const { buildSendContent } = require("./baileys-adapter");
+        return sock.sendMessage(chatId, buildSendContent(content, options));
+      }} as any);
+
+      setNotifyOwnerCallback(async (message: string) => {
+        if (config.ownerChatId && connected) {
+          await queuedSendMessage(config.ownerChatId, message);
+          conversationStore.addMessage(config.ownerChatId, "assistant", message);
         }
       });
-    } catch (err) {
-      console.error("[sms-watcher] Failed to start SMS watcher:", err);
-    }
 
-    // Poll iCloud email for order/booking confirmations
-    try {
-      startEmailPoller(async (text: string) => {
-        if (config.ownerChatId && whatsappClient) {
-          await queuedSendMessage(config.ownerChatId, text);
-          conversationStore.addMessage(config.ownerChatId, "assistant", text);
+      setSendMessageCallback(async (chatId: string, message: string) => {
+        if (connected) {
+          await queuedSendMessage(chatId, message);
+          conversationStore.addMessage(chatId, "assistant", message);
         }
       });
-    } catch (err) {
-      console.error("[email] Failed to start email poller:", err);
-    }
 
-    // Poll Telegram alert channel for rocket/missile alerts
-    try {
-      startAlertPoller(
-        // Text-only callback
-        async (text: string) => {
-          if (config.ownerChatId && whatsappClient) {
+      setSendFileCallback(async (chatId: string, base64: string, filename: string, mimetype: string, caption?: string) => {
+        if (connected) {
+          const media = createAdaptedMedia(mimetype, base64, filename);
+          await queuedSendMessage(chatId, media, { caption });
+          conversationStore.addMessage(chatId, "assistant", caption || `📎 ${filename}`);
+        }
+      });
+
+      // Poll for pending notifications from dashboard
+      startNotificationPoller();
+
+      // Poll for delivery SMS alerts
+      try {
+        startDeliveryPoller(async (text: string) => {
+          if (config.ownerChatId && connected) {
             await queuedSendMessage(config.ownerChatId, text);
           }
-        },
-        // Image + caption callback — uses fetch() instead of MessageMedia.fromUrl()
-        // to avoid Puppeteer "detached Frame" errors
-        async (imageUrl: string, caption: string) => {
-          if (config.ownerChatId && whatsappClient) {
-            try {
-              const imageResponse = await fetch(imageUrl);
-              if (!imageResponse.ok) throw new Error(`HTTP ${imageResponse.status}`);
-              const buffer = Buffer.from(await imageResponse.arrayBuffer());
-              const base64 = buffer.toString("base64");
-              const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
-              const media = new MessageMedia(contentType, base64, "telegram-image.jpg");
-              await queuedSendMessage(config.ownerChatId, media, { caption });
-            } catch (imgErr) {
-              // Fallback to text if image download fails
-              console.error("[telegram] Image download failed, sending text only:", imgErr);
-              await queuedSendMessage(config.ownerChatId, caption);
+        });
+      } catch (err) {
+        console.error("[sms] Failed to start delivery poller:", err);
+      }
+
+      // SMS Sender Watcher
+      try {
+        startSmsWatcher(async (text: string) => {
+          if (config.ownerChatId && connected) {
+            await queuedSendMessage(config.ownerChatId, text);
+            conversationStore.addMessage(config.ownerChatId, "assistant", text);
+          }
+        });
+      } catch (err) {
+        console.error("[sms-watcher] Failed to start SMS watcher:", err);
+      }
+
+      // Poll iCloud email
+      try {
+        startEmailPoller(async (text: string) => {
+          if (config.ownerChatId && connected) {
+            await queuedSendMessage(config.ownerChatId, text);
+            conversationStore.addMessage(config.ownerChatId, "assistant", text);
+          }
+        });
+      } catch (err) {
+        console.error("[email] Failed to start email poller:", err);
+      }
+
+      // Poll Telegram alert channel
+      try {
+        startAlertPoller(
+          async (text: string) => {
+            if (config.ownerChatId && connected) {
+              await queuedSendMessage(config.ownerChatId, text);
+            }
+          },
+          async (imageUrl: string, caption: string) => {
+            if (config.ownerChatId && connected) {
+              try {
+                const imageResponse = await fetch(imageUrl);
+                if (!imageResponse.ok) throw new Error(`HTTP ${imageResponse.status}`);
+                const buffer = Buffer.from(await imageResponse.arrayBuffer());
+                const base64 = buffer.toString("base64");
+                const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
+                const media = createAdaptedMedia(contentType, base64, "telegram-image.jpg");
+                await queuedSendMessage(config.ownerChatId, media, { caption });
+              } catch (imgErr) {
+                console.error("[telegram] Image download failed, sending text only:", imgErr);
+                await queuedSendMessage(config.ownerChatId, caption);
+              }
             }
           }
-        }
-      );
-    } catch (err) {
-      console.error("[telegram] Failed to start alert poller:", err);
+        );
+      } catch (err) {
+        console.error("[telegram] Failed to start alert poller:", err);
+      }
+
+      // Start proactive messaging scheduler
+      try {
+        startProactiveScheduler();
+      } catch (err) {
+        console.error("[proactive] Failed to start scheduler:", err);
+      }
     }
 
-    // Start proactive messaging scheduler
-    try {
-      startProactiveScheduler();
-    } catch (err) {
-      console.error("[proactive] Failed to start scheduler:", err);
+    if (connection === "close") {
+      connected = false;
+      const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
+      const loggedOut = statusCode === baileys.DisconnectReason.loggedOut;
+
+      if (loggedOut) {
+        console.error("[whatsapp] Logged out by WhatsApp. Deleting session and exiting...");
+        try {
+          const { rmSync } = require("fs");
+          rmSync(authDir, { recursive: true, force: true });
+        } catch {}
+        process.exit(1);
+      }
+
+      console.error(`[whatsapp] ⚠️ Disconnected (code=${statusCode}). Reconnecting in ${reconnectDelay / 1000}s...`);
+      setTimeout(() => {
+        console.log("[whatsapp] Attempting reconnect...");
+        createWhatsAppClient().catch((err) => {
+          console.error("[whatsapp] Reconnect failed, exiting for PM2 restart:", err);
+          process.exit(1);
+        });
+      }, reconnectDelay);
+      reconnectDelay = Math.min(reconnectDelay * 2, 5 * 60 * 1000);
     }
   });
 
-  client.on("authenticated", () => { console.log("WhatsApp authenticated successfully."); });
-  client.on("auth_failure", (msg: string) => { console.error("Authentication failed:", msg); });
-  let reconnectDelay = 60000; // Start at 60s, increase on repeated disconnects
-  client.on("disconnected", (reason: string) => {
-    console.error(`[whatsapp] ⚠️ Disconnected: ${reason}. Restarting in ${reconnectDelay / 1000}s...`);
-    whatsappClient = null;
-    setTimeout(() => {
-      console.log("[whatsapp] Attempting reconnect...");
-      client.initialize().catch((err) => {
-        console.error("[whatsapp] Reconnect failed, exiting for PM2 restart:", err);
-        process.exit(1); // PM2 will restart us
-      });
-    }, reconnectDelay);
-    // Exponential backoff: 60s → 120s → 240s → max 300s
-    reconnectDelay = Math.min(reconnectDelay * 2, 5 * 60 * 1000);
-  });
-
-  // Reset backoff when connection is stable
-  client.on("ready", () => { reconnectDelay = 60000; });
-
-  // Detect stale connection — if no WhatsApp activity for 5 minutes, health check
-  let lastActivity = Date.now();
-  const originalEmit = client.emit.bind(client);
-  client.emit = function (event: string, ...args: any[]) {
-    lastActivity = Date.now();
-    return originalEmit(event, ...args);
-  } as any;
-
+  // Health check — detect stale connections
   setInterval(() => {
     const silenceMs = Date.now() - lastActivity;
-    // If no activity for 10 minutes and we think we're connected, check
-    if (silenceMs > 10 * 60 * 1000 && whatsappClient) {
-      console.warn(`[whatsapp] No activity for ${Math.round(silenceMs / 60000)} minutes. Testing connection...`);
-      client.getState().then((state) => {
-        if (state !== "CONNECTED") {
-          console.error(`[whatsapp] State is ${state}, not CONNECTED. Exiting for PM2 restart.`);
-          process.exit(1);
-        } else {
-          console.log(`[whatsapp] Health check OK — state: ${state}`);
-        }
-      }).catch((err) => {
-        console.error("[whatsapp] Health check failed, exiting for PM2 restart:", err);
+    if (silenceMs > 10 * 60 * 1000 && connected) {
+      console.warn(`[whatsapp] No activity for ${Math.round(silenceMs / 60000)} minutes. Connection may be stale.`);
+      // Baileys doesn't have getState() — if no messages for 10min, PM2 restart is safer
+      if (silenceMs > 20 * 60 * 1000) {
+        console.error("[whatsapp] 20min silence. Exiting for PM2 restart.");
         process.exit(1);
-      });
+      }
     }
-  }, 5 * 60 * 1000); // Check every 5 minutes
+  }, 5 * 60 * 1000);
 
-  client.on("message", async (msg: Message) => {
-    const chatId = msg.from;
-    // Emit event for autonomous agents
-    try {
-      const { agentEventBus } = require("../agents/autonomous");
-      const chat = await msg.getChat();
-      agentEventBus.emitTyped("message:received", {
-        chatId,
-        isGroup: chat.isGroup,
-        senderName: msg.author || chatId,
-        timestamp: Date.now(),
-      });
-    } catch {}
-    await withChatLock(chatId, () => handleMessage(msg));
+  // Incoming messages
+  sock.ev.on("messages.upsert", async ({ messages, type }: any) => {
+    if (type !== "notify") return; // Only process new messages, not history sync
+
+    for (const rawMsg of messages) {
+      if (!rawMsg.message) continue;
+      if (rawMsg.key.fromMe) continue;
+      // Skip status broadcasts
+      if (rawMsg.key.remoteJid === "status@broadcast") continue;
+
+      lastActivity = Date.now();
+      storeMessage(rawMsg.key.remoteJid || "", rawMsg);
+
+      const adapted = adaptMessage(sock, rawMsg);
+      const chatId = adapted.from;
+
+      // Emit event for autonomous agents
+      try {
+        const { agentEventBus } = require("../agents/autonomous");
+        const chat = await adapted.getChat();
+        agentEventBus.emitTyped("message:received", {
+          chatId,
+          isGroup: chat.isGroup,
+          senderName: adapted.author || chatId,
+          timestamp: Date.now(),
+        });
+      } catch {}
+
+      await withChatLock(chatId, () => handleMessage(adapted as any));
+    }
   });
+}
 
-  return client;
+export async function shutdownWhatsApp(): Promise<void> {
+  if (baileysSock) {
+    try { baileysSock.end(undefined); } catch {}
+    baileysSock = null;
+    connected = false;
+  }
 }
 
 /**
@@ -317,7 +324,7 @@ export function createWhatsAppClient(): Client {
 /**
  * Poll for pending notifications from the dashboard (e.g., followup completed → notify requester).
  */
-function startNotificationPoller(client: Client): void {
+function startNotificationPoller(): void {
   const notifyPath = statePath("pending-notifications.json");
 
   setInterval(() => {
@@ -347,52 +354,9 @@ function startNotificationPoller(client: Client): void {
   console.log("[notify] Notification poller started");
 }
 
-async function processUnreadMessages(client: Client): Promise<void> {
-  console.log("[unread] Checking for unread messages...");
-  try {
-    const chats = await client.getChats();
-    const unreadChats = chats.filter((chat) => chat.unreadCount > 0);
+// Note: processUnreadMessages not available with Baileys — messages arrive via messages.upsert on connect
 
-    if (unreadChats.length === 0) {
-      console.log("[unread] No unread messages found");
-      return;
-    }
-
-    console.log(`[unread] Found ${unreadChats.length} chats with unread messages`);
-
-    for (const chat of unreadChats) {
-      try {
-        // Fetch unread messages from this chat
-        const messages = await chat.fetchMessages({ limit: chat.unreadCount });
-        const unreadFromOthers = messages.filter((m) => !m.fromMe);
-
-        if (unreadFromOthers.length === 0) continue;
-
-        console.log(`[unread] Processing ${unreadFromOthers.length} unread messages from ${chat.name || chat.id._serialized}`);
-
-        // Process each unread message through the normal flow
-        for (const msg of unreadFromOthers) {
-          try {
-            await withChatLock(msg.from, () => handleMessage(msg));
-          } catch (err) {
-            console.error(`[unread] Error processing message from ${msg.from}:`, err);
-          }
-        }
-
-        // Mark chat as read
-        await chat.sendSeen();
-      } catch (err) {
-        console.error(`[unread] Error processing chat ${chat.name}:`, err);
-      }
-    }
-
-    console.log("[unread] Finished processing unread messages");
-  } catch (err) {
-    console.error("[unread] Error fetching chats:", err);
-  }
-}
-
-async function handleMessage(msg: Message): Promise<void> {
+async function handleMessage(msg: any): Promise<void> {
   if (msg.fromMe) return;
 
   // --- Media processing ---
@@ -732,8 +696,8 @@ async function handleMessage(msg: Message): Promise<void> {
       trace,
       {
         isVoice: isVoiceMessage,
-        sendVoice: isVoiceMessage && whatsappClient ? async (base64: string, mimetype: string) => {
-          const voiceMedia = new MessageMedia(mimetype, base64, "voice.mp3");
+        sendVoice: isVoiceMessage && connected ? async (base64: string, mimetype: string) => {
+          const voiceMedia = createAdaptedMedia(mimetype, base64, "voice.mp3");
           await queuedSendMessage(chatId, voiceMedia, { sendAudioAsVoice: true });
         } : undefined,
       }

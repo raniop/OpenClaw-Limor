@@ -2,7 +2,7 @@
  * Message send queue — enforces delays between WhatsApp sends to avoid bot detection.
  * Per-chat queuing with random jitter and burst protection.
  */
-import type { Client, MessageMedia, MessageSendOptions } from "whatsapp-web.js";
+import type { AdaptedMedia } from "./baileys-adapter";
 
 const PER_CHAT_DELAY_MIN = 800;
 const PER_CHAT_DELAY_MAX = 1500;
@@ -17,8 +17,8 @@ const BURST_WINDOW = 5000; // 5s window for burst detection
 
 type QueueItem = {
   chatId: string;
-  content: string | MessageMedia;
-  options?: MessageSendOptions;
+  content: string | AdaptedMedia;
+  options?: any;
   resolve: (val: any) => void;
   reject: (err: any) => void;
 };
@@ -26,9 +26,9 @@ type QueueItem = {
 const chatQueues = new Map<string, QueueItem[]>();
 const processingChats = new Set<string>();
 
-let clientRef: Client | null = null;
+let clientRef: { sendMessage(chatId: string, content: any, options?: any): Promise<any> } | null = null;
 
-export function initSendQueue(client: Client): void {
+export function initSendQueue(client: { sendMessage(chatId: string, content: any, options?: any): Promise<any> }): void {
   clientRef = client;
 }
 
@@ -92,8 +92,8 @@ async function processQueue(chatId: string): Promise<void> {
 
 export function queuedSendMessage(
   chatId: string,
-  content: string | MessageMedia,
-  options?: MessageSendOptions,
+  content: string | AdaptedMedia,
+  options?: any,
 ): Promise<any> {
   if (!clientRef) {
     return Promise.reject(new Error("[send-queue] Client not initialized"));
