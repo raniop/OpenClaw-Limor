@@ -42,6 +42,7 @@ import { readFileSync, writeFileSync, existsSync } from "fs";
 import { addManualContact } from "../contacts";
 import { trackGroupPerson, getGroupPeopleContext } from "../conversation";
 import { syncContacts } from "../sync-contacts";
+import { initSendQueue, queuedSendMessage } from "./send-queue";
 
 let latestQR: string | null = null;
 let qrServer: http.Server | null = null;
@@ -79,7 +80,7 @@ export function getClient(): Client | null {
 
 async function sendToChat(chatId: string, text: string): Promise<void> {
   if (whatsappClient) {
-    await whatsappClient.sendMessage(chatId, text);
+    await queuedSendMessage(chatId, text);
   }
 }
 
@@ -135,17 +136,18 @@ export function createWhatsAppClient(): Client {
     } catch {}
     if (qrServer) { qrServer.close(); qrServer = null; }
     log.systemReady();
+    initSendQueue(client);
 
     setNotifyOwnerCallback(async (message: string) => {
       if (config.ownerChatId && whatsappClient) {
-        await whatsappClient.sendMessage(config.ownerChatId, message);
+        await queuedSendMessage(config.ownerChatId, message);
         conversationStore.addMessage(config.ownerChatId, "assistant", message);
       }
     });
 
     setSendMessageCallback(async (chatId: string, message: string) => {
       if (whatsappClient) {
-        await whatsappClient.sendMessage(chatId, message);
+        await queuedSendMessage(chatId, message);
         conversationStore.addMessage(chatId, "assistant", message);
       }
     });
@@ -153,7 +155,7 @@ export function createWhatsAppClient(): Client {
     setSendFileCallback(async (chatId: string, base64: string, filename: string, mimetype: string, caption?: string) => {
       if (whatsappClient) {
         const media = new MessageMedia(mimetype, base64, filename);
-        await whatsappClient.sendMessage(chatId, media, { caption });
+        await queuedSendMessage(chatId, media, { caption });
         conversationStore.addMessage(chatId, "assistant", caption || `📎 ${filename}`);
       }
     });
@@ -170,7 +172,7 @@ export function createWhatsAppClient(): Client {
     try {
       startDeliveryPoller(async (text: string) => {
         if (config.ownerChatId && whatsappClient) {
-          await whatsappClient.sendMessage(config.ownerChatId, text);
+          await queuedSendMessage(config.ownerChatId, text);
         }
       });
     } catch (err) {
@@ -181,7 +183,7 @@ export function createWhatsAppClient(): Client {
     try {
       startSmsWatcher(async (text: string) => {
         if (config.ownerChatId && whatsappClient) {
-          await whatsappClient.sendMessage(config.ownerChatId, text);
+          await queuedSendMessage(config.ownerChatId, text);
           conversationStore.addMessage(config.ownerChatId, "assistant", text);
         }
       });
@@ -193,7 +195,7 @@ export function createWhatsAppClient(): Client {
     try {
       startEmailPoller(async (text: string) => {
         if (config.ownerChatId && whatsappClient) {
-          await whatsappClient.sendMessage(config.ownerChatId, text);
+          await queuedSendMessage(config.ownerChatId, text);
           conversationStore.addMessage(config.ownerChatId, "assistant", text);
         }
       });
@@ -207,7 +209,7 @@ export function createWhatsAppClient(): Client {
         // Text-only callback
         async (text: string) => {
           if (config.ownerChatId && whatsappClient) {
-            await whatsappClient.sendMessage(config.ownerChatId, text);
+            await queuedSendMessage(config.ownerChatId, text);
           }
         },
         // Image + caption callback — uses fetch() instead of MessageMedia.fromUrl()
@@ -221,11 +223,11 @@ export function createWhatsAppClient(): Client {
               const base64 = buffer.toString("base64");
               const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
               const media = new MessageMedia(contentType, base64, "telegram-image.jpg");
-              await whatsappClient.sendMessage(config.ownerChatId, media, { caption });
+              await queuedSendMessage(config.ownerChatId, media, { caption });
             } catch (imgErr) {
               // Fallback to text if image download fails
               console.error("[telegram] Image download failed, sending text only:", imgErr);
-              await whatsappClient.sendMessage(config.ownerChatId, caption);
+              await queuedSendMessage(config.ownerChatId, caption);
             }
           }
         }
@@ -330,7 +332,7 @@ function startNotificationPoller(client: Client): void {
       // Send each notification
       for (const n of notifications) {
         if (n.chatId && n.message) {
-          client.sendMessage(n.chatId, n.message).catch((err: any) =>
+          queuedSendMessage(n.chatId, n.message).catch((err: any) =>
             console.error(`[notify] Failed to send to ${n.chatId}:`, err.message)
           );
           console.log(`[notify] Sent completion notification to ${n.chatId}`);
@@ -732,7 +734,7 @@ async function handleMessage(msg: Message): Promise<void> {
         isVoice: isVoiceMessage,
         sendVoice: isVoiceMessage && whatsappClient ? async (base64: string, mimetype: string) => {
           const voiceMedia = new MessageMedia(mimetype, base64, "voice.mp3");
-          await whatsappClient!.sendMessage(chatId, voiceMedia, { sendAudioAsVoice: true });
+          await queuedSendMessage(chatId, voiceMedia, { sendAudioAsVoice: true });
         } : undefined,
       }
     );

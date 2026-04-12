@@ -9,6 +9,7 @@ import { resolve } from "path";
 import { execSync } from "child_process";
 import { config } from "../config";
 import { getClient } from "../whatsapp";
+import { queuedSendMessage } from "../whatsapp/send-queue";
 
 const PROJECT_ROOT = resolve(__dirname, "..", "..");
 const STATE_FILE = resolve(PROJECT_ROOT, "workspace", "state", "last-update-check.json");
@@ -130,7 +131,7 @@ async function checkForUpdates(): Promise<void> {
   const client = getClient();
   if (client && config.ownerChatId) {
     try {
-      await client.sendMessage(
+      await queuedSendMessage(
         config.ownerChatId,
         `🔄 *גרסה חדשה זמינה!*\n\n` +
         `גרסה נוכחית: v${localVersion}\n` +

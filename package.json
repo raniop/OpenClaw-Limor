@@ -42,7 +42,7 @@
     "ssh2": "^1.17.0",
     "telegram": "^2.26.22",
     "uuid": "^13.0.0",
-    "whatsapp-web.js": "^1.26.1-alpha.3"
+    "whatsapp-web.js": "^1.34.6"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
