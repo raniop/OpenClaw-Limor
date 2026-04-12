@@ -63,8 +63,8 @@ async function initWithRetry(maxRetries = 2) {
         try { unlinkSync(lockFile); } catch {}
 
         if (attempt < maxRetries) {
-          console.log("[init] Retrying in 3 seconds...");
-          await new Promise(r => setTimeout(r, 3000));
+          console.log("[init] Retrying in 10 seconds...");
+          await new Promise(r => setTimeout(r, 10000));
           continue;
         }
 

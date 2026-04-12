@@ -102,7 +102,19 @@ export function createWhatsAppClient(): Client {
     puppeteer: {
       headless: true,
       executablePath,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-blink-features=AutomationControlled",
+        "--disable-dev-shm-usage",
+        "--no-first-run",
+        "--disable-extensions",
+        "--disable-default-apps",
+        "--disable-infobars",
+        "--disable-gpu",
+        "--lang=he-IL,he,en-US,en",
+        "--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      ],
     },
   });
 
@@ -232,8 +244,9 @@ export function createWhatsAppClient(): Client {
 
   client.on("authenticated", () => { console.log("WhatsApp authenticated successfully."); });
   client.on("auth_failure", (msg: string) => { console.error("Authentication failed:", msg); });
+  let reconnectDelay = 60000; // Start at 60s, increase on repeated disconnects
   client.on("disconnected", (reason: string) => {
-    console.error(`[whatsapp] ⚠️ Disconnected: ${reason}. Restarting in 10 seconds...`);
+    console.error(`[whatsapp] ⚠️ Disconnected: ${reason}. Restarting in ${reconnectDelay / 1000}s...`);
     whatsappClient = null;
     setTimeout(() => {
       console.log("[whatsapp] Attempting reconnect...");
@@ -241,8 +254,13 @@ export function createWhatsAppClient(): Client {
         console.error("[whatsapp] Reconnect failed, exiting for PM2 restart:", err);
         process.exit(1); // PM2 will restart us
       });
-    }, 10000);
+    }, reconnectDelay);
+    // Exponential backoff: 60s → 120s → 240s → max 300s
+    reconnectDelay = Math.min(reconnectDelay * 2, 5 * 60 * 1000);
   });
+
+  // Reset backoff when connection is stable
+  client.on("ready", () => { reconnectDelay = 60000; });
 
   // Detect stale connection — if no WhatsApp activity for 5 minutes, health check
   let lastActivity = Date.now();
