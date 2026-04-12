@@ -372,7 +372,7 @@ async function processUnreadMessages(client: Client): Promise<void> {
   }
 }
 
-export async function handleMessage(msg: Message): Promise<void> {
+async function handleMessage(msg: Message): Promise<void> {
   if (msg.fromMe) return;
 
   // --- Media processing ---
