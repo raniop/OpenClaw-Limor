@@ -5,19 +5,10 @@
 import { config } from "../config";
 import { randomUUID } from "crypto";
 
-// GatewayClient lives in openclaw's gateway-runtime ESM module.
-// We use dynamic import() since the package is ESM-only.
-// The path resolves through openclaw's package.json "exports" map at runtime.
-let GatewayClientClass: any = null;
-async function loadGatewayClient(): Promise<any> {
-  if (!GatewayClientClass) {
-    // Use Function to avoid TypeScript moduleResolution checking the path
-    const importDynamic = new Function("specifier", "return import(specifier)");
-    const mod = await importDynamic("openclaw/plugin-sdk/gateway-runtime");
-    GatewayClientClass = mod.GatewayClient;
-  }
-  return GatewayClientClass;
-}
+// Use require() because openclaw uses ESM exports map which doesn't resolve
+// under tsconfig's "module": "commonjs" with default moduleResolution.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { GatewayClient: GatewayClientClass } = require("openclaw/plugin-sdk");
 
 // Type definitions (from openclaw/dist/plugin-sdk/src/gateway/client.d.ts)
 interface GatewayClientOptions {
@@ -52,14 +43,12 @@ export function getGatewayClient(): IGatewayClient {
   return client;
 }
 
-export async function initGateway(): Promise<IGatewayClient> {
+export function initGateway(): IGatewayClient {
   if (client) return client;
 
   if (!config.openclawGatewayUrl) {
     throw new Error("[openclaw] OPENCLAW_GATEWAY_URL is required when OPENCLAW_ENABLED=true");
   }
-
-  const Cls = await loadGatewayClient();
 
   const opts: Record<string, unknown> = {
     url: config.openclawGatewayUrl,
@@ -84,33 +73,10 @@ export async function initGateway(): Promise<IGatewayClient> {
     },
   };
 
-  client = new Cls(opts) as IGatewayClient;
+  client = new GatewayClientClass(opts) as IGatewayClient;
   client.start();
   console.log(`[openclaw] Connecting to gateway: ${config.openclawGatewayUrl}`);
   return client;
-}
-
-/**
- * Convert Limor's internal chat IDs to MyClaw/Baileys JID format for sending.
- * Limor uses "18537179529435@lid" (whatsapp-web.js LID) but MyClaw needs "972524444244@s.whatsapp.net".
- */
-function toSendableJid(chatId: string): string {
-  // If it's the owner's LID, convert to phone-based JID
-  if (chatId === config.ownerChatId) {
-    const phone = config.ownerPhone?.replace(/^0/, "972").replace(/^\+/, "") || "";
-    if (phone) return `${phone}@s.whatsapp.net`;
-  }
-  // Already a standard JID
-  if (chatId.includes("@s.whatsapp.net") || chatId.includes("@g.us")) return chatId;
-  // LID format — try to extract and convert (best effort)
-  if (chatId.includes("@lid")) {
-    // Can't convert unknown LIDs; return as-is and hope MyClaw handles it
-    return chatId;
-  }
-  // Plain phone number
-  const phone = chatId.replace(/^\+/, "").replace(/\D/g, "");
-  if (phone) return `${phone}@s.whatsapp.net`;
-  return chatId;
 }
 
 /**
@@ -118,9 +84,8 @@ function toSendableJid(chatId: string): string {
  */
 export async function gatewaySendText(to: string, message: string): Promise<void> {
   const gw = getGatewayClient();
-  const jid = toSendableJid(to);
   await gw.request("send", {
-    to: jid,
+    to,
     message,
     channel: "whatsapp",
     accountId: config.openclawWhatsAppAccountId || undefined,
@@ -139,12 +104,11 @@ export async function gatewaySendMedia(
   caption?: string,
 ): Promise<void> {
   const gw = getGatewayClient();
-  const jid = toSendableJid(to);
   // For media, we use the send method with mediaUrl pointing to a data URI
   // OpenClaw's outbound system handles base64 data URIs
   const dataUri = `data:${mimetype};base64,${base64}`;
   await gw.request("send", {
-    to: jid,
+    to,
     message: caption || "",
     mediaUrl: dataUri,
     channel: "whatsapp",

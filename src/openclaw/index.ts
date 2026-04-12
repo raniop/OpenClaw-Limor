@@ -14,7 +14,7 @@ import { conversationStore } from "../stores";
 import { setNotifyOwnerCallback, setSendMessageCallback, setSendFileCallback } from "../ai";
 import { handleMessage } from "../whatsapp";
 import { withChatLock } from "../whatsapp/chat-lock";
-import { initGateway, setEventHandler, gatewaySendText, gatewaySendMedia, stopGateway, getGatewayClient } from "./gateway-client";
+import { initGateway, setEventHandler, gatewaySendText, gatewaySendMedia, stopGateway } from "./gateway-client";
 import { createVirtualMessage } from "./message-adapter";
 import type { OpenClawInboundMessage } from "./message-adapter";
 import { startDeliveryPoller, startSmsWatcher } from "../sms";
@@ -32,10 +32,13 @@ export async function createOpenClawClient(): Promise<void> {
   console.log("[openclaw] Starting OpenClaw transport...");
 
   // 1. Initialize gateway connection
-  await initGateway();
+  initGateway();
 
-  // 2. Set up inbound message handler (events + polling)
+  // 2. Set up inbound message handler
   setEventHandler((evt) => {
+    // Filter for WhatsApp inbound message events
+    // OpenClaw emits events like "message.received", "channel.message", etc.
+    // We handle common event names and log unknown ones for debugging
     const eventName = evt.event;
     const payload = evt.payload as Record<string, unknown> | undefined;
 
@@ -46,22 +49,18 @@ export async function createOpenClawClient(): Promise<void> {
       eventName === "message.received" ||
       eventName === "channel.message" ||
       eventName === "inbound.message" ||
-      eventName === "chat.message" ||
-      eventName === "limor.inbound"
+      eventName === "chat.message"
     ) {
       handleInboundMessage(payload).catch((err) =>
         console.error("[openclaw] Error handling inbound message:", err)
       );
-    } else if (eventName === "session.updated" || eventName === "channels.status" || eventName === "tick" || eventName === "health") {
+    } else if (eventName === "session.updated" || eventName === "channels.status" || eventName === "tick") {
       // Known non-message events — ignore silently
     } else {
-      // Log unknown events during initial integration
+      // Log unknown events during initial integration to discover the right event names
       console.log(`[openclaw] Event: ${eventName}`, JSON.stringify(payload).slice(0, 200));
     }
   });
-
-  // 2b. Poll limor.poll gateway method for messages queued by the MyClaw plugin
-  startMessagePoller();
 
   // 3. Set up send callbacks (same interface as whatsapp-web.js module)
   log.systemReady();
@@ -155,33 +154,12 @@ export async function createOpenClawClient(): Promise<void> {
 }
 
 /**
- * Dedup: track recent message IDs to prevent double-processing
- * (messages arrive via both gateway events and limor.poll)
- */
-const recentMessageIds = new Set<string>();
-
-/**
  * Handle an inbound message event from the OpenClaw gateway.
  */
 async function handleInboundMessage(payload: Record<string, unknown>): Promise<void> {
-  // Dedup by messageId or content+timestamp
-  const dedupKey = (payload.messageId as string) || `${payload.from}:${payload.content}:${payload.timestamp}`;
-  if (recentMessageIds.has(dedupKey)) return;
-  recentMessageIds.add(dedupKey);
-  setTimeout(() => recentMessageIds.delete(dedupKey), 30000); // Clean after 30s
-
-  // Map sender JID to owner chat ID if it matches owner's phone
-  // MyClaw/Baileys uses "972524444244@s.whatsapp.net" but Limor expects "18537179529435@lid"
-  const rawFrom = (payload.from as string) || (payload.senderId as string) || "";
-  // Strip leading 0 or + from owner phone for matching (0524444244 → 524444244)
-  const ownerPhone = config.ownerPhone?.replace(/^[\+0]+/, "") || "";
-  const normalizedFrom = ownerPhone && rawFrom.includes(ownerPhone)
-    ? config.ownerChatId  // Map to the owner chat ID Limor expects
-    : rawFrom;
-
   // Map payload to our canonical inbound type
   const inbound: OpenClawInboundMessage = {
-    from: normalizedFrom,
+    from: (payload.from as string) || (payload.senderId as string) || "",
     to: payload.to as string | undefined,
     content: (payload.content as string) || (payload.body as string) || (payload.message as string) || "",
     body: payload.body as string | undefined,
@@ -261,56 +239,9 @@ function startNotificationPoller(): void {
 }
 
 /**
- * Poll the MyClaw gateway for queued WhatsApp messages.
- * The limor-relay plugin on MyClaw intercepts messages and queues them.
- * We poll every 2 seconds to fetch and process them.
- */
-let pollerInterval: ReturnType<typeof setInterval> | null = null;
-
-function startMessagePoller(): void {
-  let polling = false;
-
-  pollerInterval = setInterval(async () => {
-    if (polling) return; // Skip if previous poll is still running
-    polling = true;
-
-    try {
-      const gw = getGatewayClient();
-      const result = await gw.request<{ messages: Array<Record<string, unknown>>; count: number }>(
-        "limor.poll",
-        {},
-        { timeoutMs: 5000 },
-      );
-
-      if (result.count > 0) {
-        console.log(`[openclaw] Polled ${result.count} message(s) from MyClaw`);
-        for (const msg of result.messages) {
-          handleInboundMessage(msg).catch((err: any) =>
-            console.error("[openclaw] Error handling polled message:", err.message)
-          );
-        }
-      }
-    } catch (err: any) {
-      // Silently ignore poll errors (gateway not connected yet, etc.)
-      if (!err.message?.includes("not connected") && !err.message?.includes("timeout")) {
-        console.error("[openclaw] Poll error:", err.message);
-      }
-    } finally {
-      polling = false;
-    }
-  }, 2000); // Poll every 2 seconds
-
-  console.log("[openclaw] Message poller started (every 2s)");
-}
-
-/**
  * Graceful shutdown.
  */
 export async function shutdownOpenClaw(): Promise<void> {
-  if (pollerInterval) {
-    clearInterval(pollerInterval);
-    pollerInterval = null;
-  }
   console.log("[openclaw] Shutting down...");
   log.systemShutdown();
   await stopGateway();
