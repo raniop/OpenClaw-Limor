@@ -72,21 +72,18 @@ export async function appleListEvents(date: Date): Promise<string> {
   const startStr = formatDateForAppleScript(startOfDay);
   const endStr = formatDateForAppleScript(endOfDay);
 
-  // Get events from ALL calendars (not just Home)
-  const script = `
-tell application "Calendar"
-  set eventList to {}
+  // Get events from ALL calendars — build result string manually to avoid delimiter issues
+  const script = `tell application "Calendar"
+  set resultText to ""
   repeat with cal in calendars
     try
       set calEvents to (every event of cal whose start date >= date "${startStr}" and start date <= date "${endStr}")
       repeat with evt in calEvents
-        set eventInfo to (summary of evt) & "|||" & (start date of evt as string) & "|||" & (end date of evt as string) & "|||" & (name of cal)
-        set end of eventList to eventInfo
+        set resultText to resultText & (summary of evt) & "|||" & (start date of evt as string) & "|||" & (end date of evt as string) & "|||" & (name of cal) & linefeed
       end repeat
     end try
   end repeat
-  set AppleScript's text item delimiters to "\\n"
-  return eventList as text
+  return resultText
 end tell`;
 
   const output = runAppleScript(script);
@@ -134,17 +131,15 @@ export async function appleFindAndDeleteEvent(
   const safeQuery = titleQuery.replace(/"/g, '\\"');
 
   // First list events to find matches
-  const listScript = `
-tell application "Calendar"
-  set results to {}
+  const listScript = `tell application "Calendar"
+  set resultText to ""
   tell calendar "${CALENDAR_NAME}"
     set dayEvents to (every event whose start date >= date "${startStr}" and start date <= date "${endStr}")
     repeat with evt in dayEvents
-      set end of results to (summary of evt) & "|||" & (uid of evt) & "|||" & (start date of evt as string)
+      set resultText to resultText & (summary of evt) & "|||" & (uid of evt) & "|||" & (start date of evt as string) & linefeed
     end repeat
   end tell
-  set AppleScript's text item delimiters to "\\n"
-  return results as text
+  return resultText
 end tell`;
 
   const output = runAppleScript(listScript);
@@ -191,19 +186,17 @@ export async function appleDeleteAllEventsOnDate(date: Date): Promise<string> {
   const startStr = formatDateForAppleScript(startOfDay);
   const endStr = formatDateForAppleScript(endOfDay);
 
-  const script = `
-tell application "Calendar"
+  const script = `tell application "Calendar"
   tell calendar "${CALENDAR_NAME}"
     set dayEvents to (every event whose start date >= date "${startStr}" and start date <= date "${endStr}")
     set eventCount to count of dayEvents
     if eventCount = 0 then return "אין אירועים ביום הזה."
-    set deletedNames to {}
+    set resultText to ""
     repeat with evt in dayEvents
-      set end of deletedNames to summary of evt
+      set resultText to resultText & (summary of evt) & ", "
       delete evt
     end repeat
-    set AppleScript's text item delimiters to ", "
-    return "נמחקו " & eventCount & " אירועים: " & (deletedNames as text)
+    return "נמחקו " & eventCount & " אירועים: " & resultText
   end tell
 end tell`;
 
@@ -211,14 +204,12 @@ end tell`;
 }
 
 export async function appleListCalendars(): Promise<string[]> {
-  const output = runAppleScript(`
-tell application "Calendar"
-  set calNames to {}
+  const output = runAppleScript(`tell application "Calendar"
+  set resultText to ""
   repeat with cal in calendars
-    set end of calNames to name of cal
+    set resultText to resultText & (name of cal) & "|||"
   end repeat
-  set AppleScript's text item delimiters to "|||"
-  return calNames as text
+  return resultText
 end tell`);
   return output.split("|||").map((s) => s.trim()).filter(Boolean);
 }
