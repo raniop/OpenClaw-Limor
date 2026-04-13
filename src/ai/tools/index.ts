@@ -26,3 +26,4 @@ export { telegramTools } from "./telegram";
 export { operationalRuleTools } from "./operational-rules";
 export { contractTools } from "./contracts";
 export { billTools } from "./bills";
+export { insuranceTools } from "./insurance";

@@ -26,6 +26,7 @@ import { telegramHandlers } from "./telegram";
 import { operationalRulesHandlers } from "./operational-rules";
 import { contractHandlers } from "./contracts";
 import { billHandlers } from "./bills";
+import { insuranceHandlers } from "./insurance";
 
 export type { ToolHandler } from "./types";
 
@@ -57,4 +58,5 @@ export const allHandlers: Record<string, ToolHandler> = {
   ...operationalRulesHandlers,
   ...contractHandlers,
   ...billHandlers,
+  ...insuranceHandlers,
 };
