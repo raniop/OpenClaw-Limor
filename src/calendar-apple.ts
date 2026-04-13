@@ -24,20 +24,24 @@ function runAppleScript(script: string): string {
 }
 
 /**
- * Format a JS Date to AppleScript-compatible date string.
- * AppleScript needs: "Saturday, April 12, 2026 at 10:00:00 AM"
+ * Build AppleScript code that constructs a date object from components.
+ * Avoids locale-dependent date string parsing entirely.
  */
-function formatDateForAppleScript(date: Date): string {
-  return date.toLocaleString("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
+function appleScriptDateExpr(varName: string, date: Date): string {
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1; // JS months are 0-indexed
+  const day = date.getDate();
+  const hours = date.getHours();
+  const minutes = date.getMinutes();
+  const seconds = date.getSeconds();
+  // Build date from "current date" and override each component
+  return `set ${varName} to current date
+set year of ${varName} to ${year}
+set month of ${varName} to ${month}
+set day of ${varName} to ${day}
+set hours of ${varName} to ${hours}
+set minutes of ${varName} to ${minutes}
+set seconds of ${varName} to ${seconds}`;
 }
 
 export async function appleCreateEvent(
@@ -45,15 +49,13 @@ export async function appleCreateEvent(
   startDate: Date,
   endDate: Date,
 ): Promise<CreateEventResult> {
-  const startStr = formatDateForAppleScript(startDate);
-  const endStr = formatDateForAppleScript(endDate);
-  // Escape double quotes in title
   const safeTitle = title.replace(/"/g, '\\"');
 
-  const script = `
+  const script = `${appleScriptDateExpr("startD", startDate)}
+${appleScriptDateExpr("endD", endDate)}
 tell application "Calendar"
   tell calendar "${CALENDAR_NAME}"
-    set newEvent to make new event at end with properties {summary:"${safeTitle}", start date:date "${startStr}", end date:date "${endStr}"}
+    set newEvent to make new event at end with properties {summary:"${safeTitle}", start date:startD, end date:endD}
     return uid of newEvent
   end tell
 end tell`;
@@ -69,15 +71,14 @@ export async function appleListEvents(date: Date): Promise<string> {
   const endOfDay = new Date(date);
   endOfDay.setHours(23, 59, 59, 999);
 
-  const startStr = formatDateForAppleScript(startOfDay);
-  const endStr = formatDateForAppleScript(endOfDay);
-
-  // Get events from ALL calendars — build result string manually to avoid delimiter issues
-  const script = `tell application "Calendar"
+  // Get events from ALL calendars — build dates programmatically to avoid locale issues
+  const script = `${appleScriptDateExpr("startD", startOfDay)}
+${appleScriptDateExpr("endD", endOfDay)}
+tell application "Calendar"
   set resultText to ""
   repeat with cal in calendars
     try
-      set calEvents to (every event of cal whose start date >= date "${startStr}" and start date <= date "${endStr}")
+      set calEvents to (every event of cal whose start date >= startD and start date <= endD)
       repeat with evt in calEvents
         set resultText to resultText & (summary of evt) & "|||" & (start date of evt as string) & "|||" & (end date of evt as string) & "|||" & (name of cal) & linefeed
       end repeat
@@ -126,15 +127,15 @@ export async function appleFindAndDeleteEvent(
   const endOfDay = new Date(date);
   endOfDay.setHours(23, 59, 59, 999);
 
-  const startStr = formatDateForAppleScript(startOfDay);
-  const endStr = formatDateForAppleScript(endOfDay);
   const safeQuery = titleQuery.replace(/"/g, '\\"');
 
   // First list events to find matches
-  const listScript = `tell application "Calendar"
+  const listScript = `${appleScriptDateExpr("startD", startOfDay)}
+${appleScriptDateExpr("endD", endOfDay)}
+tell application "Calendar"
   set resultText to ""
   tell calendar "${CALENDAR_NAME}"
-    set dayEvents to (every event whose start date >= date "${startStr}" and start date <= date "${endStr}")
+    set dayEvents to (every event whose start date >= startD and start date <= endD)
     repeat with evt in dayEvents
       set resultText to resultText & (summary of evt) & "|||" & (uid of evt) & "|||" & (start date of evt as string) & linefeed
     end repeat
@@ -183,12 +184,11 @@ export async function appleDeleteAllEventsOnDate(date: Date): Promise<string> {
   const endOfDay = new Date(date);
   endOfDay.setHours(23, 59, 59, 999);
 
-  const startStr = formatDateForAppleScript(startOfDay);
-  const endStr = formatDateForAppleScript(endOfDay);
-
-  const script = `tell application "Calendar"
+  const script = `${appleScriptDateExpr("startD", startOfDay)}
+${appleScriptDateExpr("endD", endOfDay)}
+tell application "Calendar"
   tell calendar "${CALENDAR_NAME}"
-    set dayEvents to (every event whose start date >= date "${startStr}" and start date <= date "${endStr}")
+    set dayEvents to (every event whose start date >= startD and start date <= endD)
     set eventCount to count of dayEvents
     if eventCount = 0 then return "אין אירועים ביום הזה."
     set resultText to ""
