@@ -9,9 +9,18 @@ const CALENDAR_NAME = process.env.APPLE_CALENDAR_NAME || "Home";
 const TIMEOUT = 15000; // 15s timeout for AppleScript
 
 function runAppleScript(script: string): string {
-  // Escape single quotes in the script for shell
-  const escaped = script.replace(/'/g, "'\\''");
-  return execSync(`osascript -e '${escaped}'`, { timeout: TIMEOUT }).toString().trim();
+  // Write to temp file to avoid shell escaping issues with AppleScript's quotes
+  const tmpFile = `/tmp/harb_applescript_${Date.now()}.scpt`;
+  const { writeFileSync, unlinkSync } = require("fs");
+  try {
+    writeFileSync(tmpFile, script, "utf-8");
+    const result = execSync(`osascript "${tmpFile}"`, { timeout: TIMEOUT }).toString().trim();
+    try { unlinkSync(tmpFile); } catch {}
+    return result;
+  } catch (err) {
+    try { unlinkSync(tmpFile); } catch {}
+    throw err;
+  }
 }
 
 /**
