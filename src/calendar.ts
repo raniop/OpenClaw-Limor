@@ -1,6 +1,18 @@
+/**
+ * Calendar module — Apple Calendar (primary) + Google Calendar (fallback).
+ * Tries Apple Calendar via AppleScript first. Falls back to Google if Apple fails.
+ */
 import { google } from "googleapis";
 import { config } from "./config";
 import { withCircuitBreaker } from "./utils/circuit-breaker";
+import {
+  appleCreateEvent,
+  appleListEvents,
+  appleFindAndDeleteEvent,
+  appleDeleteAllEventsOnDate,
+} from "./calendar-apple";
+
+// ─── Google Calendar (fallback) ───────────────────────────────────────
 
 function getCalendarClient() {
   const oauth2Client = new google.auth.OAuth2(
@@ -18,7 +30,7 @@ export interface CreateEventResult {
   summary: string;
 }
 
-async function _createEvent(
+async function googleCreateEvent(
   title: string,
   startDate: Date,
   endDate: Date
@@ -28,36 +40,24 @@ async function _createEvent(
     calendarId: "primary",
     requestBody: {
       summary: title,
-      start: {
-        dateTime: startDate.toISOString(),
-        timeZone: "Asia/Jerusalem",
-      },
-      end: {
-        dateTime: endDate.toISOString(),
-        timeZone: "Asia/Jerusalem",
-      },
+      start: { dateTime: startDate.toISOString(), timeZone: "Asia/Jerusalem" },
+      end: { dateTime: endDate.toISOString(), timeZone: "Asia/Jerusalem" },
     },
   });
-  return {
-    eventId: event.data.id || "",
-    summary: event.data.summary || title,
-  };
+  return { eventId: event.data.id || "", summary: event.data.summary || title };
 }
 
-async function _deleteEvent(eventId: string): Promise<string> {
+async function googleDeleteEvent(eventId: string): Promise<string> {
   const calendar = getCalendarClient();
   try {
-    await calendar.events.delete({
-      calendarId: "primary",
-      eventId,
-    });
+    await calendar.events.delete({ calendarId: "primary", eventId });
     return `✅ האירוע נמחק בהצלחה.`;
   } catch (err: any) {
     return `❌ לא הצלחתי למחוק: ${err.message}`;
   }
 }
 
-async function _findAndDeleteEvent(date: Date, titleQuery: string): Promise<string> {
+async function googleFindAndDeleteEvent(date: Date, titleQuery: string): Promise<string> {
   const calendar = getCalendarClient();
   const startOfDay = new Date(date);
   startOfDay.setHours(0, 0, 0, 0);
@@ -73,22 +73,16 @@ async function _findAndDeleteEvent(date: Date, titleQuery: string): Promise<stri
   });
 
   const events = res.data.items;
-  if (!events || events.length === 0) {
-    return "❌ לא נמצאו אירועים ביום הזה.";
-  }
+  if (!events || events.length === 0) return "❌ לא נמצאו אירועים ביום הזה.";
 
-  // Find matching events by title
   const query = titleQuery.toLowerCase();
-  const matching = events.filter(e =>
-    e.summary?.toLowerCase().includes(query)
-  );
+  const matching = events.filter((e) => e.summary?.toLowerCase().includes(query));
 
   if (matching.length === 0) {
-    const available = events.map(e => `• ${e.summary}`).join("\n");
+    const available = events.map((e) => `• ${e.summary}`).join("\n");
     return `❌ לא נמצא אירוע שמתאים ל-"${titleQuery}". אירועים ביום הזה:\n${available}`;
   }
 
-  // Delete all matching
   const results: string[] = [];
   for (const event of matching) {
     if (event.id) {
@@ -99,11 +93,10 @@ async function _findAndDeleteEvent(date: Date, titleQuery: string): Promise<stri
       results.push(`✅ נמחק: ${time} - ${event.summary}`);
     }
   }
-
   return results.join("\n");
 }
 
-async function _deleteAllEventsOnDate(date: Date): Promise<string> {
+async function googleDeleteAllEventsOnDate(date: Date): Promise<string> {
   const calendar = getCalendarClient();
   const startOfDay = new Date(date);
   startOfDay.setHours(0, 0, 0, 0);
@@ -118,9 +111,7 @@ async function _deleteAllEventsOnDate(date: Date): Promise<string> {
   });
 
   const events = res.data.items;
-  if (!events || events.length === 0) {
-    return "אין אירועים ביום הזה.";
-  }
+  if (!events || events.length === 0) return "אין אירועים ביום הזה.";
 
   const results: string[] = [];
   for (const event of events) {
@@ -129,13 +120,10 @@ async function _deleteAllEventsOnDate(date: Date): Promise<string> {
       results.push(`✅ נמחק: ${event.summary}`);
     }
   }
-
   return results.join("\n");
 }
 
-async function _listEvents(
-  date: Date
-): Promise<string> {
+async function googleListEvents(date: Date): Promise<string> {
   const calendar = getCalendarClient();
   const startOfDay = new Date(date);
   startOfDay.setHours(0, 0, 0, 0);
@@ -152,39 +140,64 @@ async function _listEvents(
   });
 
   const events = res.data.items;
-  if (!events || events.length === 0) {
-    return "אין אירועים ביומן ליום הזה.";
-  }
+  if (!events || events.length === 0) return "אין אירועים ביומן ליום הזה.";
 
   return events
     .map((e) => {
       const start = e.start?.dateTime
-        ? new Date(e.start.dateTime).toLocaleTimeString("he-IL", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })
+        ? new Date(e.start.dateTime).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })
         : "כל היום";
       return `• ${start} - ${e.summary}`;
     })
     .join("\n");
 }
 
-// --- Circuit breaker wrappers ---
-const calendarBreaker = { name: "google-calendar", failureThreshold: 3, cooldownMs: 300_000 };
-const CALENDAR_FALLBACK = "❌ Google Calendar לא זמין כרגע. נסה שוב.";
+// ─── Apple-first with Google fallback ─────────────────────────────────
 
-export async function createEvent(title: string, startDate: Date, endDate: Date): Promise<CreateEventResult> {
-  return withCircuitBreaker(calendarBreaker, () => _createEvent(title, startDate, endDate), CALENDAR_FALLBACK as any);
+const googleBreaker = { name: "google-calendar", failureThreshold: 3, cooldownMs: 300_000 };
+const GOOGLE_FALLBACK = "❌ גם Apple Calendar וגם Google Calendar לא זמינים כרגע.";
+
+export async function createEvent(
+  title: string,
+  startDate: Date,
+  endDate: Date,
+): Promise<CreateEventResult> {
+  try {
+    return await appleCreateEvent(title, startDate, endDate);
+  } catch (err: any) {
+    console.warn(`[calendar] Apple Calendar failed: ${err.message}. Trying Google...`);
+    return withCircuitBreaker(googleBreaker, () => googleCreateEvent(title, startDate, endDate), GOOGLE_FALLBACK as any);
+  }
 }
-export function deleteEvent(eventId: string): Promise<string> {
-  return withCircuitBreaker(calendarBreaker, () => _deleteEvent(eventId), CALENDAR_FALLBACK);
+
+export async function listEvents(date: Date): Promise<string> {
+  try {
+    return await appleListEvents(date);
+  } catch (err: any) {
+    console.warn(`[calendar] Apple Calendar failed: ${err.message}. Trying Google...`);
+    return withCircuitBreaker(googleBreaker, () => googleListEvents(date), GOOGLE_FALLBACK);
+  }
 }
-export function findAndDeleteEvent(date: Date, titleQuery: string): Promise<string> {
-  return withCircuitBreaker(calendarBreaker, () => _findAndDeleteEvent(date, titleQuery), CALENDAR_FALLBACK);
+
+export async function findAndDeleteEvent(date: Date, titleQuery: string): Promise<string> {
+  try {
+    return await appleFindAndDeleteEvent(date, titleQuery);
+  } catch (err: any) {
+    console.warn(`[calendar] Apple Calendar failed: ${err.message}. Trying Google...`);
+    return withCircuitBreaker(googleBreaker, () => googleFindAndDeleteEvent(date, titleQuery), GOOGLE_FALLBACK);
+  }
 }
-export function deleteAllEventsOnDate(date: Date): Promise<string> {
-  return withCircuitBreaker(calendarBreaker, () => _deleteAllEventsOnDate(date), CALENDAR_FALLBACK);
+
+export async function deleteAllEventsOnDate(date: Date): Promise<string> {
+  try {
+    return await appleDeleteAllEventsOnDate(date);
+  } catch (err: any) {
+    console.warn(`[calendar] Apple Calendar failed: ${err.message}. Trying Google...`);
+    return withCircuitBreaker(googleBreaker, () => googleDeleteAllEventsOnDate(date), GOOGLE_FALLBACK);
+  }
 }
-export function listEvents(date: Date): Promise<string> {
-  return withCircuitBreaker(calendarBreaker, () => _listEvents(date), CALENDAR_FALLBACK);
+
+export async function deleteEvent(eventId: string): Promise<string> {
+  // deleteEvent by ID only works with Google (Apple uses UID differently)
+  return withCircuitBreaker(googleBreaker, () => googleDeleteEvent(eventId), GOOGLE_FALLBACK);
 }
