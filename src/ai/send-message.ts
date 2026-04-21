@@ -45,9 +45,13 @@ export async function sendMessage(
   sender?: SenderContext,
   options?: SendMessageOptions
 ): Promise<SendMessageResult> {
-  const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error("__SEND_MESSAGE_TIMEOUT__")), SEND_MESSAGE_TIMEOUT_MS)
-  );
+  let timeoutHandle: NodeJS.Timeout | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(
+      () => reject(new Error("__SEND_MESSAGE_TIMEOUT__")),
+      SEND_MESSAGE_TIMEOUT_MS
+    );
+  });
 
   try {
     return await Promise.race([timeoutPromise, (async () => {
@@ -197,6 +201,10 @@ export async function sendMessage(
       return { text: "⏰ הפעולה לקחה יותר מדי זמן. נסה שוב עם בקשה פשוטה יותר?", toolsUsed: [], toolsSucceeded: [], toolsFailed: [] };
     }
     throw err;
+  } finally {
+    // Clear the timeout handle so it doesn't keep the Node event loop alive
+    // (was causing test suite to hang for SEND_MESSAGE_TIMEOUT_MS after completion)
+    if (timeoutHandle) clearTimeout(timeoutHandle);
   }
 }
 
