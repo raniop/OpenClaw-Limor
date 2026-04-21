@@ -4,7 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 export const crmTools: Anthropic.Tool[] = [
   {
     name: "crm_search_policy",
-    description: "חיפוש פוליסות ב-CRM לפי תעודת זהות של לקוח או לפי מספר פוליסה. מחזיר גם פוליסות מבוטלות.",
+    description: "חיפוש פוליסות ב-CRM לפי תעודת זהות של לקוח או לפי מספר פוליסה. מחזיר גם פוליסות מבוטלות. שים לב: כל המחירים/פרמיות ב-CRM הם בדולר ($), לא בשקלים!",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -22,7 +22,7 @@ export const crmTools: Anthropic.Tool[] = [
   },
   {
     name: "crm_policy_details",
-    description: "קבלת פרטים מלאים על פוליסה ספציפית לפי מזהה פוליסה",
+    description: "קבלת פרטים מלאים על פוליסה ספציפית לפי מזהה פוליסה. שים לב: כל המחירים/פרמיות הם בדולר ($), לא בשקלים!",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -50,7 +50,7 @@ export const crmTools: Anthropic.Tool[] = [
   },
   {
     name: "crm_dashboard",
-    description: "נתוני דשבורד כלליים או לפי חודש ושנה ספציפיים",
+    description: "נתוני דשבורד כלליים או לפי חודש ושנה ספציפיים. שים לב: כל הסכומים הם בדולר ($), לא בשקלים!",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -68,7 +68,7 @@ export const crmTools: Anthropic.Tool[] = [
   },
   {
     name: "crm_top_policies",
-    description: "רשימת הפוליסות המובילות",
+    description: "רשימת הפוליסות המובילות. שים לב: כל המחירים/פרמיות הם בדולר ($), לא בשקלים!",
     input_schema: {
       type: "object" as const,
       properties: {
