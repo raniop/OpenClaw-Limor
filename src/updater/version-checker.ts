@@ -1,86 +1,84 @@
 /**
- * Background version checker.
- * Checks GitHub for new releases on startup + every 24 hours.
+ * Baileys version checker.
+ * Polls npm registry for new @whiskeysockets/baileys releases on startup + every 24 hours.
  * Notifies the owner via WhatsApp when an update is available.
  */
 import https from "https";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { resolve } from "path";
-import { execSync } from "child_process";
 import { config } from "../config";
 import { getClient } from "../whatsapp";
 import { queuedSendMessage } from "../whatsapp/send-queue";
 
 const PROJECT_ROOT = resolve(__dirname, "..", "..");
 const STATE_FILE = resolve(PROJECT_ROOT, "workspace", "state", "last-update-check.json");
-const CHECK_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
+const CHECK_INTERVAL = 24 * 60 * 60 * 1000;
+const BAILEYS_PKG = "@whiskeysockets/baileys";
 
-function getLocalVersion(): string {
+function getInstalledBaileysVersion(): string | null {
   try {
-    const pkg = JSON.parse(readFileSync(resolve(PROJECT_ROOT, "package.json"), "utf-8"));
-    return pkg.version || "0.0.0";
+    const pkg = JSON.parse(
+      readFileSync(resolve(PROJECT_ROOT, "node_modules", BAILEYS_PKG, "package.json"), "utf-8"),
+    );
+    return pkg.version || null;
   } catch {
-    return "0.0.0";
+    return null;
   }
 }
 
-function getRepoInfo(): { owner: string; repo: string } | null {
-  try {
-    const remote = execSync("git remote get-url origin", {
-      cwd: PROJECT_ROOT,
-      encoding: "utf-8",
-      timeout: 5000,
-    }).trim();
-    const match = remote.match(/github\.com[:/]([^/]+)\/([^/.]+)/);
-    if (match) return { owner: match[1], repo: match[2] };
-  } catch {}
-  return null;
-}
-
-function fetchLatestTag(owner: string, repo: string): Promise<string | null> {
-  return new Promise((resolve) => {
+function fetchLatestBaileysVersion(): Promise<string | null> {
+  return new Promise((resolvePromise) => {
     const options = {
-      hostname: "api.github.com",
-      path: `/repos/${owner}/${repo}/tags?per_page=1`,
-      headers: { "User-Agent": "OpenClaw-Updater" },
+      hostname: "registry.npmjs.org",
+      // `/latest` follows the `latest` dist-tag — including prereleases tagged as latest
+      path: `/${encodeURIComponent(BAILEYS_PKG)}/latest`,
+      headers: {
+        "User-Agent": "Limor-Updater",
+        Accept: "application/json",
+      },
     };
 
-    https.get(options, (res) => {
-      let data = "";
-      res.on("data", (chunk) => (data += chunk));
-      res.on("end", () => {
-        try {
-          const tags = JSON.parse(data);
-          if (Array.isArray(tags) && tags.length > 0) {
-            resolve(tags[0].name.replace(/^v/, ""));
-          } else {
-            resolve(null);
+    https
+      .get(options, (res) => {
+        let data = "";
+        res.on("data", (chunk) => (data += chunk));
+        res.on("end", () => {
+          try {
+            const body = JSON.parse(data);
+            resolvePromise(body.version || null);
+          } catch {
+            resolvePromise(null);
           }
-        } catch {
-          resolve(null);
-        }
-      });
-    }).on("error", () => resolve(null));
+        });
+      })
+      .on("error", () => resolvePromise(null));
   });
 }
 
 function compareVersions(a: string, b: string): number {
-  const pa = a.split(".").map(Number);
-  const pb = b.split(".").map(Number);
+  // Strip prerelease suffix for a coarse numeric compare, then tiebreak on the suffix string.
+  const [baseA, preA = ""] = a.split("-", 2);
+  const [baseB, preB = ""] = b.split("-", 2);
+  const pa = baseA.split(".").map(Number);
+  const pb = baseB.split(".").map(Number);
   for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
     const na = pa[i] || 0;
     const nb = pb[i] || 0;
     if (na > nb) return 1;
     if (na < nb) return -1;
   }
-  return 0;
+  // Equal base: a version without prerelease > one with (1.0.0 > 1.0.0-rc.1)
+  if (preA && !preB) return -1;
+  if (!preA && preB) return 1;
+  if (preA === preB) return 0;
+  return preA < preB ? -1 : 1;
 }
 
 function getLastNotifiedVersion(): string | null {
   try {
     if (existsSync(STATE_FILE)) {
       const state = JSON.parse(readFileSync(STATE_FILE, "utf-8"));
-      return state.lastNotifiedVersion || null;
+      return state.lastNotifiedBaileysVersion || null;
     }
   } catch {}
   return null;
@@ -88,81 +86,79 @@ function getLastNotifiedVersion(): string | null {
 
 function saveLastNotifiedVersion(version: string): void {
   try {
-    writeFileSync(STATE_FILE, JSON.stringify({
-      lastNotifiedVersion: version,
-      checkedAt: new Date().toISOString(),
-    }), "utf-8");
+    writeFileSync(
+      STATE_FILE,
+      JSON.stringify({
+        lastNotifiedBaileysVersion: version,
+        checkedAt: new Date().toISOString(),
+      }),
+      "utf-8",
+    );
   } catch {}
 }
 
 async function checkForUpdates(): Promise<void> {
-  const localVersion = getLocalVersion();
-  const repo = getRepoInfo();
-
-  if (!repo) {
-    console.log("[updater] Could not detect GitHub remote, skipping update check");
+  const installed = getInstalledBaileysVersion();
+  if (!installed) {
+    console.log("[updater] Baileys not installed — skipping check");
     return;
   }
 
-  console.log(`[updater] v${localVersion} — checking for updates...`);
+  console.log(`[updater] Baileys v${installed} — checking npm for updates...`);
 
-  const latestVersion = await fetchLatestTag(repo.owner, repo.repo);
-  if (!latestVersion) {
-    console.log("[updater] No tagged releases found");
+  const latest = await fetchLatestBaileysVersion();
+  if (!latest) {
+    console.log("[updater] Could not fetch latest Baileys version");
     return;
   }
 
-  if (compareVersions(latestVersion, localVersion) <= 0) {
-    console.log(`[updater] Up to date (v${localVersion})`);
+  if (compareVersions(latest, installed) <= 0) {
+    console.log(`[updater] Baileys up to date (v${installed})`);
     return;
   }
 
-  // New version available!
-  console.log(`[updater] New version available: v${latestVersion} (current: v${localVersion})`);
+  console.log(`[updater] New Baileys version: v${latest} (installed: v${installed})`);
 
-  // Don't notify if we already notified for this version
   const lastNotified = getLastNotifiedVersion();
-  if (lastNotified === latestVersion) {
+  if (lastNotified === latest) {
     console.log("[updater] Already notified for this version, skipping");
     return;
   }
 
-  // Send WhatsApp notification to owner
   const client = getClient();
   if (client && config.ownerChatId) {
     try {
       await queuedSendMessage(
         config.ownerChatId,
-        `🔄 *גרסה חדשה זמינה!*\n\n` +
-        `גרסה נוכחית: v${localVersion}\n` +
-        `גרסה חדשה: v${latestVersion}\n\n` +
-        `לעדכון, הריצו בטרמינל:\n` +
-        `\`npm run update\`\n\n` +
-        `או דאבל-קליק על Start OpenClaw`
+        `🔄 *עדכון Baileys זמין*\n\n` +
+          `מותקן: v${installed}\n` +
+          `חדש: v${latest}\n\n` +
+          `Baileys זה החיבור ל-WhatsApp — עדכונים יכולים לתקן באגים אבל גם לשבור דברים.\n\n` +
+          `לעדכון ידני:\n` +
+          `\`npm i ${BAILEYS_PKG}@latest && npm run build\`\n` +
+          `\`npx pm2 restart limor\``,
       );
-      console.log("[updater] Notified owner about new version");
+      console.log("[updater] Notified owner about new Baileys version");
     } catch (err) {
       console.log("[updater] Failed to notify owner:", err);
     }
   }
 
-  saveLastNotifiedVersion(latestVersion);
+  saveLastNotifiedVersion(latest);
 }
 
 let interval: ReturnType<typeof setInterval> | null = null;
 
 export function startUpdateChecker(): void {
-  // Check after a short delay (let WhatsApp connect first)
   setTimeout(() => {
     checkForUpdates().catch((err) =>
-      console.log("[updater] Check failed:", err.message)
+      console.log("[updater] Check failed:", err.message),
     );
-  }, 60_000); // 1 minute after startup
+  }, 60_000);
 
-  // Then check every 24 hours
   interval = setInterval(() => {
     checkForUpdates().catch((err) =>
-      console.log("[updater] Check failed:", err.message)
+      console.log("[updater] Check failed:", err.message),
     );
   }, CHECK_INTERVAL);
 }
