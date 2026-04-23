@@ -308,6 +308,10 @@ async function main() {
     "SMS watcher (forward bank/insurance SMS to WhatsApp, macOS only)? / מעקב SMS?",
     false
   );
+  const intTelegramAlerts = await askYesNo(
+    "Telegram public channel alerts (rocket alerts, news)? / התרעות מערוצי טלגרם ציבוריים?",
+    false
+  );
   const intCapabilities = await askYesNo(
     "Self-programming via Claude Code CLI (advanced)? / עריכה-עצמית של קוד (מתקדם)?",
     false
@@ -335,6 +339,33 @@ async function main() {
       const emoji = await ask("  Emoji / אימוג'י", "📩");
       smsWatchedSenders.push({ sender, label, emoji });
       const more = await askYesNo("  Add another sender? / להוסיף עוד?", false);
+      if (!more) break;
+    }
+  }
+
+  // ─── Telegram channels ──────────────────────────────────
+
+  const telegramChannels: Array<{
+    name: string;
+    label: string;
+    emoji: string;
+    alertKeywords?: string[];
+    excludeKeywords?: string[];
+  }> = [];
+
+  if (intTelegramAlerts) {
+    printSection("Step 6b: Telegram Channels / ערוצי טלגרם ציבוריים");
+    console.log("  Enter Telegram channel usernames (without @) to monitor.");
+    console.log("  Examples: beforeredalert (rocket alerts), almogboker78 (news).");
+    console.log("  A fresh install has no channels — only add what YOU want.");
+    console.log("");
+    while (true) {
+      const name = await ask("Channel username (empty to finish) / שם ערוץ");
+      if (!name) break;
+      const label = await ask("  Label / תווית", name);
+      const emoji = await ask("  Emoji / אימוג'י", "📢");
+      telegramChannels.push({ name, label, emoji });
+      const more = await askYesNo("  Add another channel? / להוסיף עוד?", false);
       if (!more) break;
     }
   }
@@ -555,8 +586,10 @@ DEBUG_BRAIN_TRACE=false
       control4: wantSmartHome,
       gett: wantGett,
       crm: wantCrm,
+      telegramAlerts: intTelegramAlerts,
     },
     smsWatchedSenders: smsWatchedSenders.length > 0 ? smsWatchedSenders : undefined,
+    telegramChannels: telegramChannels.length > 0 ? telegramChannels : undefined,
     crmLabel: crmLabel || undefined,
   };
 

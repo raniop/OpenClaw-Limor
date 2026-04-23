@@ -3,65 +3,17 @@
  * Monitors public Telegram channels via web preview scraping.
  * No Telegram bot or API key needed.
  *
- * Channels:
- *   - beforeredalert: rocket/missile alerts → filtered by keywords
- *   - almogboker78: Almog Boker news/alerts → forwarded as-is
+ * Channels are loaded from workspace/owner.json (telegramChannels).
+ * A fresh install has no channels — the owner opts in explicitly.
  */
+import { loadOwnerConfig, type TelegramChannel } from "../owner-config";
 
-// --- Channel configuration ---
+// Local alias so the rest of the file keeps its existing vocabulary.
+type ChannelConfig = TelegramChannel;
 
-interface ChannelConfig {
-  /** Telegram channel username (used in URL) */
-  name: string;
-  /** Display label for WhatsApp messages */
-  label: string;
-  /** Emoji prefix for forwarded messages */
-  emoji: string;
-  /** If set, only forward messages containing one of these keywords */
-  alertKeywords?: string[];
-  /** Messages containing these are always excluded */
-  excludeKeywords?: string[];
+function getChannels(): ChannelConfig[] {
+  return loadOwnerConfig().telegramChannels;
 }
-
-const CHANNELS: ChannelConfig[] = [
-  {
-    name: "beforeredalert",
-    label: "beforeredalert",
-    emoji: "🚨",
-    alertKeywords: [
-      "שיגור",
-      "צבע אדום",
-      "ירי רקטות",
-      "התרעה",
-      "כניסה למרחב מוגן",
-      "יירוט",
-      "טיל",
-      "רקטה",
-      "ירי לעבר",
-      "יציאה",
-      "יציאות",
-      "התרחב",
-    ],
-    excludeKeywords: [
-      "כניסה למבוגרים",
-      "הסרטון כבר מסתובב",
-      "תיעוד שלא היה אמור",
-      "הלינק ימחק",
-      "🔞",
-    ],
-  },
-  {
-    name: "almogboker78",
-    label: "אלמוג בוקר",
-    emoji: "📢",
-    // No keyword filter — forward everything
-    excludeKeywords: [
-      "כניסה למבוגרים",
-      "🔞",
-      "הלינק ימחק",
-    ],
-  },
-];
 
 // --- State per channel ---
 
@@ -291,7 +243,7 @@ async function checkChannel(config: ChannelConfig): Promise<void> {
 // --- Poll all channels ---
 
 async function checkAllChannels(): Promise<void> {
-  for (const config of CHANNELS) {
+  for (const config of getChannels()) {
     await checkChannel(config);
   }
 }
@@ -304,11 +256,16 @@ export function startAlertPoller(
   onAlert: (message: string) => Promise<void>,
   onAlertWithImage?: (imageUrl: string, caption: string) => Promise<void>
 ): void {
+  const channels = getChannels();
+  if (channels.length === 0) {
+    console.log("[telegram] Alert poller skipped — no telegramChannels configured in owner.json");
+    return;
+  }
   notifyCallback = onAlert;
   notifyWithImageCallback = onAlertWithImage || null;
   checkAllChannels();
   pollTimer = setInterval(checkAllChannels, POLL_INTERVAL_MS);
-  console.log(`[telegram] Alert poller started (${CHANNELS.length} channels, every ${POLL_INTERVAL_MS / 1000}s, images: ${!!onAlertWithImage})`);
+  console.log(`[telegram] Alert poller started (${channels.length} channels, every ${POLL_INTERVAL_MS / 1000}s, images: ${!!onAlertWithImage})`);
 }
 
 /**

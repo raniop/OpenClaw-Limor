@@ -28,7 +28,8 @@
     "googleCalendar": false,
     "control4": false,
     "gett": false,
-    "crm": false
+    "crm": false,
+    "telegramAlerts": false
   },
   "smsWatchedSenders": [
     {
@@ -39,5 +40,6 @@
       "excludeKeywords": ["הטבה", "מבצע"]
     }
   ],
+  "telegramChannels": [],
   "crmLabel": ""
 }

@@ -34,6 +34,19 @@ export interface SmsWatchedSender {
   excludeKeywords?: string[];
 }
 
+export interface TelegramChannel {
+  /** Telegram channel username (without @) — used in public preview URL */
+  name: string;
+  /** Display label for WhatsApp messages */
+  label: string;
+  /** Emoji prefix */
+  emoji: string;
+  /** If set, only forward messages matching one of these keywords */
+  alertKeywords?: string[];
+  /** Messages containing these are always excluded */
+  excludeKeywords?: string[];
+}
+
 export interface IntegrationFlags {
   appleCalendar: boolean;
   sms: boolean;
@@ -43,6 +56,7 @@ export interface IntegrationFlags {
   control4: boolean;
   gett: boolean;
   crm: boolean;
+  telegramAlerts: boolean;
 }
 
 export interface AssistantIdentity {
@@ -74,6 +88,11 @@ export interface OwnerConfig {
   integrations: IntegrationFlags;
   /** SMS senders to watch and forward to WhatsApp */
   smsWatchedSenders: SmsWatchedSender[];
+  /**
+   * Public Telegram channels to scrape and forward.
+   * Empty by default — a fresh install does not silently follow anyone.
+   */
+  telegramChannels: TelegramChannel[];
   /** Optional CRM label shown to the bot (e.g. "ביטוח אופיר"). Empty if no CRM. */
   crmLabel?: string;
 }
@@ -90,6 +109,7 @@ function defaultIntegrations(): IntegrationFlags {
     control4: false,
     gett: false,
     crm: false,
+    telegramAlerts: false,
   };
 }
 
@@ -156,6 +176,7 @@ export function loadOwnerConfig(): OwnerConfig {
     assistant,
     integrations: { ...defaultIntegrations(), ...(json.integrations || {}) },
     smsWatchedSenders: json.smsWatchedSenders || defaultSmsWatchedSenders(),
+    telegramChannels: json.telegramChannels || [],
     crmLabel: json.crmLabel,
   };
 

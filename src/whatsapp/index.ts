@@ -250,8 +250,9 @@ export async function createWhatsAppClient(): Promise<void> {
         console.error("[email] Failed to start email poller:", err);
       }
 
-      // Poll Telegram alert channel
-      try {
+      // Poll Telegram alert channel — opt-in via owner.json integrations.telegramAlerts
+      if (config.owner.integrations.telegramAlerts) {
+        try {
         startAlertPoller(
           async (text: string) => {
             if (config.ownerChatId && connected) {
@@ -275,8 +276,11 @@ export async function createWhatsAppClient(): Promise<void> {
             }
           }
         );
-      } catch (err) {
-        console.error("[telegram] Failed to start alert poller:", err);
+        } catch (err) {
+          console.error("[telegram] Failed to start alert poller:", err);
+        }
+      } else {
+        console.log("[telegram] Alert poller disabled via owner.integrations.telegramAlerts=false");
       }
 
       // Start proactive messaging scheduler
