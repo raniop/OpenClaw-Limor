@@ -67,9 +67,9 @@ export function checkOverdueFollowups(): ProactiveMessage | null {
   // Extract the task from reason — strip the "[מ-Name] " prefix
   const task = unreminded.reason.replace(/^\[מ-[^\]]*\]\s*/, "").substring(0, 80);
   const name = unreminded.contactName || "מישהו";
+  const ownerFullName = config.owner.fullName;
   const isOwnerReminder = unreminded.requesterName === config.ownerName
-    || unreminded.requesterName === "רני"
-    || unreminded.requesterName === "רני אופיר"
+    || (ownerFullName && unreminded.requesterName === ownerFullName)
     || name === config.ownerName;
 
   // If this followup has a target contact, route the message to them

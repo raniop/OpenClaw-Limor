@@ -22,6 +22,7 @@ import { checkApprovalGate } from "./approval-gate";
 import { handleResponse } from "./response-handler";
 import { classifyGroupMessage, recordGroupResponse, hasRecentGroupResponse, filterGroupMessage, isBotContact } from "./group-classifier";
 import { trackMessage as trackThread, formatThreadContext, isPartOfOtherThread } from "./thread-tracker";
+import { ACTION_CLAIM_PATTERN } from "../ai/action-claim-pattern";
 import { getResolvedContext, formatCompressedContextForPrompt, formatDebugTrace, applyFollowupAutomation } from "../context";
 import type { ResolvedContext } from "../context";
 import { setPersistedState, clearState as clearConversationState, saveContextSnapshot, getContextSnapshot } from "../context/conversation-state-store";
@@ -58,15 +59,15 @@ function startQRServer(): void {
     if (latestQR) {
       const svg = await QRCode.toString(latestQR, { type: "svg", width: 400 });
       res.writeHead(200, { "Content-Type": "text/html" });
-      res.end(`<!DOCTYPE html><html><head><title>OpenClaw QR</title>
+      res.end(`<!DOCTYPE html><html><head><title>Limor QR</title>
         <style>body{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;background:#111;color:white;font-family:sans-serif;}
         h1{margin-bottom:20px;}</style></head>
-        <body><h1>🐾 OpenClaw - Scan with WhatsApp</h1>${svg}
+        <body><h1>🐾 Limor - Scan with WhatsApp</h1>${svg}
         <p>Open WhatsApp > Settings > Linked Devices > Link a Device</p>
         <script>setTimeout(()=>location.reload(),20000)</script></body></html>`);
     } else {
       res.writeHead(200, { "Content-Type": "text/html" });
-      res.end(`<!DOCTYPE html><html><head><title>OpenClaw QR</title>
+      res.end(`<!DOCTYPE html><html><head><title>Limor QR</title>
         <style>body{display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#111;color:white;font-family:sans-serif;}</style></head>
         <body><h1>✅ Connected! (or waiting for QR...)</h1>
         <script>setTimeout(()=>location.reload(),3000)</script></body></html>`);
@@ -221,16 +222,20 @@ export async function createWhatsAppClient(): Promise<void> {
         console.error("[sms] Failed to start delivery poller:", err);
       }
 
-      // SMS Sender Watcher
-      try {
-        startSmsWatcher(async (text: string) => {
-          if (config.ownerChatId && connected) {
-            await queuedSendMessage(config.ownerChatId, text);
-            conversationStore.addMessage(config.ownerChatId, "assistant", text);
-          }
-        });
-      } catch (err) {
-        console.error("[sms-watcher] Failed to start SMS watcher:", err);
+      // SMS Sender Watcher — opt-in via owner.json integrations.sms
+      if (config.owner.integrations.sms) {
+        try {
+          startSmsWatcher(async (text: string) => {
+            if (config.ownerChatId && connected) {
+              await queuedSendMessage(config.ownerChatId, text);
+              conversationStore.addMessage(config.ownerChatId, "assistant", text);
+            }
+          });
+        } catch (err) {
+          console.error("[sms-watcher] Failed to start SMS watcher:", err);
+        }
+      } else {
+        console.log("[sms-watcher] Disabled via owner.integrations.sms=false");
       }
 
       // Poll iCloud email
@@ -692,9 +697,15 @@ async function handleMessage(msg: any): Promise<void> {
     let allowedToolNames: string[] | undefined;
     let resolvedCtx: ResolvedContext | undefined;
 
-    // Inject conversation summary if history was trimmed
+    // Inject conversation summary if history was trimmed.
+    // When the current turn is a media/placeholder message, demote the summary
+    // so the model doesn't anchor its "נושא נוכחי" to something stale instead of reading the image.
     if (conversationSummary) {
-      extraContext += `\n\n⚠️ שים לב: יש היסטוריה ישנה שלא נראית בשיחה הנוכחית. סיכום: ${conversationSummary}`;
+      if (imageData) {
+        extraContext += `\n\n📚 רקע משיחות קודמות (עשוי להיות לא רלוונטי להודעה הנוכחית — סמוך על מה שבתמונה): ${conversationSummary}`;
+      } else {
+        extraContext += `\n\n⚠️ שים לב: יש היסטוריה ישנה שלא נראית בשיחה הנוכחית. סיכום: ${conversationSummary}`;
+      }
     }
 
     // Inject relevant topic segments from past conversations
@@ -835,8 +846,7 @@ async function handleMessage(msg: any): Promise<void> {
         opTrace.responseLength = response.length;
         opTrace.aiDurationMs = aiDurationMs;
         opTrace.totalDurationMs = elapsed(trace);
-        const actionClaimPattern = /שולחת בקשה|שלחתי בקשה|שולחת לרני|העברתי לרני|קבעתי|שלחתי זימון|שולחת זימון|שלחתי הודעה|שלחתי ל|העברתי ל|בדקתי את|מצאתי (מסעדה|טיסה|מלון)|הזמנתי|ביטלתי|יצרתי|נוצרה|הוספתי|מחקתי/;
-        opTrace.hadHallucination = actionClaimPattern.test(response) && toolsUsedInMessage.length === 0;
+        opTrace.hadHallucination = ACTION_CLAIM_PATTERN.test(response) && toolsUsedInMessage.length === 0;
 
         // Run self-check
         const selfCheckResult = runSelfCheck(opTrace, response, toolsUsedInMessage);

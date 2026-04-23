@@ -1,5 +1,7 @@
 import { readFileSync, existsSync, readdirSync } from "fs";
 import { resolve, join } from "path";
+import { loadOwnerConfig } from "./owner-config";
+import { renderOwnerTemplate } from "./owner-template";
 
 const WORKSPACE_DIR = resolve(__dirname, "..", "workspace");
 
@@ -15,7 +17,10 @@ function readWorkspaceFile(relativePath: string): string {
     console.log(`⚠️ Workspace file not found: ${relativePath}`);
     return "";
   }
-  const content = readFileSync(fullPath, "utf-8");
+  const raw = readFileSync(fullPath, "utf-8");
+  // Render any {{owner.*}} / {{assistant.*}} placeholders using the owner config.
+  // This happens lazily on first read; cache stores the rendered text.
+  const content = renderOwnerTemplate(raw, loadOwnerConfig());
   fileCache.set(relativePath, content);
   return content;
 }

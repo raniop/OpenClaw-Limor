@@ -3,6 +3,7 @@
  * מבוססת על flags בוליאניים — ללא קריאות AI.
  */
 import type { OperationalTrace } from "./operational-trace";
+import { ACTION_CLAIM_PATTERN } from "../ai/action-claim-pattern";
 
 // --- Types ---
 
@@ -28,7 +29,7 @@ export interface SelfCheckResult {
 
 // --- Hallucination regex — תבניות של טענת ביצוע פעולה ---
 
-const ACTION_CLAIM_PATTERNS = /שולחת בקשה|שלחתי בקשה|שולחת לרני|העברתי לרני|קבעתי|שלחתי זימון|שולחת זימון|שלחתי הודעה|שלחתי ל|העברתי ל|בדקתי את|מצאתי (מסעדה|טיסה|מלון)|הזמנתי|ביטלתי|יצרתי|נוצרה|הוספתי|מחקתי/;
+const ACTION_CLAIM_PATTERNS = ACTION_CLAIM_PATTERN;
 
 // --- Followup mention patterns ---
 

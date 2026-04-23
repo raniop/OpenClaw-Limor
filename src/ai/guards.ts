@@ -11,6 +11,7 @@ import { log } from "../logger";
 import { startTimer } from "../observability";
 import type { SenderContext } from "./types";
 import { getNotifyOwnerCallback } from "./callbacks";
+import { HALLUCINATION_PATTERN } from "./action-claim-pattern";
 
 const MAX_TOOL_ITERATIONS = 15;
 
@@ -18,8 +19,6 @@ export interface HallucinationCheckResult {
   isHallucination: boolean;
   claimedAction: string | null;
 }
-
-const HALLUCINATION_PATTERN = /שולחת בקשה|שלחתי בקשה|שולחת לרני|העברתי לרני|קבעתי|שלחתי זימון|שולחת זימון|שלחתי הודעה|שלחתי ל|העברתי ל|בדקתי את|מצאתי (מסעדה|טיסה|מלון)|הזמנתי|ביטלתי|יצרתי|נוצרה|הוספתי|מחקתי|החלפתי|עברתי ל|שיניתי|עדכנתי|בוצע|הופעל|הוגדר|נשמר|הועבר/;
 // Detect when Limor mentions an agent by name without actually delegating
 const AGENT_REFERENCE_PATTERN = /בוריס (בדק|מצא|דיווח|זיהה|החזיר)|מיכל (סיכמה|מצאה|החזירה)|רונית (חיפשה|מצאה|בדקה)|נועה (ניתחה|בדקה|מצאה)|יעל (יצרה|הגדירה)|טל (בדקה|זיהתה|מצאה)|מאיה (הפעילה|כיבתה|הדליקה)|עדי (קבעה|מחקה|בדקה)|הילה (מצאה|הזמינה|חיפשה)|דנה (מצאה|השוותה|חיפשה)/;
 

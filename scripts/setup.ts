@@ -1,5 +1,5 @@
 /**
- * Interactive setup wizard for OpenClaw WhatsApp AI Bot.
+ * Interactive setup wizard for Limor WhatsApp AI Bot.
  * Run: npm run setup
  *
  * No external dependencies — uses Node.js built-in readline.
@@ -12,6 +12,9 @@ import {
   existsSync,
   copyFileSync,
   mkdirSync,
+  renameSync,
+  readdirSync,
+  statSync,
 } from "fs";
 import { resolve, join } from "path";
 
@@ -20,6 +23,8 @@ const SOULS_DIR = join(ROOT, "souls");
 const ENV_EXAMPLE = join(ROOT, ".env.example");
 const ENV_PATH = join(ROOT, ".env");
 const WS_IDENTITY = join(ROOT, "workspace", "identity");
+const OWNER_JSON_PATH = join(ROOT, "workspace", "owner.json");
+const MEMORY_DIR = join(ROOT, "workspace", "memory");
 
 // ── Readline helpers ─────────────────────────────────────
 
@@ -56,6 +61,21 @@ function askSecret(question: string): Promise<string> {
   });
 }
 
+async function askChoice<T extends string>(
+  question: string,
+  choices: { value: T; label: string }[],
+  defaultValue: T
+): Promise<T> {
+  const lines = choices.map((c, i) => `    ${i + 1}. ${c.label}`);
+  const defaultIdx = choices.findIndex((c) => c.value === defaultValue) + 1;
+  console.log(`  ${question}`);
+  console.log(lines.join("\n"));
+  const ans = await ask("Choice", String(defaultIdx));
+  const idx = parseInt(ans, 10) - 1;
+  if (idx >= 0 && idx < choices.length) return choices[idx].value;
+  return defaultValue;
+}
+
 // ── Validators ───────────────────────────────────────────
 
 function isValidPhone(phone: string): boolean {
@@ -72,7 +92,7 @@ function isValidApiKey(key: string): boolean {
 
 // ── Banner ───────────────────────────────────────────────
 
-function printBanner() {
+function printBanner(assistantName = "Limor") {
   console.log("");
   console.log(
     "  ╔══════════════════════════════════════════════════════╗"
@@ -81,7 +101,7 @@ function printBanner() {
     "  ║                                                      ║"
   );
   console.log(
-    "  ║   OpenClaw Setup Wizard / אשף ההתקנה של OpenClaw    ║"
+    `  ║   ${assistantName} Setup Wizard / אשף ההתקנה                     ║`
   );
   console.log(
     "  ║                                                      ║"
@@ -99,19 +119,58 @@ function printBanner() {
     "  ╚══════════════════════════════════════════════════════╝"
   );
   console.log("");
-  console.log(
-    "  This wizard will help you configure your personal AI assistant."
-  );
-  console.log(
-    "  האשף הזה יעזור לך להגדיר את העוזרת האישית שלך."
-  );
-  console.log("");
 }
 
 function printSection(title: string) {
   console.log("");
   console.log(`  --- ${title} ---`);
   console.log("");
+}
+
+// ── Memory backup ────────────────────────────────────────
+
+/**
+ * Before writing a fresh owner.json we back up any existing personal memory
+ * so two owners don't share personality notes, passport numbers, etc.
+ */
+function backupMemoryIfNeeded(): string | null {
+  if (!existsSync(MEMORY_DIR)) return null;
+  const usersDir = join(MEMORY_DIR, "users");
+  const hasUserFiles = existsSync(usersDir) && readdirSync(usersDir).some((f) => f.endsWith(".md") && f !== ".gitkeep");
+  const hasOwnerProfile = existsSync(join(MEMORY_DIR, "owner_profile.md"));
+  if (!hasUserFiles && !hasOwnerProfile) return null;
+
+  const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  const backupDir = join(ROOT, "workspace", `memory.backup-${ts}`);
+  mkdirSync(backupDir, { recursive: true });
+
+  // Copy users/ recursively
+  if (existsSync(usersDir)) {
+    const destUsers = join(backupDir, "users");
+    mkdirSync(destUsers, { recursive: true });
+    for (const f of readdirSync(usersDir)) {
+      if (f === ".gitkeep") continue;
+      const src = join(usersDir, f);
+      if (statSync(src).isFile()) copyFileSync(src, join(destUsers, f));
+    }
+  }
+  if (hasOwnerProfile) {
+    copyFileSync(join(MEMORY_DIR, "owner_profile.md"), join(backupDir, "owner_profile.md"));
+  }
+
+  // Clear users/ (keep .gitkeep)
+  if (existsSync(usersDir)) {
+    for (const f of readdirSync(usersDir)) {
+      if (f === ".gitkeep") continue;
+      try {
+        renameSync(join(usersDir, f), join(backupDir, "users", f));
+      } catch {
+        // Already moved above — ignore
+      }
+    }
+  }
+
+  return backupDir;
 }
 
 // ── Main ─────────────────────────────────────────────────
@@ -121,11 +180,11 @@ async function main() {
 
   // ─── Step 1: Bot name ──────────────────────────────────
 
-  printSection("Step 1: Bot Name / שם הבוט");
+  printSection("Step 1: Assistant Name / שם העוזרת");
 
-  const botNameHe = await ask("Bot name in Hebrew / שם הבוט בעברית", "לימור");
+  const botNameHe = await ask("Assistant name in Hebrew / שם העוזרת בעברית", "לימור");
   const defaultEn = botNameHe === "לימור" ? "Limor" : "";
-  const botNameEn = await ask("Bot name in English / שם הבוט באנגלית", defaultEn);
+  const botNameEn = await ask("Assistant name in English / שם העוזרת באנגלית", defaultEn);
 
   if (!botNameEn) {
     console.log("\n  Error: English name is required.\n");
@@ -137,36 +196,91 @@ async function main() {
 
   printSection("Step 2: Owner Details / פרטי הבעלים");
 
-  const ownerName = await ask("Your name in Hebrew / שם בעברית");
+  const ownerName = await ask("Your first name in Hebrew / שם פרטי בעברית");
   if (!ownerName) {
     console.log("\n  Error: Owner name is required.\n");
     rl.close();
     process.exit(1);
   }
 
+  const ownerFullName = await ask("Your full name in Hebrew / שם מלא בעברית", ownerName);
+  const ownerNameEn = await ask("Your name in English (optional) / שם באנגלית");
+
+  const gender = await askChoice<"male" | "female">(
+    "Your gender (affects Hebrew pronoun agreement) / המין שלך (משפיע על פניה בעברית):",
+    [
+      { value: "male", label: "זכר / Male" },
+      { value: "female", label: "נקבה / Female" },
+    ],
+    "male"
+  );
+
   let ownerPhone = "";
   while (true) {
-    ownerPhone = await ask(
-      "Phone number (972XXXXXXXXX format) / מספר טלפון"
-    );
-    if (!ownerPhone) break; // optional, skip
+    ownerPhone = await ask("Phone number (972XXXXXXXXX format) / מספר טלפון");
+    if (!ownerPhone) break;
     if (isValidPhone(ownerPhone)) break;
-    console.log(
-      "    Invalid format. Use Israeli format: 972XXXXXXXXX (e.g. 972521234567)"
-    );
+    console.log("    Invalid format. Use Israeli format: 972XXXXXXXXX (e.g. 972521234567)");
   }
 
   let ownerEmail = "";
   while (true) {
     ownerEmail = await ask("Email address / כתובת אימייל");
-    if (!ownerEmail) break; // optional, skip
+    if (!ownerEmail) break;
     if (isValidEmail(ownerEmail)) break;
     console.log("    Invalid email format. Try again.");
   }
 
-  // ─── Step 3: Anthropic API Key ─────────────────────────
+  // ─── Step 3: Family (optional) ─────────────────────────
 
-  printSection("Step 3: AI API Key / מפתח API (Required)");
+  printSection("Step 3: Family (optional) / בני משפחה (אופציונלי)");
+  console.log("  Adding family members helps the assistant handle permissions and references.");
+  console.log("  שמירת בני משפחה עוזרת לעוזרת להתייחס אליהם בצורה טבעית.");
+  console.log("");
+
+  const family: Array<{
+    name: string;
+    fullName?: string;
+    relation: string;
+    hasPrivilegedAccess?: boolean;
+  }> = [];
+
+  const wantFamily = await askYesNo("Add family members? / להוסיף בני משפחה?", false);
+  if (wantFamily) {
+    while (true) {
+      const name = await ask("Family member first name (empty to finish) / שם פרטי (ריק = סיום)");
+      if (!name) break;
+      const fullName = await ask("  Full name (optional) / שם מלא", name);
+      const relation = await askChoice<string>(
+        "  Relation / קשר משפחתי:",
+        [
+          { value: "father", label: "אבא / Father" },
+          { value: "mother", label: "אמא / Mother" },
+          { value: "spouse", label: "בן/בת זוג / Spouse" },
+          { value: "sibling", label: "אח/ות / Sibling" },
+          { value: "child", label: "ילד/ה / Child" },
+          { value: "other", label: "אחר / Other" },
+        ],
+        "other"
+      );
+      const privileged = await askYesNo(
+        "  Grant privileged access (CRM, sensitive data)? / הרשאות מתקדמות?",
+        false
+      );
+      family.push({
+        name,
+        fullName: fullName !== name ? fullName : undefined,
+        relation,
+        hasPrivilegedAccess: privileged,
+      });
+      const more = await askYesNo("  Add another family member? / להוסיף עוד?", false);
+      if (!more) break;
+    }
+  }
+
+  // ─── Step 4: Anthropic API Key ─────────────────────────
+
+  printSection("Step 4: AI API Key / מפתח API (Required)");
 
   console.log("  Get your key at: https://console.anthropic.com");
   console.log("");
@@ -179,93 +293,137 @@ async function main() {
       continue;
     }
     if (isValidApiKey(apiKey)) break;
-    console.log(
-      "    Invalid key format. Must start with 'sk-ant-'. Try again."
-    );
+    console.log("    Invalid key format. Must start with 'sk-ant-'. Try again.");
   }
 
-  // ─── Step 4: Optional Services ─────────────────────────
+  // ─── Step 5: Integrations (feature flags) ──────────────
 
-  printSection("Step 4: Optional Services / שירותים אופציונליים");
-  console.log("  You can skip these and add them later in the .env file.");
+  printSection("Step 5: Integrations / אינטגרציות");
+  console.log("  Enable the features you want. Mac-only features require running on macOS.");
   console.log("");
 
-  // Google Calendar
+  const intAppleCalendar = await askYesNo("Apple Calendar (macOS only)? / יומן Apple (רק במק)?", true);
+  const intIMessage = await askYesNo("iMessage reading (macOS only)? / קריאת iMessage?", true);
+  const intSms = await askYesNo(
+    "SMS watcher (forward bank/insurance SMS to WhatsApp, macOS only)? / מעקב SMS?",
+    false
+  );
+  const intCapabilities = await askYesNo(
+    "Self-programming via Claude Code CLI (advanced)? / עריכה-עצמית של קוד (מתקדם)?",
+    false
+  );
+
+  // ─── Step 6: SMS watched senders ───────────────────────
+
+  const smsWatchedSenders: Array<{
+    sender: string;
+    label: string;
+    emoji: string;
+    keywords?: string[];
+    excludeKeywords?: string[];
+  }> = [];
+
+  if (intSms) {
+    printSection("Step 6: SMS Watched Senders / שולחי SMS לעקוב");
+    console.log("  Add senders whose SMS should be forwarded to WhatsApp.");
+    console.log("  (Common ones: HAREL, AMEX, Isracard, bit)");
+    console.log("");
+    while (true) {
+      const sender = await ask("Sender name (empty to finish) / שם שולח");
+      if (!sender) break;
+      const label = await ask("  Label / תווית", sender);
+      const emoji = await ask("  Emoji / אימוג'י", "📩");
+      smsWatchedSenders.push({ sender, label, emoji });
+      const more = await askYesNo("  Add another sender? / להוסיף עוד?", false);
+      if (!more) break;
+    }
+  }
+
+  // ─── Step 7: Optional external services ────────────────
+
+  printSection("Step 7: Optional External Services / שירותים חיצוניים (אופציונלי)");
+  console.log("  You can skip these and add them later by editing .env.");
+  console.log("");
+
   let googleClientId = "";
   let googleClientSecret = "";
   let googleRefreshToken = "";
-  const wantCalendar = await askYesNo(
-    "Enable Google Calendar integration? / הפעלת יומן גוגל?"
-  );
-  if (wantCalendar) {
+  const wantGCal = await askYesNo("Google Calendar integration? / יומן גוגל?", false);
+  if (wantGCal) {
     googleClientId = await ask("  Google Client ID");
     googleClientSecret = await ask("  Google Client Secret");
     googleRefreshToken = await ask("  Google Refresh Token");
   }
 
-  // SMTP Email
   let smtpEmail = "";
   let smtpPassword = "";
-  const wantEmail = await askYesNo(
-    "Enable email sending (SMTP)? / הפעלת שליחת אימיילים?"
-  );
+  const wantEmail = await askYesNo("Email sending (SMTP)? / שליחת אימיילים?", false);
   if (wantEmail) {
     smtpEmail = await ask("  SMTP Email (Gmail address)");
     smtpPassword = await askSecret("  SMTP App Password");
   }
 
-  // CRM
   let crmApiUrl = "";
   let crmUsername = "";
   let crmPassword = "";
-  const wantCrm = await askYesNo("Enable CRM integration? / הפעלת CRM?");
+  let crmLabel = "";
+  const wantCrm = await askYesNo("CRM integration? / CRM?", false);
   if (wantCrm) {
     crmApiUrl = await ask("  CRM API URL");
     crmUsername = await ask("  CRM Username");
     crmPassword = await askSecret("  CRM Password");
+    crmLabel = await ask("  CRM label (e.g. 'ביטוח אופיר') / תווית ל-CRM", "CRM");
   }
 
-  // Web Search
+  let harbIdNumber = "";
+  let harbPassword = "";
+  const wantHarb = await askYesNo("Har HaBituach (insurance policies scraper)? / הר הביטוח?", false);
+  if (wantHarb) {
+    harbIdNumber = await ask("  ID number / תעודת זהות");
+    harbPassword = await askSecret("  Password / סיסמה");
+  }
+
   let braveKey = "";
   let rapidApiKey = "";
-  const wantSearch = await askYesNo(
-    "Enable web search? / הפעלת חיפוש באינטרנט?"
-  );
+  const wantSearch = await askYesNo("Web search? / חיפוש באינטרנט?", false);
   if (wantSearch) {
     braveKey = await ask("  Brave Search API Key (brave.com/search/api)");
-    rapidApiKey = await ask("  RapidAPI Key (for flights/hotels, optional)");
+    rapidApiKey = await ask("  RapidAPI Key (flights/hotels, optional)");
   }
 
-  // Smart Home
   let c4Ip = "";
   let c4User = "";
   let c4Pass = "";
-  const wantSmartHome = await askYesNo(
-    "Enable Smart Home (Control4)? / הפעלת בית חכם?"
-  );
+  const wantSmartHome = await askYesNo("Smart Home (Control4)? / בית חכם?", false);
   if (wantSmartHome) {
     c4Ip = await ask("  Control4 Director IP");
     c4User = await ask("  Control4 Username");
     c4Pass = await askSecret("  Control4 Password");
   }
 
-  // Gett Taxi
   let gettClientId = "";
   let gettClientSecret = "";
   let gettBusinessId = "";
-  const wantGett = await askYesNo("Enable Gett Taxi? / הפעלת Gett?");
+  const wantGett = await askYesNo("Gett Taxi? / Gett?", false);
   if (wantGett) {
     gettClientId = await ask("  Gett Client ID");
     gettClientSecret = await ask("  Gett Client Secret");
     gettBusinessId = await ask("  Gett Business ID");
   }
 
-  // ─── Step 5: Generate .env ─────────────────────────────
+  // ─── Step 8: Backup existing memory & write files ──────
 
   printSection("Generating configuration files...");
 
+  // Backup any prior owner's memory so we don't mix identities
+  const backup = backupMemoryIfNeeded();
+  if (backup) {
+    console.log(`  📦 Backed up previous memory to: ${backup}`);
+  }
+
   const soulSlug = botNameEn.toLowerCase().replace(/[^a-z0-9]/g, "");
 
+  // ─── Write .env ────────────────────────────────────────
   const envContent = `# ═══════════════════════════════════════════════════════════
 # Bot Configuration
 # ═══════════════════════════════════════════════════════════
@@ -276,10 +434,10 @@ SOUL_NAME=${soulSlug}
 
 # ═══════════════════════════════════════════════════════════
 # Owner Configuration
+# Primary source of truth is workspace/owner.json; these env vars are fallbacks.
 # ═══════════════════════════════════════════════════════════
 
 OWNER_NAME=${ownerName}
-# Paste your WhatsApp chat ID here after first run (check logs)
 OWNER_CHAT_ID=
 OWNER_PHONE=${ownerPhone}
 OWNER_EMAIL=${ownerEmail}
@@ -315,6 +473,13 @@ CRM_USERNAME=${crmUsername}
 CRM_PASSWORD=${crmPassword}
 
 # ═══════════════════════════════════════════════════════════
+# Har HaBituach (insurance policy scraper)
+# ═══════════════════════════════════════════════════════════
+
+HARB_ID_NUMBER=${harbIdNumber}
+HARB_PASSWORD=${harbPassword}
+
+# ═══════════════════════════════════════════════════════════
 # Web Search
 # ═══════════════════════════════════════════════════════════
 
@@ -338,6 +503,13 @@ GETT_CLIENT_SECRET=${gettClientSecret}
 GETT_BUSINESS_ID=${gettBusinessId}
 
 # ═══════════════════════════════════════════════════════════
+# Health (optional)
+# ═══════════════════════════════════════════════════════════
+
+# Daily calorie goal for health tool (0 = disabled)
+HEALTH_DAILY_CALORIE_GOAL=0
+
+# ═══════════════════════════════════════════════════════════
 # Advanced Settings
 # ═══════════════════════════════════════════════════════════
 
@@ -345,11 +517,8 @@ MAX_HISTORY=100
 DEBUG_BRAIN_TRACE=false
 `;
 
-  // Write .env (warn if exists)
   if (existsSync(ENV_PATH)) {
-    const overwrite = await askYesNo(
-      ".env already exists. Overwrite? / הקובץ .env כבר קיים. לדרוס?"
-    );
+    const overwrite = await askYesNo(".env already exists. Overwrite? / הקובץ .env קיים. לדרוס?", false);
     if (!overwrite) {
       console.log("  Skipping .env generation. Your existing .env was kept.");
     } else {
@@ -361,186 +530,79 @@ DEBUG_BRAIN_TRACE=false
     console.log("  .env file created.");
   }
 
-  // ─── Step 6: Generate soul JSON ────────────────────────
+  // ─── Write workspace/owner.json ────────────────────────
+
+  const ownerJson = {
+    name: ownerName,
+    nameEn: ownerNameEn || undefined,
+    fullName: ownerFullName !== ownerName ? ownerFullName : undefined,
+    gender,
+    phone: ownerPhone,
+    email: ownerEmail,
+    chatId: "",
+    language: "he",
+    family,
+    assistant: {
+      name: botNameHe,
+      nameEn: botNameEn,
+    },
+    integrations: {
+      appleCalendar: intAppleCalendar,
+      sms: intSms,
+      capabilities: intCapabilities,
+      iMessage: intIMessage,
+      googleCalendar: wantGCal,
+      control4: wantSmartHome,
+      gett: wantGett,
+      crm: wantCrm,
+    },
+    smsWatchedSenders: smsWatchedSenders.length > 0 ? smsWatchedSenders : undefined,
+    crmLabel: crmLabel || undefined,
+  };
+
+  writeFileSync(OWNER_JSON_PATH, JSON.stringify(ownerJson, null, 2), "utf-8");
+  console.log("  workspace/owner.json created.");
+
+  // ─── Ensure soul file exists ───────────────────────────
 
   const soulPath = join(SOULS_DIR, `${soulSlug}.json`);
   const limorSoulPath = join(SOULS_DIR, "limor.json");
+  if (!existsSync(SOULS_DIR)) mkdirSync(SOULS_DIR, { recursive: true });
 
-  if (!existsSync(SOULS_DIR)) {
-    mkdirSync(SOULS_DIR, { recursive: true });
-  }
-
-  // If the soul already exists and is not limor, ask before overwriting
-  let writeSoul = true;
-  if (existsSync(soulPath) && soulSlug !== "limor") {
-    writeSoul = await askYesNo(
-      `souls/${soulSlug}.json already exists. Overwrite? / לדרוס?`
-    );
-  }
-
-  if (writeSoul) {
-    // Start from limor.json as template if available, otherwise build fresh
-    let soulData: any;
-    if (existsSync(limorSoulPath) && soulSlug !== "limor") {
-      soulData = JSON.parse(readFileSync(limorSoulPath, "utf-8"));
-    } else if (soulSlug === "limor" && existsSync(limorSoulPath)) {
-      // Don't overwrite limor.json if it already exists and we picked limor
-      console.log(`  souls/${soulSlug}.json already exists, keeping it.`);
-      writeSoul = false;
-      soulData = null;
+  if (!existsSync(soulPath)) {
+    if (soulSlug !== "limor" && existsSync(limorSoulPath)) {
+      // Copy limor.json as template — its {{placeholder}}s are rendered at load time.
+      copyFileSync(limorSoulPath, soulPath);
+      console.log(`  souls/${soulSlug}.json created (from limor.json template).`);
     } else {
-      soulData = {
-        identity: {
-          role: "עוזרת אישית",
-          owner: ownerName,
-          age: "צעירה",
-          origin: "ישראלית",
-          traits: [
-            "חברותית וחמה",
-            "אמיתית וכנה",
-            "שובבה עם חוש הומור",
-            "מקצועית כשצריך",
-            "חכמה ויודעת להסביר דברים מורכבים בפשטות",
-            "אופטימית ומעודדת",
-            "ישירה",
-          ],
-          vibe: "כמו חברה טובה שתמיד שם",
-        },
-        speech: {
-          defaultLanguage: "he",
-          languageRule: "תמיד עונה בשפה שבה פנו אליה",
-          tone: "טבעית ויומיומית, לא רשמית מדי",
-          emojis: true,
-          emojiNote: "משתמשת באימוג'ים כשמתאים אבל לא מגזימה",
-          responseLength:
-            "קצרות וממוקדות כברירת מחדל, מפורטות כשמבקשים",
-          slang: [
-            "יאללה",
-            "סבבה",
-            "אחלה",
-            "וואלה",
-            "בול",
-            "חזק",
-            "מגניב",
-            "ברור",
-            "נו",
-            "תכלס",
-            "בקטנה",
-          ],
-          slangNote:
-            "משתמשת בסלנג ישראלי כשמתאים — מגוון ביטויים, לא רק אחלה וסבבה",
-        },
-        capabilities: [
-          "לענות על שאלות בכל נושא",
-          "לעזור בכתיבה, תרגום, סיכום",
-          "לתת עצות ורעיונות",
-          "לעזור בקוד ותכנות",
-          "לקבוע ולנהל פגישות ואירועים ביומן של הבעלים",
-          "לראות את לוח הזמנים של הבעלים ליום מסוים",
-          "לחפש שולחנות פנויים במסעדות דרך אונטופו וטאביט",
-          "לחפש טיסות ומלונות בזמן אמת",
-          "לזכור הוראות וכללים חדשים שהבעלים מלמד אותך",
-          "לקרוא ולהבין תמונות שנשלחות בוואטסאפ",
-          "לקרוא ולשמור קבצים",
-          "סתם לשוחח ולהיות חברה טובה",
-        ],
-        rules: [
-          "אף פעם לא מעמידה פנים שהיא אדם – היא AI וגאה בזה",
-          "לא ממציאה עובדות – אם לא יודעת, אומרת",
-          "שומרת על פרטיות – לא מבקשת מידע רגיש",
-          "מתייחסת לכולם בכבוד ובחום",
-          "יש לך זיכרון – את זוכרת דברים שאנשים סיפרו לך בשיחות קודמות ומשתמשת בזה באופן טבעי",
-        ],
-        model: {
-          name: "claude-sonnet-4-6",
-          maxTokens: 4096,
-        },
-      };
-    }
-
-    if (writeSoul && soulData) {
-      // Apply user's names
-      soulData.name = botNameHe;
-      soulData.nameEn = botNameEn;
-      if (!soulData.version) soulData.version = "1.0.0";
-      if (!soulData.description)
-        soulData.description = "עוזרת אישית חכמה עם נשמה ישראלית";
-      soulData.identity.owner = ownerName;
-
-      // Replace owner name references in capabilities
-      soulData.capabilities = soulData.capabilities.map((c: string) =>
-        c
-          .replace(/רני אופיר/g, ownerName)
-          .replace(/רני/g, ownerName)
-          .replace(/של הבעלים/g, `של ${ownerName}`)
-      );
-
-      writeFileSync(soulPath, JSON.stringify(soulData, null, 2), "utf-8");
-      console.log(`  souls/${soulSlug}.json created.`);
+      console.log(`  souls/${soulSlug}.json already exists, keeping it.`);
     }
   }
 
-  // ─── Step 7: Update workspace/identity/SOUL.md ─────────
-
-  if (!existsSync(WS_IDENTITY)) {
-    mkdirSync(WS_IDENTITY, { recursive: true });
-  }
-
-  const soulMdPath = join(WS_IDENTITY, "SOUL.md");
-  const soulMd = `השם שלך הוא ${botNameHe} (${botNameEn}). עוזרת אישית חכמה עם נשמה ישראלית.
-את העוזרת האישית של ${ownerName}. הוא יצר אותך והוא הבעלים שלך.
-כשמציגים את עצמך: "${botNameHe}, העוזרת האישית של ${ownerName}".
-
-## מי את
-- את ${botNameHe}, כמו חברה טובה שתמיד שם
-- חברותית וחמה
-- אמיתית וכנה
-- שובבה עם חוש הומור
-- מקצועית כשצריך
-- חכמה ויודעת להסביר דברים מורכבים בפשטות
-- אופטימית ומעודדת
-- ישירה
-
-## מודעות עצמית
-- השם שלך הוא ${botNameHe} ואת מכירה את עצמך היטב
-- הסגנון שלך: טבעית ויומיומית, לא רשמית מדי
-- כשמישהו שואל אותך מי את – ענו בחום ותארי את עצמך על פי התכונות האלה
-- אל תגידי שאין לך גישה למידע על עצמך – את מכירה את עצמך היטב
-`;
-
-  writeFileSync(soulMdPath, soulMd, "utf-8");
-  console.log("  workspace/identity/SOUL.md updated.");
+  // Reset owner_profile.md (avoid carrying over prior owner's notes)
+  const ownerProfile = join(MEMORY_DIR, "owner_profile.md");
+  if (!existsSync(MEMORY_DIR)) mkdirSync(MEMORY_DIR, { recursive: true });
+  writeFileSync(
+    ownerProfile,
+    `# פרופיל הבעלים - ${ownerFullName}\n\nהפרטים נטענים מ-workspace/owner.json בזמן ריצה.\nקובץ זה משמש כתיעוד בלבד.\n`,
+    "utf-8"
+  );
 
   // ─── Done ──────────────────────────────────────────────
 
   console.log("");
-  console.log(
-    "  ╔══════════════════════════════════════════════════════╗"
-  );
-  console.log(
-    `  ║  Setup complete! / ההתקנה הושלמה!                    ║`
-  );
-  console.log(
-    `  ║  Your assistant "${botNameHe}" is ready.               ║`
-  );
-  console.log(
-    "  ╚══════════════════════════════════════════════════════╝"
-  );
+  console.log("  ╔══════════════════════════════════════════════════════╗");
+  console.log(`  ║  Setup complete! / ההתקנה הושלמה!                    ║`);
+  console.log(`  ║  Your assistant "${botNameHe}" is ready.              ║`);
+  console.log("  ╚══════════════════════════════════════════════════════╝");
   console.log("");
   console.log("  Next steps / צעדים הבאים:");
   console.log("");
   console.log("    1. npm run build");
   console.log("    2. npx pm2 start ecosystem.config.js");
   console.log("    3. Scan the QR code with WhatsApp / סרוק את קוד ה-QR");
-  console.log(
-    `    4. Send a message and find your OWNER_CHAT_ID in the logs`
-  );
-  console.log(
-    "    5. Add OWNER_CHAT_ID to .env and restart:"
-  );
-  console.log(
-    "       npx pm2 delete limor && npx pm2 start ecosystem.config.js"
-  );
+  console.log("    4. Send a message — find OWNER_CHAT_ID in logs and add to .env");
+  console.log("    5. npx pm2 restart " + soulSlug);
   console.log("");
 
   rl.close();

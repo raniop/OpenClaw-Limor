@@ -16,84 +16,21 @@ import type { SmsMessage } from "./sms-reader";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { shouldForwardSMS } from "../operational-rules";
 import { statePath } from "../state-dir";
+import { loadOwnerConfig, type SmsWatchedSender } from "../owner-config";
 
 // ─── Watcher configuration ────────────────────────────────────────────────────
 
-export interface SmsWatcherConfig {
-  /** Sender name/number to watch (substring match, case-insensitive) */
-  sender: string;
-  /** Human-readable label for WhatsApp messages */
-  label: string;
-  /** Emoji prefix for forwarded messages */
-  emoji: string;
-  /** If set, only forward messages whose text contains one of these keywords */
-  keywords?: string[];
-  /** If set, skip messages whose text contains any of these strings */
-  excludeKeywords?: string[];
-}
+/** Re-exported for callers that still expect the old name. */
+export type SmsWatcherConfig = SmsWatchedSender;
 
-/** Watched senders — add new entries here to monitor additional SMS senders */
-const WATCHED_SENDERS: SmsWatcherConfig[] = [
-  {
-    sender: "HAREL",
-    label: "הראל ביטוח",
-    emoji: "🏥",
-    // No keyword filter — forward ALL messages from HAREL
-  },
-  {
-    sender: "OPHIR",
-    label: "אופיר",
-    emoji: "📩",
-    // Forward ONLY authentication/OTP messages — skip Family Sharing screen time requests
-    keywords: [
-      "verification code",
-      "your code",
-      "קוד אימות",
-      "קוד",
-      "otp",
-      "one-time",
-      "one time",
-      "passcode",
-      "auth code",
-      "confirmation code",
-      "security code",
-      "login code",
-      "sign-in code",
-      "access code",
-      "2fa",
-    ],
-    excludeKeywords: [
-      "asked for more time",
-      "wants more time",
-      "screen time",
-      "asked to add",
-      "wants to add",
-      "requested more time",
-      "more time for",
-    ],
-  },
-  {
-    sender: "AMEX",
-    label: "אמריקן אקספרס",
-    emoji: "💳",
-    keywords: ["חיוב", "עסקה", "עסקאות", "יתרה", "תשלום", "אישור", "קוד", "חשבונית", "סכום", "₪", "NIS"],
-    excludeKeywords: ["הטבה", "מבצע", "הצטרף", "שדרוג"],
-  },
-  {
-    sender: "Isracard",
-    label: "ישראכרט",
-    emoji: "💳",
-    keywords: ["חיוב", "עסקה", "עסקאות", "יתרה", "תשלום", "אישור", "קוד", "חשבונית", "סכום", "₪", "NIS"],
-    excludeKeywords: ["הטבה", "מבצע", "הצטרף", "שדרוג"],
-  },
-  {
-    sender: "bit",
-    label: "ביט",
-    emoji: "💸",
-    keywords: ["העברה", "קיבלת", "שלחת", "תשלום", "חיוב", "קוד", "אימות", "₪", "NIS", "שולם"],
-    excludeKeywords: ["הטבה", "מבצע", "הצטרף"],
-  },
-];
+/**
+ * Watched senders are loaded from owner-config. A user customises the list
+ * during setup (or by editing `workspace/owner.json` directly); the watcher
+ * itself has no hardcoded senders.
+ */
+function getWatchedSenders(): SmsWatchedSender[] {
+  return loadOwnerConfig().smsWatchedSenders;
+}
 
 // ─── State persistence ─────────────────────────────────────────────────────────
 
@@ -198,7 +135,7 @@ async function pollOnce(): Promise<void> {
     }
 
     // Check each watched sender
-    for (const watchConfig of WATCHED_SENDERS) {
+    for (const watchConfig of getWatchedSenders()) {
       // Check operational rules — owner can mute/block senders dynamically
       if (!shouldForwardSMS(watchConfig.sender)) {
         continue;
@@ -266,7 +203,7 @@ export function startSmsWatcher(
     );
   }
 
-  const watcherNames = WATCHED_SENDERS.map((w) => w.sender).join(", ");
+  const watcherNames = getWatchedSenders().map((w) => w.sender).join(", ");
   console.log(
     `[sms-watcher] Started — watching: [${watcherNames}] every ${intervalMs / 1000}s`
   );
@@ -303,6 +240,6 @@ export function getSmsWatcherStatus(): {
     lastCheckedId: state.lastCheckedId,
     lastPollAt: state.lastPollAt,
     totalForwarded: state.totalForwarded,
-    watchedSenders: WATCHED_SENDERS.map((w) => w.sender),
+    watchedSenders: getWatchedSenders().map((w) => w.sender),
   };
 }

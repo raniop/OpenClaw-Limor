@@ -1,10 +1,19 @@
 @echo off
-title OpenClaw - Starting...
+setlocal enabledelayedexpansion
 cd /d "%~dp0"
+
+:: Read assistant name from .env (fallback: Limor)
+set "BOT_NAME=Limor"
+if exist ".env" (
+    for /f "usebackq tokens=2 delims==" %%a in (`findstr /B "BOT_NAME_EN=" .env`) do set "BOT_NAME=%%a"
+)
+set "BOT_NAME_LOWER=%BOT_NAME%"
+
+title %BOT_NAME% - Starting...
 
 echo.
 echo   ========================================
-echo   OpenClaw - Personal AI WhatsApp Assistant
+echo   %BOT_NAME% - Personal AI WhatsApp Assistant
 echo   ========================================
 echo.
 
@@ -40,7 +49,7 @@ echo   [1/4] Build OK
 
 :: Start bot with PM2
 echo   [2/4] Starting bot with PM2...
-call npx pm2 start ecosystem.config.js 2>nul || call npx pm2 restart limor 2>nul
+call npx pm2 start ecosystem.config.js 2>nul || call npx pm2 restart %BOT_NAME_LOWER% 2>nul
 echo   [2/4] Bot started
 
 :: Start dashboard
@@ -61,7 +70,7 @@ start http://localhost:3848
 
 echo.
 echo   ========================================
-echo   OpenClaw is running!
+echo   %BOT_NAME% is running!
 echo.
 echo   Dashboard: http://localhost:3848
 echo   Bot logs:  npx pm2 logs

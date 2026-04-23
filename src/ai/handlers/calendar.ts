@@ -209,7 +209,7 @@ export const calendarHandlers: Record<string, ToolHandler> = {
     const lines = pending.map((f, i) => {
       const task = f.reason.replace(/^\[מ-[^\]]*\]\s*/, "");
       const time = new Date(f.dueAt).toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" });
-      const recipient = f.targetName ? `📨 נשלח ל: ${f.targetName}` : "📨 נשלח ל: הבעלים (רני)";
+      const recipient = f.targetName ? `📨 נשלח ל: ${f.targetName}` : `📨 נשלח ל: הבעלים (${config.ownerName})`;
       return `${i + 1}. 📝 ${task}\n   ${recipient}\n   ⏰ ${time} | 🆔 ${f.id}`;
     });
     return `📋 *תזכורות ממתינות (${pending.length}):*\n\n${lines.join("\n\n")}`;

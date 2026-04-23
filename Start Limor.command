@@ -1,19 +1,20 @@
 #!/bin/bash
 cd "$(dirname "$0")"
 
-# Read bot name from .env (fallback: openclaw)
-BOT_NAME=$(grep '^BOT_NAME_EN=' .env 2>/dev/null | cut -d= -f2 | tr '[:upper:]' '[:lower:]')
-BOT_NAME=${BOT_NAME:-openclaw}
+# Read names from .env
+BOT_NAME_EN=$(grep '^BOT_NAME_EN=' .env 2>/dev/null | cut -d= -f2)
+BOT_NAME_EN=${BOT_NAME_EN:-Limor}
+BOT_NAME_LOWER=$(echo "$BOT_NAME_EN" | tr '[:upper:]' '[:lower:]')
 
 # Build silently
 npm run build > /dev/null 2>&1
 if [ $? -ne 0 ]; then
-  osascript -e "display notification \"Build failed!\" with title \"OpenClaw ❌\""
+  osascript -e "display notification \"Build failed!\" with title \"$BOT_NAME_EN ❌\""
   exit 1
 fi
 
 # Start bot with PM2 (background, auto-restart on crash)
-npx pm2 start ecosystem.config.js --silent 2>/dev/null || npx pm2 restart "$BOT_NAME" --silent 2>/dev/null
+npx pm2 start ecosystem.config.js --silent 2>/dev/null || npx pm2 restart "$BOT_NAME_LOWER" --silent 2>/dev/null
 
 # Clean dashboard cache and start
 cd dashboard
@@ -27,7 +28,7 @@ sleep 5
 open http://localhost:3848
 
 # Notify success
-osascript -e "display notification \"OpenClaw + Dashboard running!\" with title \"OpenClaw ✅\""
+osascript -e "display notification \"$BOT_NAME_EN + Dashboard running!\" with title \"$BOT_NAME_EN ✅\""
 
 # Dashboard health check — restart if it crashes
 while true; do
@@ -41,6 +42,6 @@ while true; do
     npm run dev > /dev/null 2>&1 &
     DASHBOARD_PID=$!
     cd ..
-    osascript -e "display notification \"Dashboard restarted\" with title \"OpenClaw ⚠️\""
+    osascript -e "display notification \"Dashboard restarted\" with title \"$BOT_NAME_EN ⚠️\""
   fi
 done

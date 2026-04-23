@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { config } from "../../config";
 
 export const telegramTools: Anthropic.Tool[] = [
   {
@@ -23,7 +24,7 @@ export const telegramTools: Anthropic.Tool[] = [
   },
   {
     name: "list_telegram_groups",
-    description: "רשימת קבוצות וערוצי טלגרם שרני חבר בהם",
+    description: `רשימת קבוצות וערוצי טלגרם ש${config.ownerName} חבר בהם`,
     input_schema: {
       type: "object" as const,
       properties: {},

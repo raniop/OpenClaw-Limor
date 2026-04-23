@@ -1,8 +1,12 @@
 #!/bin/bash
-# Start OpenClaw - Limor Bot + Dashboard
+# Start the WhatsApp AI bot + Dashboard
 cd "$(dirname "$0")"
 
-echo "🐾 Starting OpenClaw..."
+# Read assistant name from .env (fallback: Limor)
+BOT_NAME=$(grep '^BOT_NAME_EN=' .env 2>/dev/null | cut -d= -f2)
+BOT_NAME=${BOT_NAME:-Limor}
+
+echo "🐾 Starting $BOT_NAME..."
 
 # Build bot
 echo "📦 Building bot..."
@@ -15,7 +19,7 @@ DASH_PID=$!
 cd ..
 
 # Start bot
-echo "🤖 Starting Limor..."
+echo "🤖 Starting $BOT_NAME..."
 node dist/index.js &
 BOT_PID=$!
 

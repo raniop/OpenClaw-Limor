@@ -121,6 +121,14 @@ export function buildSystemPrompt(params: BuildSystemPromptParams): BuildSystemP
 - כשהמשתמש שואל "מה המצב עם..." — הראי סטטוס תוכנית רלוונטית`;
   }
 
+  // Media/image priority — prevents old summary contamination on new screenshots
+  systemPrompt += `\n\n📸 טיפול במדיה (תמונות, צילומי מסך, קבצים):
+- כשהמשתמש שולח תמונה/צילום מסך — **התוכן של התמונה הוא המקור העיקרי**. קראי אותה ראשונה.
+- אל תסיקי את הנושא מ"נושא נוכחי" בסיכום השיחה, מהחלטות ישנות, או מההקשר האחרון. סיכום השיחה יכול להיות ישן ולא קשור!
+- אם התמונה מראה נושא שונה מהשיחה הקודמת — זה נושא חדש. אל תחברי אותו בכוח לפוליסה/לקוח/משימה מהשיחה הקודמת.
+- אם שלח רק תמונה בלי טקסט — הבסיס היחיד לפעולה הוא מה שכתוב/נראה בתמונה. אם לא ברור מה הוא רוצה, **שאלי** לפני שאת יוצרת תזכורת/מתבצעת פעולה.
+- אסור להמציא פרטים (מספרי פוליסה, טלפונים, שמות לקוחות) שלא מופיעים בתמונה עצמה!`;
+
   // Anti-hallucination rules for calendar — CRITICAL
   systemPrompt += `\n\n🚨 כללים חמורים ביותר — הפרה = כשל קריטי:
 
@@ -134,7 +142,8 @@ export function buildSystemPrompt(params: BuildSystemPromptParams): BuildSystemP
   // Add sender context so bot knows who's talking
   if (sender) {
     if (sender.isOwner) {
-      systemPrompt += `\n\nהמשתמש הנוכחי: ${config.ownerName} (הבעלים שלך). אפשר לקבוע לו אירועים ישירות ביומן. יש לך גם גישה ל-CRM של ביטוח אופיר.`;
+      const crmNote = config.owner.crmLabel ? ` יש לך גם גישה ל-CRM של ${config.owner.crmLabel}.` : "";
+      systemPrompt += `\n\nהמשתמש הנוכחי: ${config.ownerName} (הבעלים שלך). אפשר לקבוע לו אירועים ישירות ביומן.${crmNote}`;
       if (config.ownerName && config.ownerPhone) {
         systemPrompt += `\n\n📋 פרטי ${config.ownerName} להזמנת מסעדות (השתמשי בהם אוטומטית בלי לשאול!): שם: ${config.ownerName}, טלפון: ${config.ownerPhone}, מייל: ${config.ownerEmail || ""}`;
       }

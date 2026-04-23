@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { config } from "../../config";
 
 /** File management tools (owner-only) */
 export const fileTools: Anthropic.Tool[] = [
@@ -60,7 +61,7 @@ export const fileTools: Anthropic.Tool[] = [
         },
         contact_name: {
           type: "string",
-          description: "שם איש הקשר לשליחה. השתמש ב-'owner' או 'רני' לשליחה לבעלים.",
+          description: `שם איש הקשר לשליחה. השתמש ב-'owner' או '${config.ownerName}' לשליחה לבעלים.`,
         },
         caption: {
           type: "string",

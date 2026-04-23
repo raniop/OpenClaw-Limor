@@ -1,9 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { config } from "../../config";
 
 export const officePcTools: Anthropic.Tool[] = [
   {
     name: "office_pc_login",
-    description: `מתחבר למחשב במשרד של רני ומבצע פעולות מרחוק.
+    description: `מתחבר למחשב במשרד של ${config.ownerName} ומבצע פעולות מרחוק.
 פעולות:
 - status: בודק אם המחשב דלוק ואם יש משתמש מחובר
 - login: מבצע login אוטומטי (restart מהיר של 30 שניות)

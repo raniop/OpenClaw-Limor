@@ -8,6 +8,8 @@ dist-test/
 # Personal state data (created at runtime)
 workspace/state/
 workspace/memory/users/
+workspace/memory/owner_profile.md
+workspace/owner.json
 memory/
 data/
 files/

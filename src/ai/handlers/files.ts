@@ -28,7 +28,8 @@ export const filesHandlers: Record<string, ToolHandler> = {
     // Resolve target chatId
     let targetChatId: string;
     const nameNormalized = (input.contact_name || "").toLowerCase().trim();
-    if (nameNormalized === "owner" || nameNormalized === "רני" || nameNormalized === "עצמי" || nameNormalized === "עצמך") {
+    const ownerAlias = (config.ownerName || "").toLowerCase();
+    if (nameNormalized === "owner" || (ownerAlias && nameNormalized === ownerAlias) || nameNormalized === "עצמי" || nameNormalized === "עצמך") {
       if (!config.ownerChatId) return "❌ ownerChatId לא מוגדר בתצורה.";
       targetChatId = config.ownerChatId;
     } else {

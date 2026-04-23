@@ -71,6 +71,20 @@ export const contactTools: Anthropic.Tool[] = [
     },
   },
   {
+    name: "list_my_groups",
+    description: `⚡ **חובה להריץ את זה קודם** כש${config.ownerName} מבקש סיכום "קבוצות" / "הקבוצות שלי" / "מה קרה בקבוצות" בלי לציין שם ספציפי. מחזיר את כל הקבוצות שהבוט משתתף בהן עם שמות מדויקים. רק אחרי שרואים את הרשימה אפשר לקרוא ל-summarize_group_activity עם שם אמיתי.`,
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        include_empty: {
+          type: "boolean",
+          description: "האם לכלול גם קבוצות ללא הודעות אחרונות (ברירת מחדל: false)",
+        },
+      },
+      required: [],
+    },
+  },
+  {
     name: "get_group_history",
     description: `צפייה בהיסטוריית שיחה של קבוצת וואטסאפ. השתמשי כש${config.ownerName} שואל 'מה היה בקבוצה X?' או 'תסכמי לי את הקבוצה'.`,
     input_schema: {
@@ -158,7 +172,7 @@ export const contactTools: Anthropic.Tool[] = [
         },
         from_name: {
           type: "string",
-          description: "מי ביקש את התזכורת — שם האדם שממנו הגיעה הבקשה. למשל: 'רני', 'אלי אופיר', 'עמית'",
+          description: `מי ביקש את התזכורת — שם האדם שממנו הגיעה הבקשה. למשל: '${config.ownerName}', שם של איש קשר.`,
         },
         due_hours: {
           type: "number",
@@ -170,7 +184,7 @@ export const contactTools: Anthropic.Tool[] = [
         },
         target_contact: {
           type: "string",
-          description: "שם איש קשר שצריך לקבל את התזכורת (אם לא צוין — התזכורת נשלחת לרני). למשל: 'עמית גולן'",
+          description: `שם איש קשר שצריך לקבל את התזכורת (אם לא צוין — התזכורת נשלחת ל${config.ownerName}). למשל: 'עמית גולן'`,
         },
         message: {
           type: "string",

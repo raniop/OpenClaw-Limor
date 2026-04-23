@@ -5,6 +5,7 @@
 import { spawn, execSync } from "child_process";
 import { existsSync, readFileSync, readdirSync } from "fs";
 import { resolve, join } from "path";
+import { homedir } from "os";
 import { config } from "../config";
 import { createWorktree, getDiff, applyWorktree, cleanupWorktree } from "./sandbox";
 import { getSpec } from "./spec-store";
@@ -17,10 +18,8 @@ const WORKTREES_DIR = join(PROJECT_ROOT, ".worktrees");
  * Claude Code updates change the version directory, so we find the latest.
  */
 function findClaudeCli(): string {
-  const baseDir = join(
-    process.env.HOME || "/Users/raniophir",
-    "Library/Application Support/Claude/claude-code"
-  );
+  const home = process.env.HOME || homedir();
+  const baseDir = join(home, "Library/Application Support/Claude/claude-code");
   try {
     const versions = readdirSync(baseDir)
       .filter((d: string) => /^\d+\.\d+\.\d+$/.test(d))
@@ -39,7 +38,7 @@ function findClaudeCli(): string {
   } catch {}
   // Fallback: try common locations
   const fallbackPaths = [
-    join(process.env.HOME || "/Users/raniophir", ".local/bin/claude"),
+    join(home, ".local/bin/claude"),
     "/usr/local/bin/claude",
     "/opt/homebrew/bin/claude",
   ];
@@ -58,6 +57,10 @@ function findClaudeCli(): string {
  * Returns a promise that resolves with the implementation result.
  */
 export async function implementCapability(capId: string, onProgress?: (msg: string) => void): Promise<string> {
+  if (!config.owner.integrations.capabilities) {
+    return "❌ יכולת העריכה-העצמית כבויה בהגדרות (owner.integrations.capabilities = false).";
+  }
+
   // Get the spec
   const spec = getSpec(capId);
   if (!spec) return `❌ לא מצאתי capability spec: ${capId}`;

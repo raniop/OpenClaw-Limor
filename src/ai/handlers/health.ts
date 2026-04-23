@@ -1,14 +1,13 @@
 /**
- * Health handlers — Apple Health data for Rani.
+ * Health handlers — Apple Health data.
  * Data is pushed from iPhone via /health-data webhook and stored in SQLite.
  */
 import type { ToolHandler } from "./types";
 import { getTodayHealth, getHealthByDate, getRecentHealth } from "../../stores/health-store";
+import { config } from "../../config";
 
-// Rani's calorie goals
-const DAILY_CALORIE_GOAL = 1800;
-const CURRENT_WEIGHT_KG = 83;
-const TARGET_WEIGHT_KG = 78;
+// Daily calorie goal — optional, set via HEALTH_DAILY_CALORIE_GOAL env var.
+const DAILY_CALORIE_GOAL = parseInt(process.env.HEALTH_DAILY_CALORIE_GOAL || "0", 10) || 0;
 
 function formatHealthRecord(record: {
   date: string;
@@ -39,11 +38,15 @@ function formatHealthRecord(record: {
   }
 
   if (record.active_calories !== null) {
-    const remaining = DAILY_CALORIE_GOAL - record.active_calories;
-    const remainingText = remaining > 0
-      ? `נותרו ${remaining} קל' ליעד`
-      : `✅ עברת את היעד ב-${Math.abs(remaining)} קל'!`;
-    lines.push(`⚡ קלוריות פעילות: ${record.active_calories} קל' (${remainingText})`);
+    if (DAILY_CALORIE_GOAL > 0) {
+      const remaining = DAILY_CALORIE_GOAL - record.active_calories;
+      const remainingText = remaining > 0
+        ? `נותרו ${remaining} קל' ליעד`
+        : `✅ עברת את היעד ב-${Math.abs(remaining)} קל'!`;
+      lines.push(`⚡ קלוריות פעילות: ${record.active_calories} קל' (${remainingText})`);
+    } else {
+      lines.push(`⚡ קלוריות פעילות: ${record.active_calories} קל'`);
+    }
   }
 
   if (record.exercise_minutes !== null) {
@@ -60,11 +63,9 @@ function formatHealthRecord(record: {
     lines.push(`❤️ דופק במנוחה: ${record.resting_heart_rate} bpm`);
   }
 
-  // Calorie budget summary: intake goal + active burn = total allowed
-  if (record.active_calories !== null) {
+  if (record.active_calories !== null && DAILY_CALORIE_GOAL > 0) {
     const totalBudget = DAILY_CALORIE_GOAL + record.active_calories;
     lines.push(`\n💡 תקציב קלורי: ${DAILY_CALORIE_GOAL} קל' בסיס + ${record.active_calories} קל' שנשרפו = ${totalBudget} קל' מותר לאכול`);
-    lines.push(`   (משקל נוכחי: ${CURRENT_WEIGHT_KG} ק"ג → יעד: ${TARGET_WEIGHT_KG} ק"ג)`);
   }
 
   const updatedAt = new Date(record.created_at).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
@@ -81,7 +82,7 @@ export const healthHandlers: Record<string, ToolHandler> = {
     if (date === "last_7_days") {
       const records = getRecentHealth(7);
       if (records.length === 0) {
-        return `❌ אין נתוני בריאות זמינים. רני צריך להגדיר את ה-iOS Shortcut שישלח נתונים אוטומטית.`;
+        return `❌ אין נתוני בריאות זמינים. ${config.ownerName} צריך להגדיר את ה-iOS Shortcut שישלח נתונים אוטומטית.`;
       }
       const lines = [`📊 נתוני Apple Health — 7 ימים אחרונים:\n`];
       for (const r of records) {
@@ -108,8 +109,8 @@ export const healthHandlers: Record<string, ToolHandler> = {
     if (!record) {
       const today = new Date().toISOString().split("T")[0];
       return `❌ אין עדיין נתוני בריאות להיום (${today}).\n\n` +
-        `💡 כדי לקבל נתונים אוטומטיים, רני צריך להגדיר iOS Shortcut שמריץ כל שעה ושולח POST ל-/health-data.\n` +
-        `הנחיות הגדרה: שאל את לימור "תסביר לי איך להגדיר את Shortcut הבריאות"`;
+        `💡 כדי לקבל נתונים אוטומטיים, ${config.ownerName} צריך להגדיר iOS Shortcut שמריץ כל שעה ושולח POST ל-/health-data.\n` +
+        `הנחיות הגדרה: שאל את ${config.botName} "תסביר לי איך להגדיר את Shortcut הבריאות"`;
     }
 
     return `📊 נתוני Apple Health — היום:\n\n${formatHealthRecord(record)}`;
