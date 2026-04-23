@@ -52,7 +52,7 @@ const agents: Map<string, AgentConfig> = new Map();
 
 // מיכל — group summarizer (WhatsApp + Telegram)
 agents.set("michal", buildAgent("michal.json",
-  pickTools([...contactTools, ...telegramTools], ["get_group_history", "summarize_group_activity", "telegram_summary", "list_telegram_groups"])
+  pickTools([...contactTools, ...telegramTools], ["list_my_groups", "get_group_history", "summarize_group_activity", "telegram_summary", "list_telegram_groups"])
 ));
 
 // רונית — internet researcher

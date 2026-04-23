@@ -12,7 +12,7 @@
 import type { ConversationMessage } from "../stores/types";
 
 /** Configuration */
-const RECENCY_WINDOW = 20;          // Always include last N messages
+const RECENCY_WINDOW = 7;           // Always include last N messages
 const MAX_SELECTED = 60;            // Maximum messages to return
 const MIN_MESSAGES_TO_FILTER = 30;  // Don't filter if history is already small
 
@@ -24,6 +24,22 @@ const DATE_PATTERN = /\d{1,2}[./]\d{1,2}|\d{1,2}:\d{2}|יום [א-ש]|בשעה|�
 
 /** Tool use markers (from Claude's tool_use responses stored as text) */
 const TOOL_MARKER_PATTERN = /\[tool:|הפעלתי|בדקתי ביומן|שלחתי הודעה|חיפשתי|יצרתי אירוע/;
+
+/**
+ * Placeholder/minimal messages — carry no semantic keywords.
+ * For these, keyword-based scoring drags in unrelated old context (e.g. yesterday's "decisions").
+ * We fall back to a pure recency window instead.
+ */
+const PLACEHOLDER_PATTERN = /^\s*\[(תמונה|קובץ|וידאו|הקלטה|audio|image|video|file)[^\]]*\]\s*$/i;
+
+function isPlaceholderOrMinimal(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return true;
+  if (PLACEHOLDER_PATTERN.test(trimmed)) return true;
+  // Very short messages also lack keywords — let recency drive selection
+  if (trimmed.length <= 3) return true;
+  return false;
+}
 
 /**
  * Extract keywords from a message for relevance scoring.
@@ -77,9 +93,9 @@ function scoreMessage(
     }
   }
 
-  // 3. Contains decisions/commitments (3 points)
+  // 3. Contains decisions/commitments (1 point — reduced to avoid stale "I did X" stickiness)
   if (DECISION_PATTERN.test(msg.content)) {
-    score += 3;
+    score += 1;
   }
 
   // 4. Contains dates/times (2 points — scheduling context)
@@ -130,6 +146,7 @@ export function selectRelevantHistory(
 
   const queryKeywords = extractKeywords(currentMessage);
   const totalMessages = history.length;
+  const isPlaceholder = isPlaceholderOrMinimal(currentMessage);
 
   // Always include the recency window (last N messages)
   const recencyStart = Math.max(0, totalMessages - RECENCY_WINDOW);
@@ -137,6 +154,15 @@ export function selectRelevantHistory(
 
   for (let i = recencyStart; i < totalMessages; i++) {
     selectedIndices.add(i);
+  }
+
+  // Placeholder messages (e.g. "[תמונה]", single char) carry no keywords.
+  // Scoring by keyword overlap drags in unrelated old "decisions" — use recency only.
+  if (isPlaceholder && mentionedEntities.length === 0) {
+    const sortedIndices = Array.from(selectedIndices).sort((a, b) => a - b);
+    const selected = sortedIndices.map((i) => history[i]);
+    console.log(`[history-selector] placeholder message — recency-only ${selected.length}/${totalMessages}`);
+    return selected;
   }
 
   // Score all messages outside the recency window

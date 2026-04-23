@@ -71,6 +71,13 @@ export async function sendMessage(
   // --- Build messages array ---
   const messages: Anthropic.MessageParam[] = history.map((m) => {
     if (m.role === "user" && m.imageData) {
+      // When caption is empty or a bare placeholder like "[תמונה]", send an
+      // explicit directive so the model grounds on the image, not on stale summary context.
+      const rawText = (m.content || "").trim();
+      const isPlaceholder = !rawText || /^\[(תמונה|image)[^\]]*\]$/i.test(rawText);
+      const textForModel = isPlaceholder
+        ? "המשתמש שלח תמונה חדשה ללא טקסט. קראי את התמונה עכשיו — התוכן שלה הוא הנושא. אל תסיקי את הנושא מסיכום השיחה או מהקשר קודם. אם לא ברור מה הוא רוצה — שאלי."
+        : rawText;
       return {
         role: "user" as const,
         content: [
@@ -82,7 +89,7 @@ export async function sendMessage(
               data: m.imageData.base64,
             },
           },
-          { type: "text" as const, text: m.content || "מה יש בתמונה?" },
+          { type: "text" as const, text: textForModel },
         ],
       };
     }
@@ -102,7 +109,7 @@ export async function sendMessage(
       ? [
           ...calendarTools, ...travelTools, ...crmTools, ...instructionTools,
           ...fileTools,
-          ...contactTools.filter(t => !["get_group_history", "summarize_group_activity"].includes(t.name)),
+          ...contactTools.filter(t => !["get_group_history", "summarize_group_activity", "list_my_groups"].includes(t.name)),
           // smartHomeTools → maya agent only
           // bookingTools → hila agent only
           // nimrodTools → nimrod agent only

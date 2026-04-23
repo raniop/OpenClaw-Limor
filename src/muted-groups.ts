@@ -45,16 +45,43 @@ export function getGroupNameById(chatId: string): string | undefined {
   return groupRegistry[chatId];
 }
 
+/** Normalize for fuzzy matching: lowercase, strip emoji/punct/whitespace. */
+function normalizeGroupName(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[\p{Extended_Pictographic}]/gu, "")
+    .replace(/[^\p{L}\p{N}]+/gu, "")
+    .trim();
+}
+
 export function findGroupChatId(name: string): string | undefined {
-  // Exact match
-  for (const [chatId, groupName] of Object.entries(groupRegistry)) {
+  const entries = Object.entries(groupRegistry);
+  // 1. Exact match
+  for (const [chatId, groupName] of entries) {
     if (groupName === name) return chatId;
   }
-  // Partial match
-  for (const [chatId, groupName] of Object.entries(groupRegistry)) {
+  // 2. Case-insensitive / normalized match
+  const nq = normalizeGroupName(name);
+  if (nq) {
+    for (const [chatId, groupName] of entries) {
+      if (normalizeGroupName(groupName) === nq) return chatId;
+    }
+    // 3. Partial normalized match (either direction)
+    for (const [chatId, groupName] of entries) {
+      const ng = normalizeGroupName(groupName);
+      if (ng && (ng.includes(nq) || nq.includes(ng))) return chatId;
+    }
+  }
+  // 4. Original substring match (kept for backward compat)
+  for (const [chatId, groupName] of entries) {
     if (groupName.includes(name) || name.includes(groupName)) return chatId;
   }
   return undefined;
+}
+
+/** Get all registered groups (chatId + name). For listing to AI. */
+export function listAllRegisteredGroups(): Array<{ chatId: string; name: string }> {
+  return Object.entries(groupRegistry).map(([chatId, name]) => ({ chatId, name }));
 }
 
 function load(): MutedGroups {
