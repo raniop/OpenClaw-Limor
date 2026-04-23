@@ -1,7 +1,7 @@
 {
-  "name": "openclaw",
+  "name": "limor",
   "version": "2026.4.12",
-  "description": "OpenClaw - Personal AI Assistant WhatsApp Bot powered by Claude",
+  "description": "Limor - Personal AI Assistant WhatsApp Bot powered by Claude",
   "main": "dist/index.js",
   "scripts": {
     "clean": "shx rm -rf dist dist-test",
@@ -17,7 +17,8 @@
     "verify": "npx tsx scripts/verify.ts",
     "install-all": "npm install && cd dashboard && npm install",
     "setup": "npx tsx scripts/setup.ts",
-    "update": "npx tsx scripts/update.ts"
+    "update": "npx tsx scripts/update.ts",
+    "update:baileys": "npx tsx scripts/update.ts --baileys"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.85.0",

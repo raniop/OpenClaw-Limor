@@ -138,7 +138,7 @@ export function Floor1Ground() {
 
       {/* Company sign on back wall */}
       <Html position={[4, 2.2, 13.9]} center distanceFactor={20} style={{ pointerEvents: "none" }}>
-        <div style={{ fontSize: 18, color: "#f59e0b", fontFamily: "system-ui", fontWeight: 800, whiteSpace: "nowrap" }}>🐾 OpenClaw Limor</div>
+        <div style={{ fontSize: 18, color: "#f59e0b", fontFamily: "system-ui", fontWeight: 800, whiteSpace: "nowrap" }}>🐾 Limor</div>
       </Html>
 
       {/* Entrance */}

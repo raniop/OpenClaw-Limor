@@ -57,7 +57,7 @@ export default function WorldPage() {
         display: "flex", alignItems: "center", gap: 8,
       }}>
         <span style={{ fontSize: 20 }}>🐾</span>
-        <span style={{ color: "#f59e0b", fontSize: 16, fontWeight: 700, fontFamily: "system-ui" }}>OpenClaw Limor</span>
+        <span style={{ color: "#f59e0b", fontSize: 16, fontWeight: 700, fontFamily: "system-ui" }}>Limor</span>
         <span style={{ color: "#888", fontSize: 12, fontFamily: "system-ui" }}>
           Personal Operator &bull; {agents.length} Agents &bull; 3 Floors
         </span>

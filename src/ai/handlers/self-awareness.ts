@@ -38,7 +38,7 @@ export const selfAwarenessHandlers: Record<string, ToolHandler> = {
     // Build summary
     const lines: string[] = [];
     lines.push(`📊 **סטטוס ${period}** (${report.totalTraces} שיחות)`);
-    lines.push(`🔖 גרסה: OpenClaw ${getVersion()} | מודל: ${config.model}`);
+    lines.push(`🔖 גרסה: Limor ${getVersion()} | מודל: ${config.model}`);
     lines.push("");
 
     // Key metrics

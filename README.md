@@ -2,6 +2,8 @@
 
 עוזרת אישית חכמה לוואטסאפ, מבוססת Claude Sonnet 4.6 / Opus 4.6 (Anthropic). מבינה עברית ואנגלית, מנהלת יומן, מזמינה מסעדות, מחפשת טיסות, שולחת הודעות, זוכרת הכל — ויודעת ללמוד מטעויות.
 
+> 👤 **מותאמת אישית לכל משתמש** — שם העוזרת, שם הבעלים, מין (לשון זכר/נקבה), בני משפחה ואינטגרציות הכל מוגדר דרך אשף התקנה שיוצר `workspace/owner.json`. אותו פרויקט משמש כל אחד שרוצה עוזר אישי משלו.
+
 ## ✨ יכולות
 
 ### שיחה ותקשורת
@@ -145,8 +147,8 @@ npx pm2 start ecosystem.config.js
 
 | Platform | File | מה עושה |
 |----------|------|---------|
-| **macOS** | `Start OpenClaw.command` | Build + PM2 + Dashboard + פותח דפדפן |
-| **Windows** | `Start OpenClaw.bat` | Build + PM2 + Dashboard + פותח דפדפן |
+| **macOS** | `Start Limor.command` | Build + PM2 + Dashboard + פותח דפדפן |
+| **Windows** | `Start Limor.bat` | Build + PM2 + Dashboard + פותח דפדפן |
 
 ### מציאת OWNER_CHAT_ID
 
@@ -160,49 +162,62 @@ npx pm2 start ecosystem.config.js
 6. הפעל מחדש: `npx pm2 restart limor`
 
 ### מה ה-Setup Wizard שואל?
-1. **שם הבוט** — איך העוזר/ת יקרא (ברירת מחדל: לימור)
-2. **שם הבעלים** — השם שלך בעברית
-3. **טלפון** — מספר ישראלי (972XXXXXXXXX)
-4. **אימייל** — לשליחת מיילים מהבוט
-5. **Anthropic API Key** — חובה (sk-ant-...)
-6. **שירותים אופציונליים** — Google Calendar, SMTP, CRM, חיפוש אינטרנט, בית חכם, מונית
+1. **שם העוזרת** — איך היא תיקרא (ברירת מחדל: לימור). כל אחד בוחר שם משלו.
+2. **פרטי הבעלים** — שם פרטי + מלא, **מין** (זכר/נקבה — משפיע על לשון פנייה בעברית), טלפון, אימייל
+3. **בני משפחה** (אופציונלי) — שם, קשר (אבא/אמא/בן-זוג...), והאם יש להם הרשאות מתקדמות (גישה ל-CRM למשל)
+4. **Anthropic API Key** — חובה (sk-ant-...)
+5. **אינטגרציות (opt-in)** — Apple Calendar, iMessage, SMS watcher, Self-Programming, Google Calendar, CRM, Control4, Gett
+6. **SMS Watchers** — שולחי SMS לעקוב (HAREL, AMEX, bit, וכו') — לכל אחד: שם, תווית, אימוג'י
+7. **שירותים חיצוניים** — SMTP, Brave Search, CRM, Har HaBituach, Control4, Gett — רק מה שהפעלת
 
 ה-wizard יוצר:
-- `.env` — כל ההגדרות
-- `souls/[botname].json` — אישיות הבוט
-- `workspace/identity/SOUL.md` — זהות הבוט
+- `workspace/owner.json` — מקור אמת יחיד לזהות הבעלים, משפחה, ואינטגרציות (gitignored — אישי!)
+- `.env` — API keys וסודות
+- `souls/[botname].json` — אישיות העוזרת (עם placeholders שמתרנדרים מ-owner.json)
+
+אם קיים `workspace/memory/` מהתקנה קודמת, האשף **מגבה אותו אוטומטית** ל-`workspace/memory.backup-[timestamp]/` כדי שלא תתערבב זהות אישית בין משתמשים.
 
 ## 🔄 עדכון / Updating
 
 ```bash
-npm run update
+npm run update            # מרענן dependencies + build
+npm run update:baileys    # משדרג את ספריית WhatsApp (Baileys) לגרסה האחרונה מ-npm
 ```
 
-הפקודה:
-1. בודקת אם יש גרסה חדשה ב-GitHub
-2. מושכת את העדכון בצורה בטוחה (לא נוגעת ב-.env, WhatsApp session, זיכרון)
-3. מתקינה תלויות חדשות ובונה מחדש
-4. מדפיסה הנחיות להפעלה מחדש
-
-הבוט גם בודק אוטומטית פעם ביום אם יש עדכון, ושולח הודעה בוואטסאפ.
+הבוט בודק אוטומטית פעם ביום אם יצאה גרסה חדשה של Baileys, ושולח הודעה בוואטסאפ. הקוד עצמו self-hosted — אתה שולט מתי לעדכן.
 
 ## ⚙️ הגדרות
+
+### `workspace/owner.json` (עיקרי — personal data)
+
+| שדה | תיאור |
+|-----|-------|
+| `name`, `fullName`, `nameEn` | שמות הבעלים |
+| `gender` | `"male"` / `"female"` — משפיע על לשון זכר/נקבה בעברית |
+| `phone`, `email`, `chatId` | פרטי קשר |
+| `family[]` | בני משפחה עם `name`, `relation`, `hasPrivilegedAccess` |
+| `assistant.name`, `assistant.nameEn` | שם העוזרת |
+| `integrations.{appleCalendar, sms, iMessage, capabilities, googleCalendar, control4, gett, crm}` | feature flags opt-in |
+| `smsWatchedSenders[]` | שולחי SMS שמועברים ל-WhatsApp — `{sender, label, emoji, keywords?, excludeKeywords?}` |
+| `crmLabel` | תיאור CRM (למשל "ביטוח אופיר") |
+
+### `.env` (סודות בלבד)
 
 | משתנה | חובה | תיאור |
 |-------|------|--------|
 | `ANTHROPIC_API_KEY` | ✅ | Anthropic API key |
-| `OWNER_CHAT_ID` | מומלץ | WhatsApp chat ID שלך |
-| `OWNER_NAME` | מומלץ | השם שלך |
-| `OWNER_PHONE` | מומלץ | טלפון (למילוי אוטומטי) |
-| `GOOGLE_CLIENT_ID` | אופציונלי | Google Calendar |
-| `GOOGLE_CLIENT_SECRET` | אופציונלי | Google Calendar |
-| `GOOGLE_REFRESH_TOKEN` | אופציונלי | Google Calendar |
+| `OPENAI_API_KEY` | אופציונלי | Voice transcription |
+| `GOOGLE_CLIENT_ID/SECRET/REFRESH_TOKEN` | אופציונלי | Google Calendar |
 | `BRAVE_SEARCH_API_KEY` | אופציונלי | חיפוש אינטרנט (fallback: DuckDuckGo) |
 | `RAPIDAPI_KEY` | אופציונלי | טיסות ומלונות |
-| `CRM_API_URL` | אופציונלי | CRM server |
-| `TELEGRAM_API_ID` | אופציונלי | Telegram Client API (מ-my.telegram.org) |
-| `TELEGRAM_API_HASH` | אופציונלי | Telegram Client API |
-| `TELEGRAM_PHONE` | אופציונלי | מספר טלפון לחשבון טלגרם |
+| `CRM_API_URL/USERNAME/PASSWORD` | אופציונלי | CRM server |
+| `HARB_ID_NUMBER/PASSWORD` | אופציונלי | הר הביטוח |
+| `SMTP_EMAIL/PASSWORD` | אופציונלי | שליחת מיילים |
+| `ICLOUD_IMAP_EMAIL/PASSWORD` | אופציונלי | קריאת מיילים |
+| `CONTROL4_*` | אופציונלי | בית חכם |
+| `GETT_*` | אופציונלי | מונית |
+| `TELEGRAM_API_ID/HASH/PHONE` | אופציונלי | Telegram (מ-my.telegram.org) |
+| `HEALTH_DAILY_CALORIE_GOAL` | אופציונלי | יעד קלוריות יומי |
 
 ## 🏗️ ארכיטקטורה
 
@@ -267,18 +282,25 @@ src/
 └── gett.ts                # Taxi booking (circuit breaker protected)
 
 workspace/
-├── identity/              # Bot personality
-│   ├── SOUL.md            # Who is Limor
+├── owner.json             # ⭐ Source of truth for identity + integrations (gitignored)
+├── owner.json.example     # Template for new installs
+├── identity/              # Assistant personality (templates — rendered via owner.json)
+│   ├── SOUL.md            # Who the assistant is
 │   ├── VOICE.md           # How she talks
 │   ├── OPERATING_PRINCIPLES.md # Iron rules
 │   └── CAPABILITIES_MAP.md # What she knows she can do
-├── policies/              # Behavioral policies
+├── policies/              # Behavioral policies (templated)
 │   ├── calendar.md        # Meeting flow rules
 │   ├── messaging.md       # Message sending rules
-│   ├── multi_step.md      # Complex task planning
-│   └── ...                # 6 more policies
-└── state/                 # Runtime state (auto-created)
+│   ├── privacy.md         # Access control rules
+│   └── ...                # 8 more policies
+└── state/                 # Runtime state (auto-created, gitignored)
     └── limor.db           # SQLite database (conversations, approvals)
+
+# Owner personalization layer
+src/owner-config.ts        # Loads + types workspace/owner.json
+src/owner-template.ts      # Renders {{owner.name}}, {{assistant.name}}, pronouns
+src/ai/action-claim-pattern.ts # Dynamic hallucination regex (owner-aware)
 
 dashboard/                 # Next.js control panel
 ├── app/

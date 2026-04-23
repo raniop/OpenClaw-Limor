@@ -1,5 +1,5 @@
 /**
- * Post-setup verification script for OpenClaw.
+ * Post-setup verification script for Limor.
  * Run: npm run verify
  *
  * Checks that everything is configured correctly before first run.
@@ -18,7 +18,7 @@ let errors = 0;
 
 console.log("");
 console.log("  \u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510");
-console.log("  \u2502  OpenClaw Setup Verification                \u2502");
+console.log("  \u2502  Limor Setup Verification                \u2502");
 console.log("  \u2502  \u05d1\u05d3\u05d9\u05e7\u05ea \u05d4\u05ea\u05e7\u05e0\u05d4                                  \u2502");
 console.log("  \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518");
 console.log("");

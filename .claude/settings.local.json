@@ -37,10 +37,8 @@
       "Bash(gh api:*)",
       "Bash(python3 -c \"import json,sys; [print\\(f[''''name'''']\\) for f in json.load\\(sys.stdin\\)]\")",
       "Bash(gh release:*)",
-      "Bash(openclaw --version)",
       "Bash(npm list:*)",
       "Bash(sudo npm:*)",
-      "Bash(npx openclaw:*)",
       "WebFetch(domain:tgm-rsv.tabit.cloud)",
       "WebFetch(domain:tabitisrael.co.il)",
       "Bash(pkill -9 -f \"node dist/index.js\")",
@@ -283,7 +281,23 @@
       "Bash(grep \"Nuni\\\\|Dugi\\\\|Dan Shabtay\\\\|Yoni\" workspace/state/*.json)",
       "Bash(curl -s http://localhost:3848/api/contacts)",
       "Bash(grep phone.*replace.*972 '/Users/raniophir/Open Claude Bot AI/dashboard/.next/server/app/page.js')",
-      "Bash(grep -o direction.*ltr '/Users/raniophir/Open Claude Bot AI/dashboard/.next/server/app/page.js')"
+      "Bash(grep -o direction.*ltr '/Users/raniophir/Open Claude Bot AI/dashboard/.next/server/app/page.js')",
+      "Bash(awk '/fail 1|ok.*-.*\\\\[fail\\\\]|status.*fail/{print NR\": \"$0}' /private/tmp/claude-501/-Users-raniophir-Open-Claude-Bot-AI/bd1fa6f2-71c7-4e92-9c1f-b63a480e98c5/tasks/b6f1tiyv6.output)",
+      "Read(//private/tmp/**)",
+      "Bash(awk '/^# Subtest:/{test=$0; next} /duration_ms: [0-9]+/{gsub\\(/[^0-9.]/,\"\"\\); if\\($0+0 > 1000\\) print $0\"ms - \"test}' /tmp/limor-test-c4.log)",
+      "Bash(awk -F': ' '$2+0 > 1000 {print}')",
+      "Bash(sort -t: -k2 -rn)",
+      "Bash(awk '{gsub\\(/,/,\"\",$2\\); if\\($2+0 > 5000\\) print $0}')",
+      "Bash(sort -k2 -rn)",
+      "Bash(grep -E \"duration_ms: [0-9]{4,}\" /tmp/limor-test-c4.log)",
+      "Bash(awk '{print $NF}')",
+      "Bash(awk '{for\\(i=13;i<=NF;i++\\) printf \"%s \", $i; print \"\"}')",
+      "Bash(curl -s -o /dev/null -w \"Dashboard HTTP: %{http_code}\\\\n\" http://localhost:3848)",
+      "Bash(ps -p 13295 -o pid,ppid,command)",
+      "Bash(kill 13295 13269)",
+      "Bash(curl -s -o /dev/null -w \"HTTP: %{http_code}\\\\n\" http://localhost:3848)",
+      "Bash(grep \"\\\\.ts$\")",
+      "Bash(node -e ' *)"
     ]
   }
 }
