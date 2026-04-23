@@ -1,9 +1,12 @@
 node_modules/
 dist/
 dist-test/
+dist-auth/
 .env
 .wwebjs_auth/
 .wwebjs_cache/
+auth_baileys/
+auth_baileys.backup-*/
 
 # Personal state data (created at runtime)
 workspace/state/
