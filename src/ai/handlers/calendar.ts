@@ -197,14 +197,15 @@ export const calendarHandlers: Record<string, ToolHandler> = {
 
     logAudit(actor, "reminder_created", input.from_name, "success", { task: input.task, targetName });
 
-    // --- Suggest calendar event for concrete-time owner reminders ---
+    // --- Suggest calendar event for owner reminders ---
     // We don't create it automatically (owner may not want it). Instead we
     // append a prompt that Limor will pass through; when the owner answers
-    // "כן" she calls create_event on the next turn.
-    const hasConcreteTime = !!input.due_at;
+    // "כן" she calls create_event on the next turn. Suggested for any owner
+    // reminder regardless of whether time was given as HH:MM ("23:30") or
+    // relative ("בעוד 3 דקות") — both produce a concrete moment.
     const isForOwner = !targetChatId;
     const calendarEnabled = config.owner.integrations.appleCalendar || config.owner.integrations.googleCalendar;
-    const suggestCalendar = hasConcreteTime && isForOwner && calendarEnabled;
+    const suggestCalendar = isForOwner && calendarEnabled;
 
     const timeStr = dueAt.toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" });
     const targetStr = targetName ? `\n📨 נשלח ל: ${targetName}` : "";
