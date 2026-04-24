@@ -9,11 +9,16 @@ const CALENDAR_NAME = process.env.APPLE_CALENDAR_NAME || "Home";
 const TIMEOUT = 15000; // 15s timeout for AppleScript
 
 function runAppleScript(script: string): string {
-  // Write to temp file to avoid shell escaping issues with AppleScript's quotes
-  const tmpFile = `/tmp/harb_applescript_${Date.now()}.scpt`;
+  // Write to temp file to avoid shell escaping issues with AppleScript's quotes.
+  // Prepend `launch application "Calendar"` so we never hit the
+  // "Application isn't running. (-600)" error when Calendar.app has been quit.
+  // `launch` is idempotent and silent — it won't bring Calendar to the
+  // foreground or open windows if it's already running.
+  const wrapped = `launch application "Calendar"\n${script}`;
+  const tmpFile = `/tmp/limor_calendar_${Date.now()}.scpt`;
   const { writeFileSync, unlinkSync } = require("fs");
   try {
-    writeFileSync(tmpFile, script, "utf-8");
+    writeFileSync(tmpFile, wrapped, "utf-8");
     const result = execSync(`osascript "${tmpFile}"`, { timeout: TIMEOUT }).toString().trim();
     try { unlinkSync(tmpFile); } catch {}
     return result;

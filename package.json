@@ -18,7 +18,8 @@
     "install-all": "npm install && cd dashboard && npm install",
     "setup": "npx tsx scripts/setup.ts",
     "update": "npx tsx scripts/update.ts",
-    "update:baileys": "npx tsx scripts/update.ts --baileys"
+    "update:baileys": "npx tsx scripts/update.ts --baileys",
+    "auth:google": "npx tsx scripts/get-google-token.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.85.0",
