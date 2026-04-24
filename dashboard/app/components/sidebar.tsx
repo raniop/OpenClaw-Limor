@@ -14,6 +14,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: "/", labelHe: "לוח בקרה", labelEn: "Dashboard", icon: "◫" },
   { href: "/approvals", labelHe: "אישורים", labelEn: "Approvals", icon: "✓" },
+  { href: "/reminders", labelHe: "תזכורות", labelEn: "Reminders", icon: "🔔" },
   { href: "/followups", labelHe: "מעקבים", labelEn: "Followups", icon: "⏰" },
   { href: "/activity", labelHe: "פעילות", labelEn: "Activity", icon: "◈" },
   { href: "/capabilities", labelHe: "יכולות", labelEn: "Capabilities", icon: "⚡" },

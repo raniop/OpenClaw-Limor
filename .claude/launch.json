@@ -15,10 +15,11 @@
     },
     {
       "name": "dashboard",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "port": 3848,
-      "cwd": "dashboard"
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "dev"],
+      "port": 3849,
+      "cwd": "dashboard",
+      "autoPort": true
     }
   ]
 }
