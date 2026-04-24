@@ -197,9 +197,34 @@ export const calendarHandlers: Record<string, ToolHandler> = {
 
     logAudit(actor, "reminder_created", input.from_name, "success", { task: input.task, targetName });
 
+    // --- Also add to calendar when there is a concrete due_at for the owner ---
+    // Skipped for reminders routed to other contacts, or when the time is vague
+    // (due_hours only — often a fuzzy "in 24h" that doesn't belong in a calendar).
+    // Can be opted out explicitly with add_to_calendar: false.
+    let calendarNote = "";
+    const wantsCalendar = input.add_to_calendar !== false;
+    const hasConcreteTime = !!input.due_at;
+    const isForOwner = !targetChatId;
+    const calendarEnabled = config.owner.integrations.appleCalendar || config.owner.integrations.googleCalendar;
+    if (wantsCalendar && hasConcreteTime && isForOwner && calendarEnabled) {
+      try {
+        const endDate = new Date(dueAt.getTime() + 30 * 60 * 1000);
+        const eventTitle = `⏰ ${input.task}`;
+        const result = await createEvent(eventTitle, dueAt, endDate);
+        const resultStr = typeof result === "string" ? result : (result as any)?.message || "";
+        if (!resultStr.startsWith("❌")) {
+          calendarNote = "\n📅 נוסף גם ליומן";
+        } else {
+          console.warn("[create_reminder] Calendar add failed:", resultStr);
+        }
+      } catch (err) {
+        console.warn("[create_reminder] Calendar add threw:", err);
+      }
+    }
+
     const timeStr = dueAt.toLocaleString("he-IL", { timeZone: "Asia/Jerusalem" });
     const targetStr = targetName ? `\n📨 נשלח ל: ${targetName}` : "";
-    return `✅ תזכורת נוצרה!\n📝 ${input.task}\n👤 מבקש: ${input.from_name}\n⏰ זמן: ${timeStr}${targetStr}`;
+    return `✅ תזכורת נוצרה!\n📝 ${input.task}\n👤 מבקש: ${input.from_name}\n⏰ זמן: ${timeStr}${targetStr}${calendarNote}`;
   },
 
   list_reminders: async () => {

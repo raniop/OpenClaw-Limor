@@ -190,6 +190,10 @@ export const contactTools: Anthropic.Tool[] = [
           type: "string",
           description: "הודעה מותאמת אישית לשלוח לאיש הקשר. למשל: 'היי עמית! תזכורת — לקחת את החסות 💪'",
         },
+        add_to_calendar: {
+          type: "boolean",
+          description: `האם להוסיף גם כאירוע ביומן של ${config.ownerName} (ברירת מחדל: true, אם יש due_at ספציפי והתזכורת היא ל${config.ownerName} עצמו). העבירי false אם ${config.ownerName} ביקש במפורש "רק תזכורת בלי יומן".`,
+        },
       },
       required: ["task", "from_name"],
     },
