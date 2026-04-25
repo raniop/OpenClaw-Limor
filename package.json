@@ -22,7 +22,7 @@
     "auth:google": "npx tsx scripts/get-google-token.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.85.0",
+    "@anthropic-ai/sdk": "^0.91.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/cron": "^2.0.1",
     "@types/mailparser": "^3.4.6",
@@ -36,7 +36,7 @@
     "link-preview-js": "^3.2.0",
     "mailparser": "^3.9.6",
     "node-cron": "^4.2.1",
-    "nodemailer": "^8.0.5",
+    "nodemailer": "^8.0.6",
     "openai": "^6.33.0",
     "pdf-parse": "^1.1.1",
     "pm2": "^6.0.14",
