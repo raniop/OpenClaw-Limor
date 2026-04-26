@@ -8,19 +8,21 @@ import { addContract } from "./contract-store";
 import { addBill } from "../bills/bill-store";
 import type { Contract } from "./contract-types";
 import type { Bill } from "../bills/bill-types";
-
-const pdfParse = require("pdf-parse");
+import { PDFParse } from "pdf-parse";
 
 /**
  * Extract text content from a PDF buffer.
  */
 export async function extractTextFromPdf(buffer: Buffer): Promise<string> {
+  const parser = new PDFParse({ data: buffer });
   try {
-    const data = await pdfParse(buffer);
-    return data.text || "";
+    const result = await parser.getText();
+    return result.text || "";
   } catch (err) {
     console.error("[pdf] Text extraction failed:", err);
     return "";
+  } finally {
+    await parser.destroy();
   }
 }
 
