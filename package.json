@@ -22,7 +22,7 @@
     "auth:google": "npx tsx scripts/get-google-token.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.91.1",
+    "@anthropic-ai/sdk": "^0.97.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/cron": "^2.0.1",
     "@types/mailparser": "^3.4.6",
@@ -48,7 +48,7 @@
     "uuid": "^14.0.0"
   },
   "devDependencies": {
-    "@types/node": "^25.6.0",
+    "@types/node": "^25.9.1",
     "@types/qrcode": "^1.5.6",
     "@types/qrcode-terminal": "^0.12.2",
     "@types/ssh2": "^1.15.5",
